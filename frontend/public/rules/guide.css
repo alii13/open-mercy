@@ -255,6 +255,7 @@ footer {
   font-family: var(--mono-font);
   font-size: 0.75rem;
   color: var(--text-muted);
+  line-height: 2;
   margin-top: 3rem;
 }
 footer a { color: var(--text); font-weight: bold; text-decoration: none; }

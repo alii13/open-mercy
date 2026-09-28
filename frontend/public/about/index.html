@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0a0a0b" />
+
+    <title>About Open Mercy - Who builds it and why</title>
+    <meta name="description" content="Open Mercy is an independent, free browser card game built by alii13. How it is made, how rules are decided, and how updates ship." />
+    <meta name="author" content="alii13" />
+    <link rel="canonical" href="https://open-mercy.com/about/" />
+    <meta name="robots" content="index, follow" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://open-mercy.com/about/" />
+    <meta property="og:title" content="About Open Mercy" />
+    <meta property="og:description" content="An independent, free browser card game. How it is made, how rules are decided, and how updates ship." />
+    <meta property="og:image" content="https://open-mercy.com/og-image.png" />
+    <meta property="og:site_name" content="Open Mercy" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="About Open Mercy" />
+    <meta name="twitter:description" content="An independent, free browser card game. How it is made and how rules are decided." />
+    <meta name="twitter:image" content="https://open-mercy.com/og-image.png" />
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "AboutPage",
+      "name": "About Open Mercy",
+      "url": "https://open-mercy.com/about/",
+      "description": "Who builds Open Mercy, how it is made, how rules are decided, and how updates ship.",
+      "author": { "@type": "Person", "name": "alii13", "url": "https://github.com/alii13" }
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://open-mercy.com/" },
+        { "@type": "ListItem", "position": 2, "name": "About", "item": "https://open-mercy.com/about/" }
+      ]
+    }
+    </script>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-HF9GCTVQ7J"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-HF9GCTVQ7J');
+      gtag('config', 'AW-18192424425');
+    </script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Chakra+Petch:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/rules/guide.css" />
+  </head>
+  <body>
+    <header>
+      <div class="container header-inner">
+        <div class="logo">
+          <a href="/">OPEN<span class="accent">MERCY</span></a>
+        </div>
+        <nav>
+          <a href="/">PLAY NOW</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="container">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <a href="/">Home</a>
+        <span class="sep">/</span>
+        <span>About</span>
+      </nav>
+
+      <h1>About Open Mercy</h1>
+
+      <p class="lead">
+        Open Mercy is a free card game that runs in your browser. It is built and
+        maintained by one developer, <a href="https://github.com/alii13" target="_blank" rel="noopener noreferrer">alii13</a>,
+        as an independent side project. There is no studio behind it and no
+        publisher.
+      </p>
+
+      <div class="callout">
+        UNO&reg; and UNO Show 'Em No Mercy&reg; are trademarks of Mattel, Inc.
+        Open Mercy is not affiliated with, sponsored by, or endorsed by Mattel.
+        It is an independent game that plays by the same style of rules.
+      </div>
+
+      <section id="what">
+        <h2>What the game is</h2>
+        <p>
+          Open Mercy plays by No Mercy-style rules on a 168-card deck: the usual
+          numbers and actions, plus Draw 6, Draw 10, Skip Everyone, Discard All
+          and Color Roulette. Draw cards stack, a 7 lets you swap hands, a 0
+          passes every hand around the table, and anyone who reaches 25 cards is
+          out.
+        </p>
+        <p>
+          You can play two ways. Solo, you face one bot at a time on a ladder of
+          eight, and beating one unlocks the next. Online, you open a room, send
+          the code or link to friends, and play with up to 20 people. Every room
+          picks one of three stacking modes before the deal. There is also a
+          daily deal that gives everyone the same shuffle for the day.
+        </p>
+        <p>
+          You do not need an account to play. Pressing PLAY NOW gives you an
+          anonymous guest seat. An account is optional and only keeps your stats.
+        </p>
+      </section>
+
+      <section id="made">
+        <h2>How it is made</h2>
+        <p>
+          The game you see is a Vue app. Online games run on a realtime server on
+          Cloudflare, where each room lives in its own small process, so a game
+          keeps its state even if someone's connection drops for a moment.
+          Accounts, profiles and game results are stored in Supabase.
+        </p>
+        <p>
+          The rules themselves are written once, in a shared rules engine that
+          both the browser and the game server use. That is a deliberate choice:
+          a solo game against a bot and an online game with friends follow the
+          same code for what is legal, what stacks, and when someone is out. If a
+          rule changes, it changes everywhere at once.
+        </p>
+        <p>
+          The source code is public on
+          <a href="https://github.com/alii13/open-mercy" target="_blank" rel="noopener noreferrer">GitHub</a>
+          under the MIT license.
+        </p>
+      </section>
+
+      <section id="rules">
+        <h2>How rules are decided</h2>
+        <p>
+          The printed No Mercy rules are the baseline, and that is what the
+          Official stacking mode plays. Where tables commonly play it
+          differently, the game offers a mode for it instead of picking a side.
+          House mode lets wild draw cards stack on anything. Casual mode lets any
+          draw card answer any other.
+        </p>
+        <p>
+          The <a href="/rules/">rules guide</a> explains every card and edge case,
+          and it is written against what the game actually does. If you find a
+          place where the guide and the game disagree, that is a bug worth
+          reporting.
+        </p>
+      </section>
+
+      <section id="updates">
+        <h2>How updates ship</h2>
+        <p>
+          Changes go out as small releases, often several in a month. Every
+          player-facing change is listed on the <a href="/changelog">changelog</a>
+          with its date. The bigger ones also show up once as a card inside the
+          game, so regular players see them without having to look.
+        </p>
+      </section>
+
+      <section id="contact">
+        <h2>Getting in touch</h2>
+        <p>
+          Bug reports, rule questions and ideas are all welcome. The
+          <a href="/contact/">contact page</a> explains where to send them and
+          what details help most.
+        </p>
+      </section>
+
+      <div class="final-cta">
+        <h2>Play a hand</h2>
+        <p>Free, no download, no account needed.</p>
+        <div class="cta-row">
+          <a href="/" class="btn btn-primary">Play Open Mercy</a>
+          <a href="/how-to-play/" class="btn btn-ghost">How to play</a>
+        </div>
+      </div>
+    </main>
+
+    <footer>
+      Built by
+      <a href="https://github.com/alii13" target="_blank" rel="noopener noreferrer">alii13</a>
+      &middot; <a href="/how-to-play/">How to play</a>
+      &middot; <a href="/rules/">Rules</a>
+      &middot; <a href="/strategy/">Strategy</a>
+      &middot; <a href="/faq/">FAQ</a>
+      &middot; <a href="/about/">About</a>
+      &middot; <a href="/contact/">Contact</a>
+      &middot; <a href="/privacy/">Privacy</a>
+      &middot; <a href="/terms/">Terms</a>
+    </footer>
+  </body>
+</html>

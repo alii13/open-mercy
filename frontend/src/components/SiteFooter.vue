@@ -9,9 +9,19 @@
     <!-- Sitewide crawlable link into the rules guide. It was reachable only
          from the settings drawer, which left a 1,800-word page effectively
          orphaned for search. -->
+    <a href="/how-to-play/" class="footer-link">How to play</a>
+    <span class="footer-sep">·</span>
     <a href="/rules/" class="footer-link">Rules guide</a>
     <span class="footer-sep">·</span>
+    <a href="/faq/" class="footer-link">FAQ</a>
+    <span class="footer-sep">·</span>
+    <a href="/about/" class="footer-link">About</a>
+    <span class="footer-sep">·</span>
+    <a href="/contact/" class="footer-link">Contact</a>
+    <span class="footer-sep">·</span>
     <a href="/privacy/" class="footer-link">Privacy</a>
+    <span class="footer-sep">·</span>
+    <a href="/terms/" class="footer-link">Terms</a>
     <span class="footer-sep">·</span>
     <span class="footer-attribution">
       Music: <a href="https://incompetech.com/" target="_blank" rel="noopener noreferrer" class="footer-attribution-link">Kevin MacLeod</a>
