@@ -1,3 +1,7 @@
+<script setup lang="ts">
+import { openPrivacySettings } from '../utils/consent'
+</script>
+
 <template>
   <footer class="site-footer">
     <span class="footer-text">Built by</span>
@@ -22,6 +26,8 @@
     <a href="/privacy/" class="footer-link">Privacy</a>
     <span class="footer-sep">·</span>
     <a href="/terms/" class="footer-link">Terms</a>
+    <span class="footer-sep">·</span>
+    <button type="button" class="footer-link footer-button" @click="openPrivacySettings()">Privacy settings</button>
     <span class="footer-sep">·</span>
     <span class="footer-attribution">
       Music: <a href="https://incompetech.com/" target="_blank" rel="noopener noreferrer" class="footer-attribution-link">Kevin MacLeod</a>
@@ -62,6 +68,16 @@
   text-decoration: none;
   font-weight: bold;
   transition: color 0.2s;
+}
+
+.footer-button {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-weight: bold;
+  letter-spacing: inherit;
+  cursor: pointer;
 }
 
 .footer-link:hover {
