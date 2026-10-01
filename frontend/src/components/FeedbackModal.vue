@@ -37,6 +37,10 @@
               :disabled="submitting"
             />
           </label>
+          <p class="field-note">
+            Optional, and only used to reply to you. See the
+            <a href="/privacy/">Privacy policy</a>.
+          </p>
 
           <p v-if="error" class="msg msg-error">{{ error }}</p>
 
@@ -199,6 +203,18 @@ async function submit() {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-2);
+}
+
+.field-note {
+  margin: calc(-1 * var(--spacing-2)) 0 0;
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.field-note a {
+  color: var(--text-primary);
+  text-decoration: underline;
 }
 
 .field-label {
