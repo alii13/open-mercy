@@ -33,7 +33,7 @@
             <li>Draw cards stack, all the way up to +10.</li>
             <li>Hold 25 cards and you are out.</li>
             <li>A 7 swaps hands, a 0 passes every hand along.</li>
-            <li>Color Roulette makes the next player draw until they hit a color.</li>
+            <li>Color Roulette makes the next player pick a color, then draw until they hit it.</li>
             <li>Forget to call MERCY! and it can cost you 10 cards.</li>
           </ul>
         </div>

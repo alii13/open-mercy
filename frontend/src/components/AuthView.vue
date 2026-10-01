@@ -255,7 +255,7 @@
         <li>·</li>
         <li>Anonymous OK</li>
       </ul>
-      <p v-if="mode === 'signup' || mode === 'claim'" class="legal-note">
+      <p v-if="mode === 'signup' || (mode === 'claim' && authStore.isAnonymous)" class="legal-note">
         By creating or claiming an account you agree to the
         <a href="/terms/">Terms</a> and <a href="/privacy/">Privacy policy</a>.
       </p>
