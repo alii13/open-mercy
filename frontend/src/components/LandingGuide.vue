@@ -87,7 +87,7 @@
 }
 
 .guide-intro {
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-size: 1.1rem;
   line-height: 1.7;
   max-width: 640px;
@@ -122,7 +122,7 @@
 .guide-block ol {
   margin: 0;
   padding-left: 1.1rem;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-size: 0.95rem;
   line-height: 1.6;
 }

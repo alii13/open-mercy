@@ -165,6 +165,8 @@ figure.shot figcaption { font-size: 0.85rem; color: var(--text-muted); text-alig
 
 /* Sections */
 section { margin: 3rem 0; scroll-margin-top: 2rem; }
+/* Anchor targets clear the sticky header (about 73px) instead of hiding under it. */
+[id] { scroll-margin-top: 5.5rem; }
 h2 {
   font-family: var(--display-font);
   font-size: 1.75rem;
