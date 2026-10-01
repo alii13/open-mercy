@@ -71,6 +71,10 @@
       gtag('config', 'AW-18192424425');
     </script>
 
+    <!-- Google AdSense: Auto ads and the consent message run on the guide pages.
+         The app at / loads only the consent message, so ads never sit beside the game. -->
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5481263585202262"
+         crossorigin="anonymous"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Chakra+Petch:wght@300;400;500;700&display=swap" rel="stylesheet">
@@ -325,6 +329,7 @@
       &middot; <a href="/contact/">Contact</a>
       &middot; <a href="/privacy/">Privacy</a>
       &middot; <a href="/terms/">Terms</a>
+      &middot; <a href="#" onclick="window.googlefc = window.googlefc || {}; googlefc.callbackQueue = googlefc.callbackQueue || []; googlefc.callbackQueue.push(function () { googlefc.showRevocationMessage(); }); return false;">Privacy settings</a>
     </footer>
   </body>
 </html>
