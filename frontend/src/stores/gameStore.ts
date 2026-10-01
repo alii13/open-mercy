@@ -538,7 +538,8 @@ export const useGameStore = defineStore('game', () => {
                 if (canPlayCard(card, topCard.value, currentColor.value, 0, stackingMode.value)) {
                     // Playable! Rule: "then immediately play it"
                     setTimeout(() => {
-                        if (card.color === 'wild' && !p.isBot) {
+                        // Color Roulette's colour is the victim's call, so it plays straight through.
+                        if (card.color === 'wild' && card.type !== 'wildColorRoulette' && !p.isBot) {
                             // Human player needs to pick a color - show modal
                             pendingDrawnWildCard.value = card
                             turnState.value = 'CHOOSING_DRAWN_WILD_COLOR'

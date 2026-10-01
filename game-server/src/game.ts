@@ -268,7 +268,8 @@ function resolveDraw(game: GameRecord, userId: string): IntentResult {
         if (!card) { engine.advanceTurn(s, ev); break }
         if (player.isEliminated || s.gameState === 'GAME_OVER') break
         if (engine.canPlayCard(card, top, s.currentColor, 0, s.stackingMode)) {
-            if (card.color === 'wild') {
+            // Color Roulette's colour is the victim's call, so it plays straight through.
+            if (card.color === 'wild' && card.type !== 'wildColorRoulette') {
                 game.pendingDrawnWildCardId = card.id
                 s.turnState = 'CHOOSING_DRAWN_WILD_COLOR'
                 break

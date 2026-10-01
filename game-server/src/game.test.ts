@@ -44,3 +44,30 @@ describe('STACK_EATEN signal', () => {
     expect(res.events.some((e) => e.t === 'STACK_EATEN')).toBe(false)
   })
 })
+
+// Issue #182: a drawn Color Roulette was parked in the drawn-wild colour picker,
+// so the drawer was asked to pick a colour as if it were a plain Wild. The
+// roulette colour belongs to the victim, so it must play straight through.
+describe('drawn Color Roulette', () => {
+  it('plays immediately and hands the colour choice to the next player', () => {
+    const { game } = startGame(
+      [
+        { userId: 'u1', name: 'Alice' },
+        { userId: 'u2', name: 'Bob' },
+      ],
+      'official',
+    )
+    game.engine.drawStack = 0
+    const drawer = game.engine.players[game.engine.currentPlayerIndex]!
+    // Strip every playable card so the draw loop is what reaches the roulette.
+    drawer.hand = []
+    game.engine.deck.push({ id: 'roulette-182', color: 'wild', type: 'wildColorRoulette' } as any)
+
+    const res = applyIntent(game, drawer.id, { kind: 'DRAW' })
+
+    expect(res.ok).toBe(true)
+    expect(game.pendingDrawnWildCardId).toBeNull()
+    expect(game.engine.turnState).toBe('CHOOSING_ROULETTE_COLOR')
+    expect(game.engine.discardPile.at(-1)?.id).toBe('roulette-182')
+  })
+})
