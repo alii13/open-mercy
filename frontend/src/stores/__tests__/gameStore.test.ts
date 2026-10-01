@@ -141,6 +141,32 @@ describe('UNO button visibility', () => {
 })
 
 describe('single-player rule fixes', () => {
+    // Issue #182: a drawn Color Roulette opened the drawn-wild colour picker,
+    // so it looked like a plain Wild. The victim picks the roulette colour.
+    it('plays a drawn Color Roulette without asking the drawer for a colour', () => {
+        vi.useFakeTimers()
+        const store = useGameStore()
+        const roulette: Card = { id: 'c-roul-182', color: 'wild', type: 'wildColorRoulette' }
+        const blue1: Card = { id: 'c-blue-1', color: 'blue', type: 'number', value: 1 }
+        const bot = makePlayer('p-1', 'Bot', [blue1])
+        bot.isBot = true
+        store.players = [makePlayer('p-0', 'You', [{ ...blue1, id: 'c-blue-1b' }]), bot]
+        store.gameState = 'PLAYING'
+        store.currentPlayerIndex = 0
+        store.discardPile = [red5]
+        store.currentColor = 'red'
+        store.drawStack = 0
+        store.deck = [roulette]
+        store.turnState = 'WAITING_FOR_ACTION'
+
+        store.drawCardsForCurrentPlayer()
+        vi.advanceTimersByTime(3000)
+
+        expect(store.pendingDrawnWildCard).toBeNull()
+        expect(store.turnState).not.toBe('CHOOSING_DRAWN_WILD_COLOR')
+        expect(store.discardPile[store.discardPile.length - 1]?.id).toBe('c-roul-182')
+    })
+
     it('detects a win when wildColorRoulette is played as the last card', () => {
         vi.useFakeTimers()
         const store = useGameStore()
