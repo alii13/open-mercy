@@ -255,6 +255,10 @@
         <li>·</li>
         <li>Anonymous OK</li>
       </ul>
+      <p v-if="mode === 'signup' || (mode === 'claim' && authStore.isAnonymous)" class="legal-note">
+        By creating or claiming an account you agree to the
+        <a href="/terms/">Terms</a> and <a href="/privacy/">Privacy policy</a>.
+      </p>
     </div>
   </div>
 </template>
@@ -656,6 +660,19 @@ async function handleForgotPassword() {
 
 .claim-copy strong {
   color: var(--text-primary);
+}
+
+.legal-note {
+  margin: var(--spacing-3) 0 0;
+  text-align: center;
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.legal-note a {
+  color: var(--text-primary);
+  text-decoration: underline;
 }
 
 .trust-list {

@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0a0a0b" />
+
+    <title>Open Mercy strategy - Tips for No Mercy rules</title>
+    <meta name="description" content="Practical Open Mercy strategy: when to hold big draw cards, how to use Discard All, who to swap hands with, two-player tricks and mistakes that cost games." />
+    <meta name="author" content="alii13" />
+    <link rel="canonical" href="https://open-mercy.com/strategy/" />
+    <meta name="robots" content="index, follow" />
+
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://open-mercy.com/strategy/" />
+    <meta property="og:title" content="Open Mercy strategy - Tips for No Mercy rules" />
+    <meta property="og:description" content="When to hold big draw cards, who to swap hands with, and the mistakes that cost games." />
+    <meta property="og:image" content="https://open-mercy.com/og-image.png" />
+    <meta property="og:site_name" content="Open Mercy" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Open Mercy strategy - Tips for No Mercy rules" />
+    <meta name="twitter:description" content="When to hold big draw cards, who to swap hands with, and the mistakes that cost games." />
+    <meta name="twitter:image" content="https://open-mercy.com/og-image.png" />
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Article",
+      "headline": "Open Mercy strategy - Tips for No Mercy rules",
+      "description": "Card management, risk and reward, multiplayer tactics, two-player specifics and common mistakes in Open Mercy.",
+      "image": "https://open-mercy.com/og-image.png",
+      "url": "https://open-mercy.com/strategy/",
+      "author": { "@type": "Person", "name": "alii13", "url": "https://github.com/alii13" },
+      "publisher": {
+        "@type": "Organization",
+        "name": "Open Mercy",
+        "logo": { "@type": "ImageObject", "url": "https://open-mercy.com/favicon.svg" }
+      },
+      "mainEntityOfPage": "https://open-mercy.com/strategy/"
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://open-mercy.com/" },
+        { "@type": "ListItem", "position": 2, "name": "Strategy", "item": "https://open-mercy.com/strategy/" }
+      ]
+    }
+    </script>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-HF9GCTVQ7J"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      // Consent Mode v2: Google tags start denied in the EEA, UK and Switzerland
+      // until the AdSense consent message (Google's certified CMP) records a choice.
+      gtag('consent', 'default', {
+        ad_storage: 'denied',
+        ad_user_data: 'denied',
+        ad_personalization: 'denied',
+        analytics_storage: 'denied',
+        region: ['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH'],
+        wait_for_update: 500
+      });
+      gtag('js', new Date());
+      gtag('config', 'G-HF9GCTVQ7J');
+      gtag('config', 'AW-18192424425');
+    </script>
+
+    <!-- Google AdSense: Auto ads and the consent message run on the guide pages.
+         The app at / loads only the consent message, so ads never sit beside the game. -->
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5481263585202262"
+         crossorigin="anonymous"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Chakra+Petch:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/rules/guide.css" />
+  </head>
+  <body>
+    <header>
+      <div class="container header-inner">
+        <div class="logo">
+          <a href="/">OPEN<span class="accent">MERCY</span></a>
+        </div>
+        <nav>
+          <a href="/">PLAY NOW</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="container">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <a href="/">Home</a>
+        <span class="sep">/</span>
+        <span>Strategy</span>
+      </nav>
+
+      <div class="hero">
+        <h1>
+          Open Mercy strategy
+          <span class="accent">How to lose less often</span>
+        </h1>
+        <p class="byline">By <a href="/about/">alii13</a> &middot; Last updated 28 September 2026 &middot; Checked against the live game</p>
+        <p class="lead">
+          No Mercy rules are swingy. You can be one card from winning and holding twenty a lap later. Nothing on this page guarantees a win, but these habits shift the odds, and most of them come from watching games go wrong.
+        </p>
+        <div class="callout">
+          UNO&reg; and UNO Show 'Em No Mercy&reg; are trademarks of Mattel, Inc. This is an independent strategy guide. <a href="/">Open Mercy</a> is our free browser game built on this ruleset, not affiliated with or endorsed by Mattel.
+        </div>
+        <div class="cta-row">
+          <a href="/" class="btn btn-primary">Practise against a bot</a>
+          <a href="/how-to-play/" class="btn btn-ghost">New? Start with how to play</a>
+        </div>
+      </div>
+
+      <div class="toc">
+        <div class="toc-title">On this page</div>
+        <ol>
+          <li><a href="#cards">Managing your hand</a></li>
+          <li><a href="#risk">Risk and reward</a></li>
+          <li><a href="#timing">Timing</a></li>
+          <li><a href="#multiplayer">Tactics with more players</a></li>
+          <li><a href="#two-player">Two-player games</a></li>
+          <li><a href="#modes">How the stacking mode changes things</a></li>
+          <li><a href="#mistakes">Mistakes that cost games</a></li>
+        </ol>
+      </div>
+
+      <section id="cards">
+        <h2>Managing your hand</h2>
+        <h3>Your big draw cards are your shield</h3>
+        <p>
+          On official rules, you can only answer a stack with a draw card of equal or higher value. That makes a Draw 10 more than an attack. It is the one card that lets you pass on any stack that comes your way. Playing it for fun on an empty table uses up your only defence. If you hold one, think of it as insurance first and a weapon second.
+        </p>
+        <p>
+          The same goes, a little less strongly, for Draw 6. A Draw 2 or Draw 4 is much weaker as a shield, because it stops working the moment someone above you adds a bigger card.
+        </p>
+
+        <h3>Discard All is a clean-up card, so let the mess build first</h3>
+        <p>
+          Discard All throws out every card of its color at once. It is worth far more when you hold five greens than when you hold two. If you can play something else and keep collecting that color, it often pays to wait.
+        </p>
+        <p>
+          Remember you also pick which card lands on top, and that card's effect fires. Holding a Draw 2, a Skip or a 7 in the same color turns a clean-up into an attack. Jo dumping four greens with a green Draw 2 on top gets rid of the cards and starts a stack on the next player in the same move.
+        </p>
+
+        <h3>Keep a way to change color</h3>
+        <p>
+          Being stuck on the wrong color means tapping the deck, and in this game you keep drawing until something plays. A plain Wild, or a number that matches across colors, gets you out of that. Try not to spend your last color-changer early unless it wins you the game.
+        </p>
+      </section>
+
+      <section id="risk">
+        <h2>Risk and reward</h2>
+        <h3>Draw 10 now or later?</h3>
+        <p>
+          Say Marcus holds a Draw 10 and the player after him has 3 cards. Playing it now hurts that player badly, unless they or someone after them has another Draw 10, in which case the stack keeps going and the penalty grows. If it comes all the way back to Marcus, he now has nothing to answer with.
+        </p>
+        <p>
+          Holding it has a cost too. If a stack reaches Marcus first, the Draw 10 saves him, but it gets spent on defence instead of on the player he wanted to hit. A reasonable rule of thumb: play the big draw when the next player is close to going out, and hold it when nobody is threatening to win.
+        </p>
+
+        <h3>The 25-card line changes the maths</h3>
+        <p>
+          Anyone holding 25 or more cards after a draw is out. Near the end of a game, a player on 18 cards is one decent stack from elimination. That makes them a target, and it also makes them desperate, so expect them to spend every draw card they have.
+        </p>
+        <div class="callout danger">
+          If you are on a big hand, the safest move is often to get rid of cards quickly rather than fish for the perfect play. Every card you shed is one more card of room before 25.
+        </div>
+      </section>
+
+      <section id="timing">
+        <h2>Timing</h2>
+        <p>
+          <strong>Watch hand sizes, not just the top card.</strong> Before you play, look at how many cards the next two players hold. A Skip that stops the player on 1 card is worth more than a clever color change.
+        </p>
+        <p>
+          <strong>Save the 7 for the right moment.</strong> Priya has 8 cards and Sam has 2. If Priya plays a 7 now and swaps with Sam, she is suddenly the one close to winning and Sam is stuck with her mess. The same 7 played while everyone holds 6 or 7 cards barely changes anything. You can always press <strong>KEEP MY HAND</strong> if no swap helps.
+        </p>
+        <p>
+          <strong>Think before you play a 0.</strong> A 0 passes every hand one seat along the direction of play. If your hand is bad and the player before you is holding very few cards, a 0 hands you their small hand and gives yours away. If the player before you is loaded up, the 0 hurts you.
+        </p>
+      </section>
+
+      <section id="multiplayer">
+        <h2>Tactics with more players</h2>
+        <p>
+          <strong>Skip Everyone is a free extra turn.</strong> Everyone else sits out and you go again. It is at its best when you can follow it with a card that sets up your next move, or when you need two plays in a row to go out.
+        </p>
+        <p>
+          <strong>Color Roulette only hits the next player.</strong> They choose the color, then draw until that color turns up. You do not control the color, so you cannot aim it well. It is strongest against a next player who is close to going out, because even a short draw sets them back. It cannot be played while a draw stack is live, so it is no help when a stack is coming at you.
+        </p>
+        <p>
+          <strong>Aim swaps at the leader.</strong> With a 7, the player with the fewest cards is usually the right target, even if their cards are not a great fit. A small hand is almost always better than a big one.
+        </p>
+        <p>
+          <strong>Remember that stacks travel.</strong> With five or more players, a Draw 2 you start can grow past 20 before it lands on anyone. Starting a stack when you have nothing higher left in your hand is a gamble that it will not come back around.
+        </p>
+      </section>
+
+      <section id="two-player">
+        <h2>Two-player games</h2>
+        <p>
+          Heads-up games play differently, and the solo bot games are all two-player.
+        </p>
+        <ul>
+          <li><strong>A Reverse acts as a Skip.</strong> With only two of you, flipping direction hands the turn straight back, so a Reverse gives you another play.</li>
+          <li><strong>Wild Reverse Draw 4 still hits.</strong> With two players it flips direction, but your opponent still takes the draw. It does not bounce back onto you.</li>
+          <li><strong>Skip Everyone is simply a Skip.</strong> There is only one other player to skip.</li>
+          <li><strong>A 0 is a forced trade.</strong> With two players, rotating hands just swaps them, so only play a 0 when your hand is the bigger one. A 7 at least lets you press KEEP MY HAND.</li>
+        </ul>
+      </section>
+
+      <section id="modes">
+        <h2>How the stacking mode changes things</h2>
+        <p>
+          The host picks a mode when creating a room. It changes how much you should value your draw cards.
+        </p>
+        <table class="card-table">
+          <thead>
+            <tr><th>Mode</th><th>Rule</th><th>What it means for you</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Official</td><td>You can only add a draw card of equal or higher value.</td><td>High draws are precious. Hold your Draw 10.</td></tr>
+            <tr><td>House</td><td>Wild draws stack on anything; colored draws must be equal or higher.</td><td>Wild Reverse Draw 4, Draw 6 and Draw 10 become escape cards.</td></tr>
+            <tr><td>Casual</td><td>Any draw card stacks on any other.</td><td>Even a Draw 2 saves you. Stacks get long.</td></tr>
+          </tbody>
+        </table>
+        <p>
+          The <a href="/rules/stacking/">stacking guide</a> has worked examples for each mode.
+        </p>
+      </section>
+
+      <section id="mistakes">
+        <h2>Mistakes that cost games</h2>
+        <div class="faq-item">
+          <div class="faq-q">Forgetting to press MERCY!</div>
+          <p>If you sit on 1 card without calling, any other player can press CAUGHT! and you draw 10. Online you can call as soon as you hold 2 cards, even off your turn, so press it early. Drawing a card resets the call.</p>
+        </div>
+        <div class="faq-item">
+          <div class="faq-q">Going out without calling</div>
+          <p>Playing from 2 cards to 0 without calling costs you 2 cards and the turn. The exception is Discard All: emptying your hand with it wins outright.</p>
+        </div>
+        <div class="faq-item">
+          <div class="faq-q">Starting a stack you cannot defend</div>
+          <p>If your Draw 2 grows into a 14 and comes back around, you need something to answer it with. Check what you are holding before you start one.</p>
+        </div>
+        <div class="faq-item">
+          <div class="faq-q">Playing a 7 on autopilot</div>
+          <p>If nobody has a smaller hand than you, press KEEP MY HAND. Swapping into a bigger hand is a mistake you choose to make.</p>
+        </div>
+        <div class="faq-item">
+          <div class="faq-q">Ignoring the player on a big hand</div>
+          <p>Someone on 20 cards is not out of the game. One lucky 7 or 0 can give them your small hand.</p>
+        </div>
+      </section>
+
+      <div class="callout success">
+        <strong>More guides:</strong> <a href="/how-to-play/">How to play</a> &middot; <a href="/rules/cards/">Every card explained</a> &middot; <a href="/rules/stacking/">Stacking rules</a> &middot; <a href="/faq/">FAQ</a>
+      </div>
+
+      <div class="final-cta">
+        <h2>Test it on a bot first</h2>
+        <p>The bot ladder is a good place to try a new habit before you use it on friends. Free, no download, no email needed.</p>
+        <div class="cta-row">
+          <a href="/" class="btn btn-primary">Play Open Mercy</a>
+          <a href="/rules/" class="btn btn-ghost">Read the full rules</a>
+        </div>
+      </div>
+    </main>
+
+    <footer>
+      Built by
+      <a href="https://github.com/alii13" target="_blank" rel="noopener noreferrer">alii13</a>
+      &middot; <a href="/how-to-play/">How to play</a>
+      &middot; <a href="/rules/">Rules</a>
+      &middot; <a href="/strategy/">Strategy</a>
+      &middot; <a href="/faq/">FAQ</a>
+      &middot; <a href="/about/">About</a>
+      &middot; <a href="/contact/">Contact</a>
+      &middot; <a href="/privacy/">Privacy</a>
+      &middot; <a href="/terms/">Terms</a>
+      &middot; <a href="#" onclick="window.googlefc = window.googlefc || {}; googlefc.callbackQueue = googlefc.callbackQueue || []; googlefc.callbackQueue.push(function () { googlefc.showRevocationMessage(); }); return false;">Privacy settings</a>
+    </footer>
+  </body>
+</html>

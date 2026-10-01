@@ -69,7 +69,7 @@ const faqs = [
   },
   {
     q: 'Can I play against AI?',
-    a: "Yes. You can start a single-player game against AI opponents whenever you don't have other players.",
+    a: "Yes. Choose Play vs bot to face one computer opponent whenever you don't have other players. There are eight bots on a ladder, and beating one unlocks the next.",
   },
   {
     q: 'How many players are supported?',

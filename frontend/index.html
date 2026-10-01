@@ -129,7 +129,7 @@
           "name": "Can I play against AI?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Yes. You can start a single-player game against AI opponents whenever you don't have other players."
+            "text": "Yes. Choose Play vs bot to face one computer opponent whenever you don't have other players. There are eight bots on a ladder, and beating one unlocks the next."
           }
         },
         {
@@ -184,9 +184,13 @@
     }
     </script>
 
-    <!-- Google AdSense (site-ownership verification + ad serving) -->
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5481263585202262"
-         crossorigin="anonymous"></script>
+    <!-- AdSense site verification without ad serving: ads run only on the static
+         guide pages, never beside the game. The app still loads Google's consent
+         message (the AdSense Privacy & messaging CMP) so EEA/UK consent and the
+         footer's Privacy settings keep working here. -->
+    <meta name="google-adsense-account" content="ca-pub-5481263585202262">
+    <script async src="https://fundingchoicesmessages.google.com/i/pub-5481263585202262?ers=1"></script>
+    <script>(function() {function signalGooglefcPresent() {if (!window.frames['googlefcPresent']) {if (document.body) {const iframe = document.createElement('iframe'); iframe.style = 'width: 0; height: 0; border: none; z-index: -1000; left: -1000px; top: -1000px;'; iframe.style.display = 'none'; iframe.name = 'googlefcPresent'; document.body.appendChild(iframe);} else {setTimeout(signalGooglefcPresent, 0);}}}signalGooglefcPresent();})();</script>
 
     <!-- Google Analytics + Google Ads. Production hostnames only: keeps
          forks running our measurement id, per-branch previews, and localhost
@@ -197,6 +201,16 @@
       var GA_ENABLED = GA_HOSTS.indexOf(location.hostname) !== -1;
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
+      // Consent Mode v2: Google tags start denied in the EEA, UK and Switzerland
+      // until the AdSense consent message (Google's certified CMP) records a choice.
+      gtag('consent', 'default', {
+        ad_storage: 'denied',
+        ad_user_data: 'denied',
+        ad_personalization: 'denied',
+        analytics_storage: 'denied',
+        region: ['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH'],
+        wait_for_update: 500
+      });
       if (GA_ENABLED) {
         var gaLoader = document.createElement('script');
         gaLoader.async = true;

@@ -97,6 +97,20 @@ h1 {
   text-shadow: 0 0 20px rgba(255, 42, 42, 0.3);
 }
 h1 .accent { color: var(--red); display: block; font-size: 1.5rem; margin-top: 0.5rem; }
+.byline {
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  text-align: center;
+  margin-bottom: 1rem;
+}
+.byline a { color: var(--text); text-decoration: none; }
+figure.shot { margin: 1.5rem 0; }
+figure.shot img { display: block; width: 100%; max-width: 420px; height: auto; margin: 0 auto; border: 1px solid var(--border); border-radius: 8px; }
+figure.shot figcaption { font-size: 0.85rem; color: var(--text-muted); text-align: center; margin-top: 0.5rem; }
+
 .lead {
   color: var(--text-dim);
   font-size: 1.1rem;
@@ -151,6 +165,8 @@ h1 .accent { color: var(--red); display: block; font-size: 1.5rem; margin-top: 0
 
 /* Sections */
 section { margin: 3rem 0; scroll-margin-top: 2rem; }
+/* Anchor targets clear the sticky header (about 73px) instead of hiding under it. */
+[id] { scroll-margin-top: 5.5rem; }
 h2 {
   font-family: var(--display-font);
   font-size: 1.75rem;
@@ -255,6 +271,7 @@ footer {
   font-family: var(--mono-font);
   font-size: 0.75rem;
   color: var(--text-muted);
+  line-height: 2;
   margin-top: 3rem;
 }
 footer a { color: var(--text); font-weight: bold; text-decoration: none; }

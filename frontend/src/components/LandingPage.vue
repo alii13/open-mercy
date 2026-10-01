@@ -88,8 +88,13 @@
     <!-- Scroll sections (kept from Phase 1) -->
     <LandingScrollSections @openFeedback="showFeedback = true" />
 
+    <LandingGuide />
+
     <LandingFAQ />
 
+    <!-- The sticky CTA covers the bottom of the screen, so it steps aside once
+         the footer arrives; otherwise its links can't be tapped on phones. -->
+    <div ref="footerSentinel" aria-hidden="true"></div>
     <SiteFooter />
 
     <!-- Sticky mobile CTA — teleported so containing-block doesn't pin it -->
@@ -113,6 +118,7 @@ import { ArrowRight } from 'lucide-vue-next'
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import gsap from 'gsap'
 import LandingScrollSections from './LandingScrollSections.vue'
+import LandingGuide from './LandingGuide.vue'
 import LandingFAQ from './LandingFAQ.vue'
 import SiteFooter from './SiteFooter.vue'
 import FeedbackModal from './FeedbackModal.vue'
@@ -136,8 +142,11 @@ const inviteCode = (() => {
   const c = new URLSearchParams(window.location.search).get('join')?.toUpperCase().trim() || ''
   return /^[A-Z0-9]{4,8}$/.test(c) ? c : ''
 })()
-const showStickyCta = ref(false)
+const heroOutOfView = ref(false)
+const footerInView = ref(false)
+const showStickyCta = computed(() => heroOutOfView.value && !footerInView.value)
 const heroSentinel = ref<HTMLElement>()
+const footerSentinel = ref<HTMLElement>()
 const heroStage = ref<HTMLElement>()
 const cardRefs = ref<HTMLElement[]>([])
 const counterRef = ref<HTMLElement>()
@@ -192,12 +201,16 @@ const reducedMotion =
 onMounted(() => {
   if (heroSentinel.value) {
     observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry) showStickyCta.value = !entry.isIntersecting
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.target === heroSentinel.value) heroOutOfView.value = !entry.isIntersecting
+          else footerInView.value = entry.isIntersecting
+        }
       },
       { threshold: 0 },
     )
     observer.observe(heroSentinel.value)
+    if (footerSentinel.value) observer.observe(footerSentinel.value)
   }
 
   // If reduced motion, set the final state directly and skip the choreography.
