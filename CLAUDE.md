@@ -24,6 +24,7 @@ Guidance for working in this repo. Hard-won - read before changing CSS, raising 
   - Prefer PRs based directly on `main`.
   - If you must stack: delete each branch as its PR merges, and verify `git log origin/main` actually contains the work afterward.
 - Run `npm run build` (from `frontend/`) and `npx vitest run` before pushing. Build = `vue-tsc -b && vite build`, not just typecheck.
+- When the diff touches `mobile/`, also run `flutter analyze` and `flutter test` from `mobile/`. CI does not cover `mobile/` yet, so these are the only gate.
 
 ## Shipping updates to players
 
