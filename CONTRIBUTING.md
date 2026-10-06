@@ -68,6 +68,17 @@ frontend/src/
 └── App.vue
 ```
 
+Outside the web app:
+
+```
+mobile/           # Flutter app (iOS + Android)
+game-server/      # Multiplayer Worker + Durable Objects
+shared/           # Engine + wire protocol (TS), used by frontend and game-server
+functions/        # Cloudflare Pages Functions
+supabase/         # SQL schema
+supabase-proxy/   # Cloudflare Worker proxy for Supabase (parked fallback)
+```
+
 ## Responsive breakpoints
 
 The app uses three breakpoints. When adding new UI, respect these:

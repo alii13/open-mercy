@@ -16,7 +16,7 @@ patterns - every item below is an incident this repo already had.
 - **Pages routing.** No `/* /index.html 200` in `_redirects`; host-level redirects live in `functions/_middleware.js`; Pages Functions live at repo-root `functions/`, never `frontend/functions/`.
 - **Stacked PRs.** Base every PR on `main`. If stacked anyway: delete each branch as its PR merges, then verify `git log origin/main` contains the work.
 - **UI changes.** Verified in a real browser (dev server or preview deploy), every state the diff introduces.
-- **Gates.** `npx vitest run` and `npm run build` (vue-tsc + vite) from `frontend/`, both green, output pristine.
+- **Gates.** `npx vitest run` and `npm run build` (vue-tsc + vite) from `frontend/`, both green, output pristine. If the diff touches `mobile/`: `flutter analyze` and `flutter test` from `mobile/`, both green (CI does not run them).
 
 ## After the review: fix, push, resolve (required)
 
