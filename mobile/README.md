@@ -1,17 +1,21 @@
-# app
+# Open Mercy mobile
 
-Open Mercy mobile app
+Flutter app for iOS and Android. Bundle ID `com.openmercy.app`.
 
-## Getting Started
+## Prerequisites
 
-This project is a starting point for a Flutter application.
+- Flutter (stable)
+- Xcode, with `xcode-select` pointing at `/Applications/Xcode.app/Contents/Developer`
+- Android Studio + Android SDK, and a JDK between 17 and 25 for Gradle
 
-A few resources to get you started if this is your first Flutter project:
+## Commands
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+```bash
+flutter analyze
+flutter test
+flutter run
+```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Signing
+
+The Xcode project has no `DEVELOPMENT_TEAM` committed. Set your own team in Xcode locally and do not commit it.
