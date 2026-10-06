@@ -65,6 +65,11 @@ Guidance for working in this repo. Hard-won - read before changing CSS, raising 
 - The game server has no Cloudflare test runner. Put pure, testable logic in its own module (e.g. `game-server/src/roomGc.ts`) and cover it via the frontend vitest runner - its `include` in `frontend/vite.config.ts` reaches `../game-server/src/**/*.test.ts`. Test files are excluded from the Worker's `tsc` build (`game-server/tsconfig.json`).
 - Room GC: an empty room is deleted after a per-visibility window (`game-server/src/roomGc.ts`) - public rooms 10 min (so quick-match never serves a dead room), private invite-link rooms 1 h (so a shared link survives a join-later gap). The DO also unregisters public rooms from the quick-match directory on GC, which is why the two windows differ.
 
+## Mobile (Flutter)
+
+- `mobile/` is one Flutter app for iOS and Android (bundle ID `com.openmercy.app`, permanent once published). Run `flutter test` and `flutter analyze` from `mobile/`.
+- Multiplayer on mobile is a WebSocket client of `game-server/`, same as the web client. The wire format lives in `shared/protocol.ts`; any Dart mirror of it must change in the same PR as the TS file.
+
 ## Supabase
 
 - **supabase-js derives its session storage key from the client URL** (`sb-<first-hostname-label>-auth-token`). Changing `supabaseUrl` - proxy on or off, a custom domain - therefore signs every existing session out silently, and guests are lost permanently because an anonymous identity cannot sign back in. This shipped as the #162 regression and was fixed by #167. The key is now pinned via `auth.storageKey` in `lib/supabase.ts`, sourced from `DIRECT_SESSION_KEY` in `utils/sessionMigration.ts`. Never remove the pin. Never change its value without shipping a key migration like `migrateLegacySession()`.

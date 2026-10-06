@@ -59,6 +59,11 @@ The ruleset popularized by Mattel's UNO Show 'Em No Mercy® never got a proper d
 │   │   ├── utils/           # Game rules, card generator, helpers
 │   │   └── types/           # TypeScript types
 │   └── index.html
+├── mobile/                  # Flutter app (iOS + Android)
+├── game-server/             # Multiplayer Worker + Durable Objects
+├── shared/                  # Engine + wire protocol (TS), used by frontend and game-server
+├── functions/               # Cloudflare Pages Functions
+├── supabase/                # SQL schema
 ├── supabase-proxy/          # Cloudflare Worker (optional)
 ├── cards/                   # Reference card images
 ├── cards-svgs/              # Reference card SVGs
