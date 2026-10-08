@@ -5,7 +5,7 @@ import type { ClientMsg, GameEvent, PresencePlayer, ServerMsg } from './protocol
 import { applyIntent, applyUnoCatch, autoResolveAbsentTurn, forceEliminate, persistResults, personalView, startGame, updateStats, viewEventFor, type GameRecord } from './game'
 import { dirCodes, liveTables, normalizeDir, type DirEntry } from './directory'
 import { addParticipant, createMeeting, deactivateMeeting, voiceConfigured, type VoiceEnv } from './voice'
-import { gcWindowMs } from './roomGc'
+import { gcWindowMs, shouldPushGc } from './roomGc'
 import { ROOM_CODE_ALPHABET, isRoomCode, normalizeRoomCode } from '../../shared/roomCode'
 import { canSeat, MAX_PLAYERS } from './seats'
 import { autoStartTick, autoStartBump, autoStartBumpsLeft, AUTO_START_MIN_PLAYERS, type AutoStartState } from './autoStart'
@@ -309,10 +309,16 @@ export class GameRoomDO {
         return this.roomIsPublic
     }
 
-    /** Any room activity pushes garbage collection out. */
+    /**
+     * Any room activity pushes garbage collection out, but not more than once
+     * a minute. This runs on every move, and the write it skips is the biggest
+     * single source of storage rows in the room.
+     */
     private async touchGc(): Promise<void> {
         const t = await this.getTimers()
-        t.gcAt = Date.now() + gcWindowMs(await this.isRoomPublic())
+        const next = Date.now() + gcWindowMs(await this.isRoomPublic())
+        if (!shouldPushGc(t.gcAt, next)) return
+        t.gcAt = next
         await this.putTimers(t)
     }
 
