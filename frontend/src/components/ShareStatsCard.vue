@@ -52,7 +52,8 @@ const canvasEl = ref<HTMLCanvasElement | null>(null)
 const copied = ref(false)
 
 function shareText(): string {
-    return `I'm a ${props.badge.title} in Open Mercy - ${props.winRate}% win rate across ${props.games} games. Think you can beat me?`
+    const article = /^[AEIOU]/i.test(props.badge.title) ? 'an' : 'a'
+    return `I'm ${article} ${props.badge.title} in Open Mercy - ${props.winRate}% win rate across ${props.games} games. Think you can beat me?`
 }
 
 function render() {

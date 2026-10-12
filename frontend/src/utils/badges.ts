@@ -26,8 +26,9 @@ export interface Badge {
     color: string
 }
 
-/** Escalating heat, culminating in gold. Steepening thresholds toward the top
- *  so the apex is genuinely months of sustained play (decay makes it harder). */
+/** Escalating heat to the King's gold, then ten prestige ranks above it.
+ *  Steepening thresholds toward the top so the apex is genuinely more than a
+ *  year of sustained play (decay makes it harder). */
 export const BADGES: Badge[] = [
     { tier: 1, threshold: 0, title: 'Recruit', color: '#8a8f98' },
     { tier: 2, threshold: 250, title: 'Scrapper', color: '#5ed17c' },

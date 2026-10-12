@@ -167,7 +167,11 @@ as $$
     tiers (tier, threshold) as (
         values (1, 0::bigint), (2, 250::bigint), (3, 600::bigint), (4, 1300::bigint),
                (5, 2700::bigint), (6, 5500::bigint), (7, 11000::bigint),
-               (8, 22000::bigint), (9, 45000::bigint), (10, 100000::bigint)
+               (8, 22000::bigint), (9, 45000::bigint), (10, 100000::bigint),
+               (11, 140000::bigint), (12, 196000::bigint), (13, 274000::bigint),
+               (14, 384000::bigint), (15, 538000::bigint), (16, 753000::bigint),
+               (17, 1050000::bigint), (18, 1480000::bigint), (19, 2070000::bigint),
+               (20, 2890000::bigint)
     )
     select ti.tier, ti.threshold, min(r.played_at)
     from tiers ti
