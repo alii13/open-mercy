@@ -54,6 +54,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: '2026-10-12T19:00Z',
+        level: 'quiet',
+        tag: 'IMPROVED',
+        title: 'See how your invites went',
+        body: 'Your waiting room now shows which friends are still deciding, which ones did not join, and whose invite ran out, with Invite again once it is allowed.',
+    },
+    {
         // A second entry on the same day: a full UTC timestamp keeps the id a
         // valid, sortable date that the page still formats as Oct 12.
         id: '2026-10-12T18:00Z',
