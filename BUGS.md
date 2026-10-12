@@ -79,6 +79,16 @@ These were needed on a phone but are not copies of anything on the web. They are
 
 **Status:** open, needs your OK.
 
+### C. Points from the PR #193 review that were not fixed in that PR
+
+- **Music credit licence.** The web credits Kevin MacLeod's CC BY track with the licence in `SiteFooter.vue`; the app copies only the settings drawer's credit (no licence name or link). Fix when the footer/about content is ported, or add "(CC BY 4.0)" to the drawer on both web and mobile.
+- **Muted at game start, then unmuted: no music.** `useMusic.ts` never sets `isPlaying` when started muted, so unmuting mid-game does nothing. Inherited from the web; changing it means changing both.
+- **iPad orientation.** `ios/Runner/Info.plist` still lists landscape orientations while the app locks to portrait; on iPad multitasking iOS can ignore the lock. Decide whether iPad is a target before the iOS build.
+- **Android INTERNET permission** is missing from the release manifest. Not needed yet (the app is offline); it must be added with the first networking PR (Supabase / game server), or release builds fail only there.
+- **Test singletons.** `SoundEffects`, `Music` and `SettingsStore` read prefs once per test isolate; a future test that seeds those prefs will be order-dependent. Add a test-only reset when that test is written.
+
+**Status:** open.
+
 ## Not tested yet - web
 
 Only the solo game store was exercised on the web (vitest probes against the real `gameStore`, plus headless screenshots of the solo table). Nothing below has been tested by me on the web:
