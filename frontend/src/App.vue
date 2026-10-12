@@ -154,9 +154,10 @@
 
     <!-- Friend requests and "they accepted", live. Never over a game: the
          count on the username chip and the Friends page keep the request
-         until the match is over. -->
+         until the match is over. Not on the Friends page either, which already
+         shows the same request with ACCEPT. -->
     <FriendToast
-      v-if="authStore.isAuthenticated && !inMpMatch && localGameStore.gameState === 'LOBBY'"
+      v-if="authStore.isAuthenticated && !inMpMatch && localGameStore.gameState === 'LOBBY' && currentScreen !== 'friends'"
     />
 
     <!-- One-time release card. Signed in only: someone who has not played has
