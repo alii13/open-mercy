@@ -28,7 +28,7 @@
         <h2 class="bp-h2">How it works</h2>
         <p>
           Every game you play earns points. Points add up over time and lift you
-          through ten badges, from Recruit to No Mercy King. Your badge shows on
+          through twenty badges, from Recruit to God of No Mercy. Your badge shows on
           every table you sit at, so everyone sees how far you've climbed.
         </p>
         <p>
@@ -40,7 +40,7 @@
 
       <!-- The ladder -->
       <section class="bp-ladder">
-        <h2 class="bp-h2">The ten badges</h2>
+        <h2 class="bp-h2">The twenty badges</h2>
         <ul class="bp-tiers">
           <li v-for="t in BADGES" :key="t.tier" class="bp-tier" :class="{ here: showOwn && t.tier === badge.tier }">
             <Badge :badge="t" size="chip" class="bp-tier-badge" />
@@ -121,7 +121,17 @@ const FEEL = [
   'Rare at any table',
   'Very rare',
   'Notable across the board',
-  'The apex - months of play',
+  'Months of play',
+  'Past the King',
+  'Rarer than a King',
+  'Only the obsessed',
+  'Feared at every table',
+  'Over half a million points',
+  'Barely ever seen',
+  'A million points',
+  'Few will ever get here',
+  'One step from the top',
+  'The top. Nothing above it',
 ]
 
 const EARN = [

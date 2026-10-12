@@ -622,7 +622,8 @@ export class GameRoomDO {
                 // A cosmetic "so-and-so reached a new badge" — relay to everyone
                 // else at the table. No game state, no persistence.
                 const tier = Number(msg.tier)
-                if (!Number.isFinite(tier) || tier < 1 || tier > 10) return
+                // Mirrors BADGES.length in frontend/src/utils/badges.ts.
+                if (!Number.isFinite(tier) || tier < 1 || tier > 20) return
                 for (const s of this.roomSockets()) {
                     if (s.userId !== tag.userId) this.send(s.ws, { t: 'badge-up', userId: tag.userId, tier })
                 }

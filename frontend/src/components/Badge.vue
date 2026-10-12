@@ -2,7 +2,7 @@
     <span
         ref="rootEl"
         class="badge"
-        :class="[`badge--${size}`, { 'badge--foil': badge.tier >= 9, 'badge--dormant': dormant, 'badge--link': link }]"
+        :class="[`badge--${size}`, { 'badge--foil': badge.tier >= 9, 'badge--ember': badge.tier >= 18, 'badge--apex': badge.tier === BADGES.length, 'badge--dormant': dormant, 'badge--link': link }]"
         :style="{ '--badge-color': badge.color }"
         :role="link ? 'button' : undefined"
         :tabindex="link ? 0 : undefined"
@@ -41,7 +41,7 @@
             >
                 <span class="badge-tip-name">{{ badge.title }}</span>
                 <span v-if="presence !== undefined" class="badge-tip-presence" :class="`badge-tip-presence--${presenceState(presence)}`">{{ presenceLabel(presence) }}</span>
-                <span class="badge-tip-rank">Rank {{ badge.tier }} of 10</span>
+                <span class="badge-tip-rank">Rank {{ badge.tier }} of {{ BADGES.length }}</span>
                 <span v-if="points != null" class="badge-tip-line">{{ points.toLocaleString() }} points</span>
                 <span v-if="progress && progress.next" class="badge-tip-line">{{ needed }} to {{ progress.next.title }}</span>
                 <span v-else-if="points != null" class="badge-tip-line badge-tip-apex">Top rank reached</span>
@@ -56,6 +56,7 @@ import { ArrowRight } from 'lucide-vue-next'
 import { computed, ref, onUnmounted } from 'vue'
 import type { Badge, Progress } from '../utils/badges'
 import { BADGE_ART } from '../utils/badgeArt'
+import { BADGES } from '../utils/badges'
 import { navigate } from '../utils/routes'
 import PresenceDot from './PresenceDot.vue'
 import { presenceLabel, presenceState } from '../utils/relativeTime'
@@ -91,7 +92,7 @@ const pctText = computed(() => `${Math.round((props.progress?.pct ?? 0) * 100)}%
 const needed = computed(() => (props.progress?.needed ?? 0).toLocaleString())
 
 const ariaLabel = computed(() => {
-    const parts = [`${props.badge.title}, rank ${props.badge.tier} of 10`]
+    const parts = [`${props.badge.title}, rank ${props.badge.tier} of ${BADGES.length}`]
     if (props.points != null) parts.push(`${props.points} points`)
     if (props.progress?.next) parts.push(`${props.progress.needed} to ${props.progress.next.title}`)
     if (props.dormant) parts.push('dormant')
@@ -226,6 +227,22 @@ onUnmounted(cancelClose)
 @keyframes badge-foil {
     0%, 100% { background-position: 140% 0; }
     50% { background-position: -40% 0; }
+}
+
+/* The last three ranks burn: a glow in the rank's own colour, and only the
+   apex breathes. */
+.badge--ember .badge-emblem {
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 6px var(--badge-color));
+}
+.badge--apex .badge-emblem {
+    animation: badge-ember 2.8s ease-in-out infinite;
+}
+@keyframes badge-ember {
+    0%, 100% { filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 4px var(--badge-color)); }
+    50% { filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 12px var(--badge-color)); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .badge--apex .badge-emblem { animation: none; }
 }
 
 .badge--dormant {
