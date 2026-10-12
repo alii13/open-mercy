@@ -67,7 +67,7 @@ export const useSocialStore = defineStore('social', () => {
     const unavailable = ref(false)
     /** User ids with a request in flight, so a button can disable itself. */
     const pendingIds = ref<Set<string>>(new Set())
-    const recent = ref<RecentOpponent[]>([])
+    const recentRows = ref<RecentOpponent[]>([])
     /** Separate from `unavailable`: a missing extra must not hide the list. */
     let recentUnavailable = false
     /** The one thing the toast shows. */
@@ -87,6 +87,10 @@ export const useSocialStore = defineStore('social', () => {
     /** Everyone already connected to you in some way - one lookup for the
      *  buttons that must not offer ADD twice. */
     const knownIds = computed(() => new Set(rows.value.map(r => r.user_id)))
+
+    /** Read on open, but the friends list moves live: someone who asked you
+     *  since is a request now, not a suggestion. */
+    const recent = computed(() => recentRows.value.filter(r => !knownIds.value.has(r.user_id)))
 
     /** Bumped by every read and every account change. A read answers only if
      *  it is still the latest - a slow one landing after a newer one would
@@ -156,14 +160,17 @@ export const useSocialStore = defineStore('social', () => {
 
     async function fetchRecent(): Promise<void> {
         if (unavailable.value || recentUnavailable) return
+        const seq = readSeq
         try {
             if (!(await hasLiveSession())) return
             const { data, error } = await supabase.rpc('recent_opponents')
+            // Asked for by an account that has since signed out.
+            if (seq !== readSeq) return
             if (error) {
                 if (isFatalSchemaError(error)) recentUnavailable = true
                 return
             }
-            recent.value = (data ?? []) as RecentOpponent[]
+            recentRows.value = (data ?? []) as RecentOpponent[]
         } catch { /* transient - keep the list on screen */ }
     }
 
@@ -172,8 +179,11 @@ export const useSocialStore = defineStore('social', () => {
         pendingIds.value = new Set(pendingIds.value).add(userId)
         try {
             const result = await call('send_friend_request', { p_user: userId }) as SendResult
-            // Asked is asked - whatever the answer, they are no longer a stranger to offer ADD for.
-            if (result !== 'failed') recent.value = recent.value.filter(r => r.user_id !== userId)
+            // Only a request that went out takes them off the list; a rate
+            // limit or a refusal leaves them there for the caller to explain.
+            if (result === 'sent' || result === 'accepted' || result === 'already') {
+                recentRows.value = recentRows.value.filter(r => r.user_id !== userId)
+            }
             // The server decides the outcome - a simultaneous ADD from the
             // other side comes back as 'accepted', not 'sent' - so re-read
             // rather than guessing the new row.
@@ -235,7 +245,7 @@ export const useSocialStore = defineStore('social', () => {
     function reset(): void {
         readSeq++
         rows.value = []
-        recent.value = []
+        recentRows.value = []
         pendingIds.value = new Set()
         notice.value = null
         announced = new Set()

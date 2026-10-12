@@ -202,6 +202,44 @@ describe('social store', () => {
             expect(social.recent).toHaveLength(0)
         })
 
+        it('keeps someone on the list when the request did not go out', async () => {
+            rpc.mockImplementation(async (fn: string) =>
+                fn === 'recent_opponents' ? { data: [opponent()], error: null }
+                : fn === 'my_friends' ? { data: [], error: null }
+                : { data: 'rate_limited', error: null })
+            const social = useSocialStore()
+            await social.fetchRecent()
+            expect(await social.sendRequest('rival')).toBe('rate_limited')
+            expect(social.recent.map(r => r.user_id)).toEqual(['rival'])
+        })
+
+        it('leaves out anyone who is already a friend or a request', async () => {
+            rpc.mockImplementation(async (fn: string) =>
+                fn === 'recent_opponents' ? { data: [opponent(), opponent({ user_id: 'stranger' })], error: null }
+                : { data: [row({ user_id: 'rival', status: 'pending', incoming: true })], error: null })
+            const social = useSocialStore()
+            await social.fetchRecent()
+            await social.refresh()
+            expect(social.recent.map(r => r.user_id)).toEqual(['stranger'])
+        })
+
+        it('drops a list that was asked for before a sign-out', async () => {
+            let release: (v: unknown) => void = () => {}
+            const social = useSocialStore()
+            const auth = useAuthStore()
+            auth.user = { id: 'first' } as never
+            await nextTick()
+            rpc.mockReset()
+            rpc.mockImplementationOnce(() => new Promise(res => { release = res }))
+            const pending = social.fetchRecent()
+            await vi.waitFor(() => expect(rpc).toHaveBeenCalled())
+            auth.user = { id: 'second' } as never
+            await nextTick()
+            release({ data: [opponent()], error: null })
+            await pending
+            expect(social.recent).toHaveLength(0)
+        })
+
         it('hides the section until its SQL is run, and stops asking', async () => {
             rpc.mockResolvedValue({ data: null, error: { code: 'PGRST202' } })
             const social = useSocialStore()

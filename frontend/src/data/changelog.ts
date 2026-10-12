@@ -54,9 +54,9 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
-        // A second entry on the same day: a full timestamp keeps the id a
-        // valid, sortable date.
-        id: '2026-10-12T18:00',
+        // A second entry on the same day: a full UTC timestamp keeps the id a
+        // valid, sortable date that the page still formats as Oct 12.
+        id: '2026-10-12T18:00Z',
         level: 'quiet',
         tag: 'IMPROVED',
         title: 'Add the people you just played',

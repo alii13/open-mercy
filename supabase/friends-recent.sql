@@ -1,6 +1,6 @@
 -- Played recently: the people a friend request is most likely to land with.
 -- Run in the Supabase SQL Editor AFTER friends.sql and presence.sql.
--- Additive: one SECURITY DEFINER read. Re-runnable.
+-- Additive: one index, one SECURITY DEFINER read. Re-runnable.
 --
 -- Multiplayer results share a game_id across the table, so the people you
 -- played are the other user_ids on your game_ids. Bot games are skipped (no
@@ -11,6 +11,11 @@
 -- game_results is owner-select-only (CLAUDE.md), which is why this is a
 -- definer function rather than a client query: it reads other players' rows
 -- for the shared games and returns only names and a head-to-head count.
+
+-- The join below looks up every player of each of your games by game_id, and
+-- game_results had no index on it (user_id only), so each call scanned the
+-- whole table.
+create index if not exists game_results_game_id_idx on game_results (game_id);
 
 create or replace function public.recent_opponents()
 returns table (

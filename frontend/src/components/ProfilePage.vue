@@ -295,22 +295,26 @@ const presenceNow = useNow()
 const social = useSocialStore()
 onMounted(() => { if (authStore.isAuthenticated) void social.refresh() })
 
-type FriendState = 'none' | 'friends' | 'asked' | 'asked-me'
+type FriendState = 'none' | 'friends' | 'asked' | 'asked-me' | 'blocked'
 const friendState = computed<FriendState>(() => {
   const id = p.value?.user_id
   const row = id ? social.rows.find(r => r.user_id === id) : undefined
   if (!row) return 'none'
   if (row.status === 'accepted') return 'friends'
+  if (row.status === 'blocked') return 'blocked'
   if (row.status === 'pending') return row.incoming ? 'asked-me' : 'asked'
   return 'none'
 })
 
 const adding = ref(false)
 const addResult = ref<string | null>(null)
+// One result per profile: an answer about the last player must not label the next.
+watch(() => props.code, () => { addResult.value = null })
 const addLabel = computed(() => {
   if (adding.value) return 'Adding…'
   if (friendState.value === 'friends') return "You're friends"
   if (friendState.value === 'asked') return 'Request sent'
+  if (friendState.value === 'blocked') return 'You blocked this player'
   switch (addResult.value) {
     case 'rate_limited': return 'Too many requests today'
     case 'declined': return 'Try again in a few days'

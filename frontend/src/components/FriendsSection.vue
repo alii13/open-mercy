@@ -101,13 +101,13 @@
             <Badge v-if="badges[o.user_id]" v-bind="badgeProps(o)" size="mark" :style="{ '--emblem-size': '34px' }" />
             <div class="fs-who">
               <button class="fs-name" @click="openProfile(o)">{{ o.username }}</button>
-              <span class="fs-status">{{ headToHead(o) }}</span>
+              <span class="fs-status" :class="{ 'fs-status--warn': addFailed[o.user_id] }">{{ addFailed[o.user_id] ?? headToHead(o) }}</span>
             </div>
             <button
               class="fs-add"
               :aria-label="`Add ${o.username} as a friend`"
-              :disabled="social.pendingIds.has(o.user_id)"
-              @click="social.sendRequest(o.user_id)"
+              :disabled="social.pendingIds.has(o.user_id) || !!addFailed[o.user_id]"
+              @click="addRecent(o.user_id)"
             >
               <Plus :size="16" :stroke-width="2.4" aria-hidden="true" />
             </button>
@@ -205,6 +205,19 @@ watch(() => shownIds.value.join(','), () => {
 function badgeProps(r: { user_id: string }) {
   const info = badges.value[r.user_id]!
   return { badge: info.badge, points: info.points, progress: info.progress }
+}
+
+// A request that did not go out says why, in the row, rather than the row
+// quietly staying put with a + that does nothing.
+const addFailed = ref<Record<string, string>>({})
+async function addRecent(userId: string): Promise<void> {
+  const result = await social.sendRequest(userId)
+  const why = result === 'rate_limited' ? 'Too many requests today'
+    : result === 'declined' ? 'Try again in a few days'
+    : result === 'blocked' ? "Can't add this player"
+    : result === 'failed' || result === 'unauthorized' || result === 'not_found' ? 'Could not send - try again later'
+    : null
+  if (why) addFailed.value = { ...addFailed.value, [userId]: why }
 }
 
 /** "3 games · you lead 2-1", or just the count when nobody has won yet. */
@@ -460,6 +473,10 @@ onUnmounted(() => {
   font-family: var(--font-body);
   font-size: 0.82rem;
   color: var(--text-secondary);
+}
+
+.fs-status--warn {
+  color: var(--color-hazard);
 }
 
 .fs-row--away .fs-status {
