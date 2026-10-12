@@ -1,13 +1,15 @@
 import { defineStore } from 'pinia'
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, toRaw } from 'vue'
 import type { Card, Player, GameState, TurnState, CardColor } from '../types/card'
 import * as engine from '@engine'
 import type { EngineEvent, EngineState } from '@engine'
 import { canPlayCard, getDrawValue, generateFullDeck, shuffleDeck, DEFAULT_STACKING_MODE } from '@engine'
 import {
-    BOT_LADDER, botById, dailyBot, chooseCard, chooseSwapTarget, chooseWildColor, willCatchMercy,
+    BOT_LADDER, botById, dailyBot, chooseSwapTarget, chooseWildColor, chooseDiscardAllTop,
+    chooseRouletteColor, wantsSwap, willCatchMercy,
     type BotProfile,
 } from '@engine/bot'
+import { chooseBotCard } from '@engine/botSearch'
 import { seededRng } from '../utils/seededRng'
 import { markDailyDone } from '../utils/dailyChallenge'
 import { recordBotWin } from '../utils/botLadder'
@@ -167,6 +169,17 @@ export const useGameStore = defineStore('game', () => {
         get swapInitiatorId() { return swapInitiatorId.value }, set swapInitiatorId(v) { swapInitiatorId.value = v },
         get hasCalledUno() { return hasCalledUno.value }, set hasCalledUno(v) { hasCalledUno.value = v },
         get stackingMode() { return stackingMode.value }, set stackingMode(v) { stackingMode.value = v },
+    }
+
+    function rawEngineState(): EngineState {
+        return {
+            players: toRaw(players.value), deck: toRaw(deck.value), discardPile: toRaw(discardPile.value),
+            currentPlayerIndex: currentPlayerIndex.value, direction: direction.value, drawStack: drawStack.value,
+            currentColor: currentColor.value, turnState: turnState.value, gameState: gameState.value,
+            winnerId: winnerId.value, rouletteTargetColor: rouletteTargetColor.value,
+            pendingDiscardAllCards: toRaw(pendingDiscardAllCards.value), swapInitiatorId: swapInitiatorId.value,
+            hasCalledUno: { ...hasCalledUno.value }, stackingMode: stackingMode.value,
+        }
     }
 
     // Map engine events onto host concerns: sounds, stats, the action guard,
@@ -435,12 +448,12 @@ export const useGameStore = defineStore('game', () => {
         if (!player) return
 
         // Host policy: a bot facing a multi-match Discard All picks its top
-        // card at random; a human gets the picker (engine enters that state).
+        // card by profile; a human gets the picker (engine enters that state).
         let discardAllTopPickId: string | undefined
         if (card.type === 'discardAll' && player.isBot) {
-            const matches = player.hand.filter(c => c.color === card.color)
+            const matches = player.hand.filter(c => c.color === card.color && c.id !== card.id)
             if (matches.length > 1) {
-                discardAllTopPickId = matches[Math.floor(hostRng() * matches.length)]!.id
+                discardAllTopPickId = chooseDiscardAllTop(matches, profileFor(player), hostRng).id
             }
         }
 
@@ -595,7 +608,7 @@ export const useGameStore = defineStore('game', () => {
         if (!currentPlayer.value?.isBot || turnState.value !== 'CHOOSING_ROULETTE_COLOR') return
 
         const bot = currentPlayer.value
-        const color = chooseBotColor(bot)
+        const color = chooseRouletteColor(bot.hand, profileFor(bot), hostRng, discardPile.value)
 
         // Small delay for realism
         setTimeout(() => {
@@ -653,21 +666,23 @@ export const useGameStore = defineStore('game', () => {
 
         if (turnState.value !== 'WAITING_FOR_ACTION') return
 
-        const top = topCard.value
-        if (!top) return
+        if (!topCard.value) return
+        const opponent = players.value.find(p => p.id !== bot.id && !p.isEliminated)
+        if (!opponent) return
 
-        const playableCards = bot.hand.filter(c =>
-            canPlayCard(c, top, currentColor.value, drawStack.value, stackingMode.value)
-        )
-
-        const cardToPlay = chooseCard(
-            { playable: playableCards, drawStack: drawStack.value, opponents: [] },
+        // Raw state: the bot's lookahead clones and replays it many times, and
+        // reactive proxies would make every read of that work tracked and slow.
+        const raw = rawEngineState()
+        const move = chooseBotCard(
+            raw,
+            raw.players.find(p => p.id === bot.id)!,
+            raw.players.find(p => p.id === opponent.id)!,
             profileFor(bot),
             hostRng,
         )
-        if (cardToPlay) {
-            const colorToPick = cardToPlay.color === 'wild' ? chooseBotColor(bot) : undefined
-            playerActionPlayCard(cardToPlay, colorToPick)
+        if (move) {
+            const colorToPick = move.card.color === 'wild' ? (move.color ?? chooseBotColor(bot)) : undefined
+            playerActionPlayCard(move.card, colorToPick)
         } else {
             drawCardsForCurrentPlayer()
         }
@@ -686,7 +701,8 @@ export const useGameStore = defineStore('game', () => {
             profileFor(bot),
             hostRng,
         )
-        if (target) swapHands(target.id)
+        if (target && wantsSwap(bot, target, profileFor(bot), hostRng)) swapHands(target.id)
+        else skipSwap()
     }
 
     watch([currentPlayerIndex, gameState, turnState, topCard], () => {
@@ -705,11 +721,9 @@ export const useGameStore = defineStore('game', () => {
                     turnState.value !== 'CHOOSING_DISCARD_ALL_TOP') return
 
                 if (turnState.value === 'CHOOSING_DISCARD_ALL_TOP') {
-                    // Bot auto-selects a random top card
                     const cards = pendingDiscardAllCards.value
                     if (cards.length > 0) {
-                        const pick = cards[Math.floor(hostRng() * cards.length)]!
-                        selectDiscardAllTop(pick.id)
+                        selectDiscardAllTop(chooseDiscardAllTop(cards, profileFor(player), hostRng).id)
                     }
                 } else if (turnState.value === 'CHOOSING_PLAYER_TO_SWAP') {
                     executeBotSwap()

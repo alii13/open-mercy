@@ -54,6 +54,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: '2026-10-12T22:00Z',
+        level: 'quiet',
+        tag: 'IMPROVED',
+        title: 'Face tougher bots and a harder daily',
+        body: "All 8 bots now play smarter, and so does the bot in the daily challenge. Expect to win about 30 to 35% fewer games against them. Beating the Terminator means something now.",
+    },
+    {
         id: '2026-10-12T21:00Z',
         level: 'loud',
         tag: 'NEW',
