@@ -24,10 +24,13 @@
       <Users :size="14" :stroke-width="2" aria-hidden="true" />
       <span class="invite-chip-text">
         <strong class="invite-who">{{ chip.from_username }}</strong> invited you
-        <span v-if="!inBotGame" class="invite-chip-when">· after this game</span>
+        <span v-if="!canLeaveForIt" class="invite-chip-when">· after this game</span>
       </span>
-      <button v-if="inBotGame" class="invite-join" :disabled="joining" @click="joinFromBotGame">
+      <button v-if="canLeaveForIt" class="invite-join" :disabled="joining" @click="joinFromBotGame">
         {{ joining ? 'JOINING…' : 'JOIN' }}
+      </button>
+      <button class="invite-dismiss" aria-label="Ignore invite" @click="invitesStore.dismiss(chip.id)">
+        <X :size="14" :stroke-width="2" aria-hidden="true" />
       </button>
     </div>
   </Transition>
@@ -64,6 +67,8 @@ usePoll(() => { void invitesStore.refresh() }, 60_000)
 const inBotGame = computed(() => botGame.gameState !== 'LOBBY')
 const showing = computed(() => (inMatch.value || inBotGame.value ? null : invitesStore.current))
 const chip = computed(() => (inMatch.value || inBotGame.value ? invitesStore.current : null))
+// The daily is one attempt a day, so walking out of it is not free.
+const canLeaveForIt = computed(() => inBotGame.value && !botGame.dailyDate)
 
 // A ten-minute invite that arrives silently on a background tab is an invite
 // that expires. One cue, and the title carries it while the tab is hidden -
@@ -99,9 +104,11 @@ const roomLine = computed(() => {
 // A bot game has no one else at the table, so leaving it for a friend costs
 // nothing. Leaving a live match does, which is why that chip has no button.
 async function joinFromBotGame() {
-  if (joining.value) return
+  const invite = chip.value
+  if (!invite || joining.value) return
+  // Read before leaving: once the game is gone the chip is too.
   botGame.returnToLobby()
-  await join(chip.value)
+  await join(invite)
 }
 
 async function join(invite = showing.value) {
@@ -223,7 +230,8 @@ async function join(invite = showing.value) {
   top: calc(env(safe-area-inset-top, 0px) + 64px);
   left: 50%;
   transform: translateX(-50%);
-  z-index: 2200;
+  /* Under modals: the results screen and the colour picker win. */
+  z-index: var(--z-toast);
   display: flex;
   align-items: center;
   gap: var(--spacing-2);

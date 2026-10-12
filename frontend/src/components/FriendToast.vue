@@ -42,9 +42,9 @@
           variant="primary"
           size="sm"
           class="ft-primary"
-          :disabled="pinging"
+          :disabled="pinging || pingFailed === 'LIMIT TODAY'"
           @click="pingBack"
-        >{{ pinging ? '…' : pingFailed ? 'TRY AGAIN' : 'PING BACK' }}</Button>
+        >{{ pinging ? '…' : (pingFailed ?? 'PING BACK') }}</Button>
         <Button
           v-else
           variant="primary"
@@ -112,7 +112,8 @@ let remaining = HIDE_MS
 let startedAt = 0
 const paused = ref(false)
 const pinging = ref(false)
-const pingFailed = ref(false)
+/** Why PING BACK did not go out, as its label. */
+const pingFailed = ref<string | null>(null)
 
 function clearHide(): void {
   if (hideTimer) clearTimeout(hideTimer)
@@ -142,7 +143,7 @@ function resume(): void {
 }
 
 watch(key, (k) => {
-  pingFailed.value = false
+  pingFailed.value = null
   clearHide()
   paused.value = false
   remaining = HIDE_MS
@@ -174,8 +175,10 @@ async function pingBack() {
   pinging.value = true
   try {
     const result = await social.sendPing(n.row.user_id)
-    pingFailed.value = result !== 'sent' && result !== 'too_soon'
-    if (!pingFailed.value) await social.answerPing(n.ping.id)
+    if (result === 'failed') pingFailed.value = 'TRY AGAIN'
+    else if (result === 'rate_limited') pingFailed.value = 'LIMIT TODAY'
+    // Sent, already sent, or no longer friends: nothing left to answer.
+    else await social.answerPing(n.ping.id)
   } finally {
     pinging.value = false
   }

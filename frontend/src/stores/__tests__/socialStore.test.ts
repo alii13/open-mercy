@@ -388,6 +388,29 @@ describe('social store', () => {
             expect(social.notice).toBeNull()
         })
 
+        it('brings the next ping up as soon as one is answered', async () => {
+            serve({ pings: [ping(), ping({ id: 'p2', from_user: 'other' })], rows: [row({ user_id: 'friend' }), row({ user_id: 'other' })] })
+            const social = useSocialStore()
+            await social.refresh()
+            await social.fetchPings()
+            await social.answerPing('p1')
+            expect(social.notice).toEqual(expect.objectContaining({ kind: 'ping', ping: expect.objectContaining({ id: 'p2' }) }))
+        })
+
+        it('gives a ping back when a request takes its place', async () => {
+            serve({ pings: [ping()] })
+            const social = useSocialStore()
+            await social.refresh()
+            await social.fetchPings()
+            expect(social.notice?.kind).toBe('ping')
+
+            serve({ rows: [row({ user_id: 'friend' }), row({ user_id: 'asked-me', status: 'pending', incoming: true })], pings: [ping()] })
+            await social.refresh()
+            expect(social.notice?.kind).toBe('request')
+            social.dismissNotice()
+            expect(social.notice?.kind).toBe('ping')
+        })
+
         it('shows a ping once per session when it is only dismissed', async () => {
             serve({ pings: [ping()] })
             const social = useSocialStore()

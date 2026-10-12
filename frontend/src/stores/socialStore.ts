@@ -158,6 +158,8 @@ export const useSocialStore = defineStore('social', () => {
             .filter(r => r.status === 'pending' && r.incoming && !announced.has(requestKey(r)))
             .sort((a, b) => b.created_at.localeCompare(a.created_at))[0]
         if (!fresh) return
+        // A ping on screen gives way to a request, and comes back after it.
+        if (notice.value?.kind === 'ping') announcedPings.delete(notice.value.ping.id)
         announced.add(requestKey(fresh))
         notice.value = { kind: 'request', row: fresh }
     }
@@ -202,9 +204,11 @@ export const useSocialStore = defineStore('social', () => {
 
     async function sendPing(userId: string): Promise<string> {
         if (pingsUnavailable.value) return 'failed'
+        const seq = accountSeq
         try {
             if (!(await hasLiveSession())) return 'failed'
             const { data, error } = await supabase.rpc('send_ping', { p_user: userId })
+            if (seq !== accountSeq) return 'failed'
             if (error) {
                 if (isFatalSchemaError(error)) pingsUnavailable.value = true
                 return 'failed'
@@ -220,7 +224,10 @@ export const useSocialStore = defineStore('social', () => {
     /** Answered or waved away: either way it must not come back tomorrow. */
     async function answerPing(id: string): Promise<void> {
         pings.value = pings.value.filter(p => p.id !== id)
-        if (notice.value?.kind === 'ping' && notice.value.ping.id === id) notice.value = null
+        if (notice.value?.kind === 'ping' && notice.value.ping.id === id) {
+            notice.value = null
+            raisePing()
+        }
         try {
             if (!(await hasLiveSession())) return
             await supabase.rpc('dismiss_ping', { p_id: id })
@@ -229,6 +236,7 @@ export const useSocialStore = defineStore('social', () => {
 
     function dismissNotice(): void {
         notice.value = null
+        raisePing()
     }
 
     async function call(fn: string, args: Record<string, unknown>): Promise<string> {

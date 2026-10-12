@@ -215,7 +215,7 @@ async function play(f: FriendRow) {
 // the clock alone can only ever grey someone out.
 const now = useNow()
 // Opening this page is seeing the request: no toast for it on the way out.
-onMounted(() => { social.dismissNotice(); void social.refresh(); void social.fetchRecent(); void social.fetchPings() })
+onMounted(() => { if (social.notice?.kind !== 'ping') social.dismissNotice(); void social.refresh(); void social.fetchRecent(); void social.fetchPings() })
 usePoll(() => { void social.refresh() }, 60_000)
 
 // Ordered when the data changes, not when the clock moves: these rows carry
