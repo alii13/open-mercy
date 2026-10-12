@@ -7,11 +7,27 @@
         wants you at their table
         <span v-if="roomLine" class="invite-room">{{ roomLine }}</span>
       </span>
-      <button class="invite-join" :disabled="joining" @click="join">
+      <button class="invite-join" :disabled="joining" @click="join()">
         {{ joining ? 'JOINING…' : 'JOIN' }}
       </button>
       <button class="invite-dismiss" aria-label="Ignore invite" @click="invitesStore.dismiss(showing.id)">
         <X :size="14" :stroke-width="2" aria-hidden="true" />
+      </button>
+    </div>
+  </Transition>
+
+  <!-- Mid-match the invite waits in a chip instead of being dropped: the
+       player learns who asked, and the full toast takes over the moment the
+       game is left. Only a bot game can be walked out of from here. -->
+  <Transition name="invite-chip">
+    <div v-if="chip" class="invite-chip" role="status">
+      <Users :size="14" :stroke-width="2" aria-hidden="true" />
+      <span class="invite-chip-text">
+        <strong class="invite-who">{{ chip.from_username }}</strong> invited you
+        <span v-if="!inBotGame" class="invite-chip-when">· after this game</span>
+      </span>
+      <button v-if="inBotGame" class="invite-join" :disabled="joining" @click="joinFromBotGame">
+        {{ joining ? 'JOINING…' : 'JOIN' }}
       </button>
     </div>
   </Transition>
@@ -22,11 +38,13 @@ import { computed, onUnmounted, ref, watch } from 'vue'
 import { Users, X } from 'lucide-vue-next'
 import { useInviteStore } from '../stores/inviteStore'
 import { useMultiplayerStore } from '../stores/multiplayerStore'
+import { useGameStore } from '../stores/gameStore'
 import { usePoll } from '../composables/useClock'
 import { soundEffects } from '../composables/useSoundEffects'
 
 const invitesStore = useInviteStore()
 const mpStore = useMultiplayerStore()
+const botGame = useGameStore()
 const joining = ref(false)
 
 // Not during a match. JOIN would abandon the game in progress, and a toast
@@ -43,7 +61,9 @@ const inMatch = computed(() => {
 // room's GC window.
 usePoll(() => { void invitesStore.refresh() }, 60_000)
 
-const showing = computed(() => (inMatch.value ? null : invitesStore.current))
+const inBotGame = computed(() => botGame.gameState !== 'LOBBY')
+const showing = computed(() => (inMatch.value || inBotGame.value ? null : invitesStore.current))
+const chip = computed(() => (inMatch.value || inBotGame.value ? invitesStore.current : null))
 
 // A ten-minute invite that arrives silently on a background tab is an invite
 // that expires. One cue, and the title carries it while the tab is hidden -
@@ -76,8 +96,15 @@ const roomLine = computed(() => {
   return [people, rules].filter(Boolean).join(' · ')
 })
 
-async function join() {
-  const invite = showing.value
+// A bot game has no one else at the table, so leaving it for a friend costs
+// nothing. Leaving a live match does, which is why that chip has no button.
+async function joinFromBotGame() {
+  if (joining.value) return
+  botGame.returnToLobby()
+  await join(chip.value)
+}
+
+async function join(invite = showing.value) {
   if (!invite || joining.value) return
   joining.value = true
   try {
@@ -189,8 +216,64 @@ async function join() {
   transform: translate(-50%, 12px);
 }
 
+/* Top centre, under the game's own top bar: the hand and the draw pile own
+   the bottom of the table. */
+.invite-chip {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 64px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2200;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  max-width: calc(100vw - var(--spacing-6));
+  padding: var(--spacing-1) var(--spacing-1) var(--spacing-1) var(--spacing-3);
+  min-height: 36px;
+  background: rgba(10, 12, 14, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.invite-chip > svg {
+  flex: none;
+  color: var(--color-neon-blue);
+}
+
+.invite-chip-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-right: var(--spacing-2);
+}
+
+.invite-chip-when {
+  color: var(--text-muted);
+}
+
+.invite-chip .invite-join {
+  border-radius: 999px;
+}
+
+.invite-chip-enter-active,
+.invite-chip-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.invite-chip-enter-from,
+.invite-chip-leave-to {
+  opacity: 0;
+  transform: translate(-50%, -8px);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .invite-toast-enter-active,
-  .invite-toast-leave-active { transition: none; }
+  .invite-toast-leave-active,
+  .invite-chip-enter-active,
+  .invite-chip-leave-active { transition: none; }
 }
 </style>

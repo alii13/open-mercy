@@ -329,6 +329,117 @@ describe('social store', () => {
         })
     })
 
+    describe('pings', () => {
+        const ping = (over: Record<string, unknown> = {}) => ({
+            id: 'p1', from_user: 'friend', from_username: 'RIVAL', created_at: '2026-08-15T10:00:00Z', ...over,
+        })
+        function serve(opts: { rows?: FriendRow[], pings?: unknown[], sent?: unknown[], send?: string, missing?: boolean } = {}) {
+            rpc.mockImplementation(async (fn: string) => {
+                if (fn === 'my_friends') return { data: opts.rows ?? [row({ user_id: 'friend' })], error: null }
+                if (opts.missing && fn.includes('ping')) return { data: null, error: { code: 'PGRST202' } }
+                if (fn === 'my_pings') return { data: opts.pings ?? [], error: null }
+                if (fn === 'my_sent_pings') return { data: opts.sent ?? [], error: null }
+                if (fn === 'send_ping') return { data: opts.send ?? 'sent', error: null }
+                return { data: 'dismissed', error: null }
+            })
+        }
+
+        it('announces a ping from a friend who wanted to play while you were away', async () => {
+            serve({ pings: [ping()] })
+            const social = useSocialStore()
+            await social.refresh()
+            await social.fetchPings()
+            expect(social.notice).toEqual({
+                kind: 'ping',
+                row: expect.objectContaining({ user_id: 'friend' }),
+                ping: expect.objectContaining({ id: 'p1' }),
+            })
+        })
+
+        it('does not push a friend request off screen', async () => {
+            serve({ rows: [row({ user_id: 'friend' }), row({ user_id: 'asked-me', status: 'pending', incoming: true })], pings: [ping()] })
+            const social = useSocialStore()
+            await social.refresh()
+            await social.fetchPings()
+            expect(social.notice?.kind).toBe('request')
+
+            // It waits its turn rather than being lost.
+            social.dismissNotice()
+            await social.fetchPings()
+            expect(social.notice?.kind).toBe('ping')
+        })
+
+        it('waits for the friends list before announcing', async () => {
+            serve({ pings: [ping()] })
+            const social = useSocialStore()
+            await social.fetchPings()
+            expect(social.notice).toBeNull()
+            await social.refresh()
+            expect(social.notice?.kind).toBe('ping')
+        })
+
+        it('answering a ping retires it for good', async () => {
+            serve({ pings: [ping()] })
+            const social = useSocialStore()
+            await social.refresh()
+            await social.fetchPings()
+            await social.answerPing('p1')
+            expect(rpc).toHaveBeenCalledWith('dismiss_ping', { p_id: 'p1' })
+            expect(social.notice).toBeNull()
+        })
+
+        it('shows a ping once per session when it is only dismissed', async () => {
+            serve({ pings: [ping()] })
+            const social = useSocialStore()
+            await social.refresh()
+            await social.fetchPings()
+            social.dismissNotice()
+            await social.fetchPings()
+            expect(social.notice).toBeNull()
+        })
+
+        it('remembers who you pinged, including a ping the server says was too soon', async () => {
+            serve({ sent: [{ to_user: 'a', created_at: '2026-08-15T10:00:00Z' }] })
+            const social = useSocialStore()
+            await social.fetchPings()
+            expect(social.pinged.has('a')).toBe(true)
+
+            expect(await social.sendPing('b')).toBe('sent')
+            expect(rpc).toHaveBeenCalledWith('send_ping', { p_user: 'b' })
+            expect(social.pinged.has('b')).toBe(true)
+
+            serve({ send: 'too_soon' })
+            await social.sendPing('c')
+            expect(social.pinged.has('c')).toBe(true)
+        })
+
+        it('turns pings off until their SQL is run, without hiding friends', async () => {
+            serve({ missing: true })
+            const social = useSocialStore()
+            await social.refresh()
+            await social.fetchPings()
+            expect(social.pingsUnavailable).toBe(true)
+            expect(social.unavailable).toBe(false)
+            expect(social.friends).toHaveLength(1)
+        })
+
+        it('re-reads when a ping arrives for the signed-in player', async () => {
+            serve()
+            const social = useSocialStore()
+            const auth = useAuthStore()
+            auth.user = { id: 'me' } as never
+            await nextTick()
+            await social.refresh()
+
+            const ch = channels.find(c => c.name === 'pings:me')
+            expect(ch!.filters).toEqual([expect.objectContaining({ table: 'pings', event: 'INSERT', filter: 'to_user=eq.me' })])
+
+            serve({ pings: [ping()] })
+            ch!.fire()
+            await vi.waitFor(() => expect(social.notice?.kind).toBe('ping'))
+        })
+    })
+
     describe('live updates', () => {
         it('re-reads when a friendship row changes for the signed-in player', async () => {
             listReturns([])

@@ -23,7 +23,7 @@
         />
         <div class="ft-text">
           <span class="ft-name">{{ title }}</span>
-          <span class="ft-sub" :class="{ 'ft-sub--live': notice.kind === 'accepted' && online }">{{ subtitle }}</span>
+          <span class="ft-sub" :class="{ 'ft-sub--live': notice.kind !== 'request' && online }">{{ subtitle }}</span>
         </div>
         <button class="ft-close" aria-label="Dismiss notification" @click="social.dismissNotice()">
           <X :size="16" :stroke-width="2" aria-hidden="true" />
@@ -38,6 +38,14 @@
           @click="accept"
         >ACCEPT</Button>
         <Button
+          v-else-if="notice.kind === 'ping' && !online"
+          variant="primary"
+          size="sm"
+          class="ft-primary"
+          :disabled="pinging"
+          @click="pingBack"
+        >{{ pinging ? '…' : pingFailed ? 'TRY AGAIN' : 'PING BACK' }}</Button>
+        <Button
           v-else
           variant="primary"
           size="sm"
@@ -45,7 +53,7 @@
           :disabled="busy !== null"
           @click="play"
         >{{ busy ? '…' : (asked[notice.row.user_id] === 'TRY AGAIN' ? 'TRY AGAIN' : 'PLAY NOW') }}</Button>
-        <button class="ft-later" @click="social.dismissNotice()">
+        <button class="ft-later" @click="later">
           {{ notice.kind === 'request' ? 'Not now' : 'Later' }}
         </button>
       </div>
@@ -87,6 +95,9 @@ const subtitle = computed(() => {
   const n = notice.value
   if (!n) return ''
   if (n.kind === 'accepted') return online.value ? "You're friends · online now" : "You're friends"
+  // A ping from hours ago to someone now offline: PLAY would invite them to
+  // a room they will not see, so the toast says when, and offers a ping back.
+  if (n.kind === 'ping') return online.value ? 'wants to play · online now' : `wanted to play · ${relativeTime(n.ping.created_at)}`
   // Under a few seconds - or a server clock a moment ahead - reads as
   // "in 0 seconds" from relativeTime, so call it what it is.
   const age = Date.now() - Date.parse(n.row.created_at)
@@ -100,6 +111,8 @@ let hideTimer: ReturnType<typeof setTimeout> | null = null
 let remaining = HIDE_MS
 let startedAt = 0
 const paused = ref(false)
+const pinging = ref(false)
+const pingFailed = ref(false)
 
 function clearHide(): void {
   if (hideTimer) clearTimeout(hideTimer)
@@ -110,7 +123,7 @@ function runHide(): void {
   clearHide()
   startedAt = Date.now()
   hideTimer = setTimeout(() => {
-    if (busy.value) return
+    if (busy.value || pinging.value) return
     social.dismissNotice()
   }, remaining)
 }
@@ -129,6 +142,7 @@ function resume(): void {
 }
 
 watch(key, (k) => {
+  pingFailed.value = false
   clearHide()
   paused.value = false
   remaining = HIDE_MS
@@ -149,7 +163,30 @@ async function play() {
   const n = notice.value
   if (!n) return
   // The waiting room takes over the screen on its own once the room exists.
-  if (await playWith(n.row.user_id)) social.dismissNotice()
+  if (!(await playWith(n.row.user_id))) return
+  if (n.kind === 'ping') await social.answerPing(n.ping.id)
+  else social.dismissNotice()
+}
+
+async function pingBack() {
+  const n = notice.value
+  if (n?.kind !== 'ping' || pinging.value) return
+  pinging.value = true
+  try {
+    const result = await social.sendPing(n.row.user_id)
+    pingFailed.value = result !== 'sent' && result !== 'too_soon'
+    if (!pingFailed.value) await social.answerPing(n.ping.id)
+  } finally {
+    pinging.value = false
+  }
+}
+
+/** "Later" on a ping retires it: it keeps for a day, and would otherwise
+ *  come back on every visit. The close button only hides it for now. */
+function later() {
+  const n = notice.value
+  if (n?.kind === 'ping') void social.answerPing(n.ping.id)
+  else social.dismissNotice()
 }
 </script>
 

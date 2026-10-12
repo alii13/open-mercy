@@ -38,7 +38,21 @@
               <button class="fs-name" @click="openProfile(f)">{{ f.username }}</button>
               <span class="fs-status">{{ seenLabel(f) }}</span>
             </div>
+            <!-- A ten-minute room invite is lost on someone who is not here;
+                 a ping waits a day. The invite stays as the fallback until
+                 friends-ping.sql runs. -->
             <button
+              v-if="!social.pingsUnavailable"
+              class="fs-text-btn"
+              :disabled="pingBusy === f.user_id || social.pinged.has(f.user_id)"
+              @click="ping(f.user_id)"
+            >
+              <Check v-if="social.pinged.has(f.user_id)" :size="16" :stroke-width="2" aria-hidden="true" />
+              <BellRing v-else :size="16" :stroke-width="2" aria-hidden="true" />
+              {{ social.pinged.has(f.user_id) ? 'Pinged' : (pingErrors[f.user_id] ?? 'Ping') }}
+            </button>
+            <button
+              v-else
               class="fs-text-btn"
               :disabled="busy === f.user_id || !!asked[f.user_id]"
               @click="play(f)"
@@ -157,7 +171,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { ChevronRight, Link2, MessageCircle, Plus, Send } from 'lucide-vue-next'
+import { BellRing, Check, ChevronRight, Link2, MessageCircle, Plus, Send } from 'lucide-vue-next'
 import { useSocialStore, type FriendRow, type RecentOpponent } from '../stores/socialStore'
 import { useAuthStore } from '../stores/authStore'
 import { isOnline, relativeTime, byPresence } from '../utils/relativeTime'
@@ -174,6 +188,23 @@ const emit = defineEmits<{ (e: 'opened-room'): void }>()
 const { busy, asked, playWith } = usePlayWithFriend()
 const { badges, fetchBadges } = useBadges()
 
+const pingBusy = ref<string | null>(null)
+const pingErrors = ref<Record<string, string>>({})
+
+async function ping(userId: string): Promise<void> {
+  if (pingBusy.value) return
+  pingBusy.value = userId
+  const result = await social.sendPing(userId)
+  pingBusy.value = null
+  if (result === 'sent' || result === 'too_soon') return
+  pingErrors.value = { ...pingErrors.value, [userId]: result === 'rate_limited' ? 'Limit today' : 'Try again' }
+  setTimeout(() => {
+    const next = { ...pingErrors.value }
+    delete next[userId]
+    pingErrors.value = next
+  }, 2500)
+}
+
 async function play(f: FriendRow) {
   // The room is open behind this screen; take them to it.
   if (await playWith(f.user_id)) emit('opened-room')
@@ -184,7 +215,7 @@ async function play(f: FriendRow) {
 // the clock alone can only ever grey someone out.
 const now = useNow()
 // Opening this page is seeing the request: no toast for it on the way out.
-onMounted(() => { social.dismissNotice(); void social.refresh(); void social.fetchRecent() })
+onMounted(() => { social.dismissNotice(); void social.refresh(); void social.fetchRecent(); void social.fetchPings() })
 usePoll(() => { void social.refresh() }, 60_000)
 
 // Ordered when the data changes, not when the clock moves: these rows carry
