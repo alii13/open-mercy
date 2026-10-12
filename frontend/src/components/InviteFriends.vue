@@ -87,6 +87,8 @@ async function readSent(): Promise<void> {
   try {
     if (!(await hasLiveSession())) return
     const { data, error } = await supabase.rpc('my_sent_invites', { p_code: code })
+    // Left for another room while this was in flight.
+    if (code !== mpStore.roomCode) return
     if (error) {
       // Until invites-sent.sql runs, the card still invites - it just cannot
       // say what happened next.
@@ -100,7 +102,7 @@ async function readSent(): Promise<void> {
 }
 
 onMounted(() => { void readSent() })
-watch(() => mpStore.roomCode, () => { sentInvites.value = {}; void readSent() })
+watch(() => mpStore.roomCode, () => { sentInvites.value = {}; errors.value = {}; void readSent() })
 usePoll(() => { void readSent() }, 15_000)
 
 const seated = computed(() => new Set(mpStore.presentUserIds))
@@ -138,7 +140,7 @@ function hint(f: { user_id: string, last_seen_at: string | null }): string {
   if (err) return err
   switch (state(f.user_id)) {
     case 'waiting': return 'Waiting for them to join'
-    case 'declined': return againOk(f.user_id) ? 'Said not now' : 'Said not now · ask again in a few minutes'
+    case 'declined': return againOk(f.user_id) ? "Didn't join" : "Didn't join · ask again in a few minutes"
     case 'missed': return 'Missed it'
     default: return presenceState(f.last_seen_at) === 'online' ? 'Online' : 'Just stepped away'
   }
