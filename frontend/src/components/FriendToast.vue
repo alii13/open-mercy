@@ -88,7 +88,7 @@ const online = computed(() => notice.value ? isOnline(notice.value.row.last_seen
 const title = computed(() => {
   const n = notice.value
   if (!n) return ''
-  return n.kind === 'request' ? n.row.username : `${n.row.username} accepted`
+  return n.kind === 'accepted' ? `${n.row.username} accepted` : n.row.username
 })
 
 const subtitle = computed(() => {
