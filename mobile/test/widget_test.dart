@@ -1,30 +1,41 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
-import 'package:flutter_test/flutter_test.dart';
-
+import 'package:app/game/local_store.dart';
 import 'package:app/main.dart';
+import 'package:app/services/prefs.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+Future<LocalStore> _boot() async {
+  SharedPreferences.setMockInitialValues({});
+  Prefs.wrap(await SharedPreferences.getInstance());
+  return LocalStore.load();
+}
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('home offers the first ladder bot and the daily', (tester) async {
+    await tester.pumpWidget(OpenMercyApp(store: await _boot()));
+    expect(find.text('OPEN MERCY'), findsOneWidget);
+    expect(find.text('PLAY VS SCRAP'), findsOneWidget);
+    expect(find.text("PLAY TODAY'S DEAL"), findsOneWidget);
+  });
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+  testWidgets('a solo game opens the table, deals, and leaves through the confirm', (tester) async {
+    await tester.pumpWidget(OpenMercyApp(store: await _boot()));
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
+    await tester.tap(find.text('PLAY VS SCRAP'));
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('SCRAP'), findsOneWidget);
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    // Dealer intro (~1s) + 14 cards at 0.3s each.
+    await tester.pump(const Duration(seconds: 6));
+    expect(find.text('/25'), findsOneWidget);
+
+    await tester.tap(find.bySemanticsLabel('Leave game'));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.text('LEAVE THE GAME?'), findsOneWidget);
+    await tester.tap(find.text('LEAVE'));
+    await tester.pump(const Duration(seconds: 2));
+    expect(find.text('OPEN MERCY'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 15));
   });
 }
