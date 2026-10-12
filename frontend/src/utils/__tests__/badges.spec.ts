@@ -40,7 +40,7 @@ function row(overrides: Partial<ResultRow>): ResultRow {
 }
 
 describe('badgeFor', () => {
-    it('maps points onto the 10-tier ladder at the boundaries', () => {
+    it('maps points onto the 20-tier ladder at the boundaries', () => {
         expect(badgeFor(0).title).toBe('Recruit')
         expect(badgeFor(249).title).toBe('Recruit')
         expect(badgeFor(250).title).toBe('Scrapper')
@@ -48,11 +48,27 @@ describe('badgeFor', () => {
         expect(badgeFor(600).title).toBe('Enforcer')
         expect(badgeFor(99_999).title).toBe('Merciless')
         expect(badgeFor(100_000).title).toBe('No Mercy King')
-        expect(badgeFor(5_000_000).tier).toBe(10)
+        expect(badgeFor(139_999).title).toBe('No Mercy King')
+        expect(badgeFor(140_000).title).toBe('Tyrant')
+        // The leader on the day ranks 11-20 shipped.
+        expect(badgeFor(215_040).title).toBe('Butcher')
+        expect(badgeFor(2_889_999).title).toBe('Apocalypse')
+        expect(badgeFor(2_890_000).title).toBe('God of No Mercy')
+        expect(badgeFor(50_000_000).tier).toBe(20)
     })
 
-    it('has 10 tiers, strictly increasing thresholds', () => {
-        expect(BADGES).toHaveLength(10)
+    // Past the King every rank costs more than the one before, so the top
+    // keeps getting harder rather than flattening into a grind of equal steps.
+    it('makes each rank past the King a bigger step than the last', () => {
+        for (let i = 11; i < BADGES.length; i++) {
+            const gap = BADGES[i]!.threshold - BADGES[i - 1]!.threshold
+            const prev = BADGES[i - 1]!.threshold - BADGES[i - 2]!.threshold
+            expect(gap).toBeGreaterThan(prev)
+        }
+    })
+
+    it('has 20 tiers, strictly increasing thresholds', () => {
+        expect(BADGES).toHaveLength(20)
         for (let i = 1; i < BADGES.length; i++) {
             expect(BADGES[i]!.threshold).toBeGreaterThan(BADGES[i - 1]!.threshold)
             expect(BADGES[i]!.tier).toBe(i + 1)
@@ -65,7 +81,7 @@ describe('botBadge', () => {
         expect(botBadge(1).tier).toBe(2)   // scrap → Scrapper
         expect(botBadge(8).tier).toBe(9)   // terminator → Merciless
         expect(botBadge(1).tier).toBeGreaterThanOrEqual(2)
-        expect(botBadge(99).title).not.toBe('No Mercy King')
+        expect(botBadge(99).tier).toBe(9)  // the King and above are human-only
         expect(botBadge(0).tier).toBe(2)   // clamps low
     })
 })
@@ -216,8 +232,8 @@ describe('progressToNext', () => {
     })
 
     it('caps out at the apex', () => {
-        const p = progressToNext(120_000)
-        expect(p.current.title).toBe('No Mercy King')
+        const p = progressToNext(3_000_000)
+        expect(p.current.title).toBe('God of No Mercy')
         expect(p.next).toBeNull()
         expect(p.pct).toBe(1)
     })

@@ -54,6 +54,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: '2026-10-12T21:00Z',
+        level: 'loud',
+        tag: 'NEW',
+        title: '10 new ranks above No Mercy King',
+        body: "No Mercy King isn't the top anymore. There are 10 new ranks above it, from Tyrant to God of No Mercy. Already a King? Check your badge - you may have moved up.",
+        bodySignedOut: "No Mercy King isn't the top anymore. There are 10 new ranks above it, from Tyrant to God of No Mercy.",
+        cta: { label: 'SEE THE RANKS', route: { name: 'badges' } },
+    },
+    {
         id: '2026-10-12T20:00Z',
         level: 'quiet',
         tag: 'NEW',

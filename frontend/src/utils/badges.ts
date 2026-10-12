@@ -19,7 +19,7 @@
 import type { ResultRow } from './gameStats'
 
 export interface Badge {
-    /** 1-10, also the emblem facet/rank count. */
+    /** 1-20, also the emblem art index. */
     tier: number
     threshold: number
     title: string
@@ -39,6 +39,19 @@ export const BADGES: Badge[] = [
     { tier: 8, threshold: 22_000, title: 'Executioner', color: '#a855f7' },
     { tier: 9, threshold: 45_000, title: 'Merciless', color: '#7c3aed' },
     { tier: 10, threshold: 100_000, title: 'No Mercy King', color: '#ffd700' },
+    // Prestige ranks: x1.4 per rank, rounded. At the fastest player's pace
+    // when these shipped (~140k points a month) the top is well over a year
+    // away - reachable, so it still pulls, but nobody walks into it.
+    { tier: 11, threshold: 140_000, title: 'Tyrant', color: '#ff7a1a' },
+    { tier: 12, threshold: 196_000, title: 'Butcher', color: '#ff2440' },
+    { tier: 13, threshold: 274_000, title: 'Dreadlord', color: '#39ff88' },
+    { tier: 14, threshold: 384_000, title: 'Harbinger', color: '#3fa9ff' },
+    { tier: 15, threshold: 538_000, title: 'Annihilator', color: '#ff5a00' },
+    { tier: 16, threshold: 753_000, title: 'Wraith', color: '#7fe9ff' },
+    { tier: 17, threshold: 1_050_000, title: 'Reaper', color: '#e8e2d0' },
+    { tier: 18, threshold: 1_480_000, title: 'Doombringer', color: '#ff2a2a' },
+    { tier: 19, threshold: 2_070_000, title: 'Apocalypse', color: '#b56bff' },
+    { tier: 20, threshold: 2_890_000, title: 'God of No Mercy', color: '#ffcc33' },
 ]
 
 export function badgeFor(points: number): Badge {
@@ -180,9 +193,11 @@ export function gameContribution(g: GameContribution): number {
 }
 
 /** Cosmetic badge for a single-player bot, tied to its ladder rung (1-based).
- *  Caps below the apex so No Mercy King stays a human-only achievement. */
+ *  Caps at Merciless so No Mercy King and everything above stay human-only. */
+const BOT_MAX_INDEX = 8
+
 export function botBadge(rung: number): Badge {
-    const idx = Math.min(Math.max(Math.round(rung), 1), BADGES.length - 2)
+    const idx = Math.min(Math.max(Math.round(rung), 1), BOT_MAX_INDEX)
     return BADGES[idx]!
 }
 
