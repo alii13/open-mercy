@@ -54,6 +54,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: '2026-10-12T20:00Z',
+        level: 'quiet',
+        tag: 'NEW',
+        title: 'Ping a friend who is offline',
+        body: 'Tap Ping on an offline friend and they see you want to play when they next open the game, any time that day. An invite that arrives during a game now shows in a small chip instead of disappearing.',
+    },
+    {
         id: '2026-10-12T19:00Z',
         level: 'quiet',
         tag: 'IMPROVED',

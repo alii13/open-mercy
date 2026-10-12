@@ -55,10 +55,17 @@ export interface RecentOpponent {
     last_played: string
 }
 
-export interface FriendNotice {
-    kind: 'request' | 'accepted'
-    row: FriendRow
+/** A friend asking to play while you were away. No room: it outlives any. */
+export interface Ping {
+    id: string
+    from_user: string
+    from_username: string
+    created_at: string
 }
+
+export type FriendNotice =
+    | { kind: 'request' | 'accepted', row: FriendRow }
+    | { kind: 'ping', row: FriendRow, ping: Ping }
 
 export const useSocialStore = defineStore('social', () => {
     const rows = ref<FriendRow[]>([])
@@ -78,6 +85,17 @@ export const useSocialStore = defineStore('social', () => {
     let announced = new Set<string>()
     const requestKey = (r: FriendRow) => `${r.user_id}:${r.created_at}`
     let channel: { unsubscribe: () => void } | null = null
+
+    const pings = ref<Ping[]>([])
+    /** Friends you pinged inside the server's six-hour window. */
+    const pinged = ref<Set<string>>(new Set())
+    /** Separate from `unavailable`, like the recent list. */
+    const pingsUnavailable = ref(false)
+    let announcedPings = new Set<string>()
+    let pingChannel: { unsubscribe: () => void } | null = null
+    /** Bumped only on an account change. Pings are not ordered against the
+     *  friends read, so readSeq would drop them for no reason. */
+    let accountSeq = 0
 
     const friends = computed(() => rows.value.filter(r => r.status === 'accepted'))
     const incoming = computed(() => rows.value.filter(r => r.status === 'pending' && r.incoming))
@@ -116,6 +134,8 @@ export const useSocialStore = defineStore('social', () => {
             const next = (data ?? []) as FriendRow[]
             raiseNotice(rows.value, next)
             rows.value = next
+            // A ping that arrived before the list did waits for it.
+            raisePing()
         } catch {
             /* transient - keep whatever list is on screen */
         } finally {
@@ -130,6 +150,7 @@ export const useSocialStore = defineStore('social', () => {
             // A request on screen gives way, but is not spent: it comes back
             // on the next read.
             if (notice.value?.kind === 'request') announced.delete(requestKey(notice.value.row))
+            if (notice.value?.kind === 'ping') announcedPings.delete(notice.value.ping.id)
             notice.value = { kind: 'accepted', row: accepted }
             return
         }
@@ -137,12 +158,85 @@ export const useSocialStore = defineStore('social', () => {
             .filter(r => r.status === 'pending' && r.incoming && !announced.has(requestKey(r)))
             .sort((a, b) => b.created_at.localeCompare(a.created_at))[0]
         if (!fresh) return
+        // A ping on screen gives way to a request, and comes back after it.
+        if (notice.value?.kind === 'ping') announcedPings.delete(notice.value.ping.id)
         announced.add(requestKey(fresh))
         notice.value = { kind: 'request', row: fresh }
     }
 
+    /** Only into an empty slot: a request needs an answer, a ping can wait
+     *  for the next read. Only from someone who is still a friend. */
+    function raisePing(): void {
+        if (notice.value) return
+        for (const p of pings.value) {
+            if (announcedPings.has(p.id)) continue
+            const friend = rows.value.find(r => r.user_id === p.from_user && r.status === 'accepted')
+            if (!friend) continue
+            announcedPings.add(p.id)
+            notice.value = { kind: 'ping', row: friend, ping: p }
+            return
+        }
+    }
+
+    async function fetchPings(): Promise<void> {
+        if (unavailable.value || pingsUnavailable.value) return
+        const seq = accountSeq
+        try {
+            if (!(await hasLiveSession())) return
+            const [got, sent] = await Promise.all([
+                supabase.rpc('my_pings'),
+                supabase.rpc('my_sent_pings'),
+            ])
+            if (seq !== accountSeq) return
+            const error = got.error ?? sent.error
+            if (error) {
+                if (isFatalSchemaError(error)) {
+                    pingsUnavailable.value = true
+                    stopPings()
+                }
+                return
+            }
+            pings.value = (got.data ?? []) as Ping[]
+            pinged.value = new Set(((sent.data ?? []) as { to_user: string }[]).map(r => r.to_user))
+            raisePing()
+        } catch { /* transient - a ping keeps for a day */ }
+    }
+
+    async function sendPing(userId: string): Promise<string> {
+        if (pingsUnavailable.value) return 'failed'
+        const seq = accountSeq
+        try {
+            if (!(await hasLiveSession())) return 'failed'
+            const { data, error } = await supabase.rpc('send_ping', { p_user: userId })
+            if (seq !== accountSeq) return 'failed'
+            if (error) {
+                if (isFatalSchemaError(error)) pingsUnavailable.value = true
+                return 'failed'
+            }
+            // too_soon means one already went out - from another tab, say.
+            if (data === 'sent' || data === 'too_soon') pinged.value = new Set(pinged.value).add(userId)
+            return typeof data === 'string' ? data : 'failed'
+        } catch {
+            return 'failed'
+        }
+    }
+
+    /** Answered or waved away: either way it must not come back tomorrow. */
+    async function answerPing(id: string): Promise<void> {
+        pings.value = pings.value.filter(p => p.id !== id)
+        if (notice.value?.kind === 'ping' && notice.value.ping.id === id) {
+            notice.value = null
+            raisePing()
+        }
+        try {
+            if (!(await hasLiveSession())) return
+            await supabase.rpc('dismiss_ping', { p_id: id })
+        } catch { /* already off screen */ }
+    }
+
     function dismissNotice(): void {
         notice.value = null
+        raisePing()
     }
 
     async function call(fn: string, args: Record<string, unknown>): Promise<string> {
@@ -222,9 +316,15 @@ export const useSocialStore = defineStore('social', () => {
         await refresh()
     }
 
+    function stopPings(): void {
+        pingChannel?.unsubscribe()
+        pingChannel = null
+    }
+
     function stop(): void {
         channel?.unsubscribe()
         channel = null
+        stopPings()
     }
 
     function start(userId: string): void {
@@ -240,6 +340,15 @@ export const useSocialStore = defineStore('social', () => {
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'friendships', filter: `addressee_id=eq.${userId}` }, nudge)
             // A row written while the socket was down is never replayed.
             .subscribe((status: string) => { if (status === 'SUBSCRIBED') nudge() })
+
+        // Its own channel: until friends-ping.sql runs the table does not
+        // exist, and that must not take the friend requests down with it.
+        if (pingsUnavailable.value) return
+        const pingNudge = () => { void fetchPings() }
+        pingChannel = supabase
+            .channel(`pings:${userId}`)
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pings', filter: `to_user=eq.${userId}` }, pingNudge)
+            .subscribe((status: string) => { if (status === 'SUBSCRIBED') pingNudge() })
     }
 
     function reset(): void {
@@ -249,6 +358,10 @@ export const useSocialStore = defineStore('social', () => {
         pendingIds.value = new Set()
         notice.value = null
         announced = new Set()
+        accountSeq++
+        pings.value = []
+        pinged.value = new Set()
+        announcedPings = new Set()
     }
 
     // A Pinia store outlives a sign-out, because nothing reloads the page.
@@ -262,8 +375,9 @@ export const useSocialStore = defineStore('social', () => {
     }, { immediate: true })
 
     return {
-        rows, loading, unavailable, pendingIds, notice, recent,
+        rows, loading, unavailable, pendingIds, notice, recent, pinged, pingsUnavailable,
         friends, incoming, outgoing, blocked, knownIds,
         refresh, fetchRecent, sendRequest, respond, remove, block, unblock, reset, dismissNotice,
+        fetchPings, sendPing, answerPing,
     }
 })
