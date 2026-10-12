@@ -28,14 +28,9 @@ export interface Poll {
     options: string[]
 }
 
-export const POLLS: Poll[] = [
-    {
-        id: '2026-08-29-mobile-app',
-        question: 'Would you play this as a phone app?',
-        body: 'An iOS and Android app is on the table. One tap tells us whether to build it.',
-        options: ['Yes', 'No'],
-    },
-]
+// Closed: 2026-08-29-mobile-app ("Would you play this as a phone app?").
+// Its votes stay in poll_votes; never reuse the id.
+export const POLLS: Poll[] = []
 
 /**
  * The first question this player has not closed, or null.
