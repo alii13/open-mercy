@@ -54,6 +54,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        // A second entry on the same day: a full UTC timestamp keeps the id a
+        // valid, sortable date that the page still formats as Oct 12.
+        id: '2026-10-12T18:00Z',
+        level: 'quiet',
+        tag: 'IMPROVED',
+        title: 'Add the people you just played',
+        body: 'Your Friends page now lists who you played lately, with your head-to-head. Share your friend link on WhatsApp, and anyone who opens it can add you straight from your profile.',
+    },
+    {
         id: '2026-10-12',
         level: 'loud',
         tag: 'NEW',

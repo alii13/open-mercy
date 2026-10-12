@@ -91,6 +91,15 @@
         </div>
         <p class="pp-cta-line">Think you can beat {{ p.username }}?</p>
         <Button variant="primary" size="md" block @click="$emit('back')">PLAY</Button>
+        <!-- Where a shared friend link lands, so it has to convert here. -->
+        <template v-if="!social.unavailable && p.user_id">
+          <Button v-if="friendState === 'asked-me'" variant="hazard" size="md" block @click="acceptFromProfile">ACCEPT FRIEND REQUEST</Button>
+          <button v-else class="pp-add-friend" :disabled="friendState !== 'none' || adding" @click="addFriend">
+            <Check v-if="friendState === 'friends' || friendState === 'asked'" :size="16" :stroke-width="2.2" aria-hidden="true" />
+            <UserPlus v-else :size="16" :stroke-width="2" aria-hidden="true" />
+            {{ addLabel }}
+          </button>
+        </template>
       </section>
       <section v-else class="pp-cta pp-cta--own">
         <div class="pp-cta-head">
@@ -227,7 +236,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
-import { ArrowRight, Check, ChevronLeft } from 'lucide-vue-next'
+import { ArrowRight, Check, ChevronLeft, UserPlus } from 'lucide-vue-next'
 import gsap from 'gsap'
 import { useProfile } from '../composables/useProfile'
 import { useMotion } from '../composables/useMotion'
@@ -285,6 +294,60 @@ const presenceNow = useNow()
 // rather than offering ADD to someone you asked yesterday.
 const social = useSocialStore()
 onMounted(() => { if (authStore.isAuthenticated) void social.refresh() })
+
+type FriendState = 'none' | 'friends' | 'asked' | 'asked-me' | 'blocked'
+const friendState = computed<FriendState>(() => {
+  const id = p.value?.user_id
+  const row = id ? social.rows.find(r => r.user_id === id) : undefined
+  if (!row) return 'none'
+  if (row.status === 'accepted') return 'friends'
+  if (row.status === 'blocked') return 'blocked'
+  if (row.status === 'pending') return row.incoming ? 'asked-me' : 'asked'
+  return 'none'
+})
+
+const adding = ref(false)
+const addResult = ref<string | null>(null)
+// One result per profile: an answer about the last player must not label the next.
+watch(() => props.code, () => { addResult.value = null })
+const addLabel = computed(() => {
+  if (adding.value) return 'Adding…'
+  if (friendState.value === 'friends') return "You're friends"
+  if (friendState.value === 'asked') return 'Request sent'
+  if (friendState.value === 'blocked') return 'You blocked this player'
+  switch (addResult.value) {
+    case 'rate_limited': return 'Too many requests today'
+    case 'declined': return 'Try again in a few days'
+    case 'blocked': return "Can't add this player"
+    case 'failed': return 'Try again'
+    default: return 'Add as friend'
+  }
+})
+
+// A visitor from a shared link is often signed out. ADD makes them a guest
+// first - the same identity PLAY would give them - and stays on this page.
+async function addFriend(): Promise<void> {
+  const id = p.value?.user_id
+  if (!id || adding.value) return
+  adding.value = true
+  try {
+    if (!authStore.isAuthenticated) {
+      const res = await authStore.signInAnonymously()
+      if (!res.success) { addResult.value = 'failed'; return }
+      await social.refresh()
+      if (friendState.value !== 'none') return
+    }
+    const result = await social.sendRequest(id)
+    addResult.value = result === 'sent' || result === 'accepted' || result === 'already' ? null : result
+  } finally {
+    adding.value = false
+  }
+}
+
+async function acceptFromProfile(): Promise<void> {
+  const id = p.value?.user_id
+  if (id) await social.respond(id, true)
+}
 
 // Same batched lookup and same cache the leaderboard and the friends list
 // use - one presence path, so the dot cannot disagree with itself.
@@ -596,27 +659,25 @@ watch(() => props.code, (code) => {
 .pp-add-friend {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: var(--spacing-2);
-  align-self: center;
-  padding: var(--spacing-2) var(--spacing-4);
-  background: transparent;
-  border: 1px solid rgba(0, 243, 255, 0.35);
-  border-radius: var(--radius-sm);
-  color: var(--color-neon-blue);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  letter-spacing: 0.14em;
+  min-height: 44px;
+  padding: 0 var(--spacing-4);
+  background: none;
+  border: none;
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
 }
 
 .pp-add-friend:hover:not(:disabled) {
-  background: rgba(0, 243, 255, 0.08);
-  border-color: rgba(0, 243, 255, 0.6);
+  color: var(--color-neon-blue);
 }
 
 .pp-add-friend:disabled {
-  opacity: 0.55;
+  color: var(--text-secondary);
   cursor: default;
 }
 

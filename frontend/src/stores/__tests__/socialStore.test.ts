@@ -177,6 +177,82 @@ describe('social store', () => {
         expect(social.incoming).toHaveLength(0)
     })
 
+    describe('played recently', () => {
+        const opponent = (over: Record<string, unknown> = {}) => ({
+            user_id: 'rival', username: 'RIVAL', share_code: 'r1', last_seen_at: null,
+            games: 3, my_wins: 2, their_wins: 1, last_played: '2026-08-15T10:00:00Z', ...over,
+        })
+
+        it('lists people from recent multiplayer games', async () => {
+            rpc.mockImplementation(async (fn: string) =>
+                fn === 'recent_opponents' ? { data: [opponent()], error: null } : { data: [], error: null })
+            const social = useSocialStore()
+            await social.fetchRecent()
+            expect(social.recent.map(r => r.user_id)).toEqual(['rival'])
+        })
+
+        it('drops someone from the list once you ask them, without waiting for a re-read', async () => {
+            rpc.mockImplementation(async (fn: string) =>
+                fn === 'recent_opponents' ? { data: [opponent()], error: null }
+                : fn === 'my_friends' ? { data: [row({ user_id: 'rival', status: 'pending', incoming: false })], error: null }
+                : { data: 'sent', error: null })
+            const social = useSocialStore()
+            await social.fetchRecent()
+            await social.sendRequest('rival')
+            expect(social.recent).toHaveLength(0)
+        })
+
+        it('keeps someone on the list when the request did not go out', async () => {
+            rpc.mockImplementation(async (fn: string) =>
+                fn === 'recent_opponents' ? { data: [opponent()], error: null }
+                : fn === 'my_friends' ? { data: [], error: null }
+                : { data: 'rate_limited', error: null })
+            const social = useSocialStore()
+            await social.fetchRecent()
+            expect(await social.sendRequest('rival')).toBe('rate_limited')
+            expect(social.recent.map(r => r.user_id)).toEqual(['rival'])
+        })
+
+        it('leaves out anyone who is already a friend or a request', async () => {
+            rpc.mockImplementation(async (fn: string) =>
+                fn === 'recent_opponents' ? { data: [opponent(), opponent({ user_id: 'stranger' })], error: null }
+                : { data: [row({ user_id: 'rival', status: 'pending', incoming: true })], error: null })
+            const social = useSocialStore()
+            await social.fetchRecent()
+            await social.refresh()
+            expect(social.recent.map(r => r.user_id)).toEqual(['stranger'])
+        })
+
+        it('drops a list that was asked for before a sign-out', async () => {
+            let release: (v: unknown) => void = () => {}
+            const social = useSocialStore()
+            const auth = useAuthStore()
+            auth.user = { id: 'first' } as never
+            await nextTick()
+            rpc.mockReset()
+            rpc.mockImplementationOnce(() => new Promise(res => { release = res }))
+            const pending = social.fetchRecent()
+            await vi.waitFor(() => expect(rpc).toHaveBeenCalled())
+            auth.user = { id: 'second' } as never
+            await nextTick()
+            release({ data: [opponent()], error: null })
+            await pending
+            expect(social.recent).toHaveLength(0)
+        })
+
+        it('hides the section until its SQL is run, and stops asking', async () => {
+            rpc.mockResolvedValue({ data: null, error: { code: 'PGRST202' } })
+            const social = useSocialStore()
+            await social.fetchRecent()
+            expect(social.recent).toHaveLength(0)
+            rpc.mockClear()
+            await social.fetchRecent()
+            expect(rpc).not.toHaveBeenCalled()
+            // The friends list itself is not affected by a missing extra.
+            expect(social.unavailable).toBe(false)
+        })
+    })
+
     describe('notices', () => {
         it('announces an unanswered request, newest first, even one that arrived while away', async () => {
             listReturns([
