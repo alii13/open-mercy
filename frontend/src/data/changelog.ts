@@ -54,6 +54,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: '2026-10-12',
+        level: 'loud',
+        tag: 'NEW',
+        title: 'Friend requests reach you live',
+        body: 'A request now pops up wherever you are, with ACCEPT right on it, and you hear the moment someone accepts yours. Your Friends page shows who is online, who is mid-match, and the requests still waiting.',
+        bodySignedOut: 'Friend requests now pop up live, with ACCEPT right on them, and senders hear the moment they are accepted. The Friends page shows who is online and who is mid-match.',
+    },
+    {
         id: '2026-08-29',
         level: 'loud',
         tag: 'NEW',

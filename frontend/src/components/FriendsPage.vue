@@ -80,9 +80,9 @@ const social = useSocialStore()
 .fp-body {
   flex: 1;
   width: 100%;
-  max-width: 30rem;
+  max-width: 65rem;
   margin: 0 auto;
-  padding: var(--spacing-4);
+  padding: var(--spacing-8) var(--spacing-4);
 }
 
 .fp-note {

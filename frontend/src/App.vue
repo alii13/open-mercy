@@ -152,6 +152,13 @@
          arrives over Realtime and lands here, above every screen. -->
     <InviteToast />
 
+    <!-- Friend requests and "they accepted", live. Never over a game: the
+         count on the username chip and the Friends page keep the request
+         until the match is over. -->
+    <FriendToast
+      v-if="authStore.isAuthenticated && !inMpMatch && localGameStore.gameState === 'LOBBY'"
+    />
+
     <!-- One-time release card. Signed in only: someone who has not played has
          no stake in what changed, and a guest who plays is signed in, so this
          is the same line the landing page is drawn on. Never over a game. -->
@@ -193,6 +200,7 @@ import { useMultiplayerStore } from './stores/multiplayerStore'
 import { useGameStore } from './stores/gameStore'
 import { usePresenceHeartbeat } from './composables/usePresenceHeartbeat'
 import InviteToast from './components/InviteToast.vue'
+import FriendToast from './components/FriendToast.vue'
 import ReleaseCard from './components/ReleaseCard.vue'
 
 const authStore = useAuthStore()

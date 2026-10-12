@@ -2,13 +2,30 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { nextTick } from 'vue'
 
-const { rpc } = vi.hoisted(() => ({ rpc: vi.fn() }))
+const { rpc, channels, unsubscribe } = vi.hoisted(() => ({
+    rpc: vi.fn(),
+    channels: [] as { name: string, filters: unknown[], fire: () => void }[],
+    unsubscribe: vi.fn(),
+}))
 vi.mock('../../lib/supabase', () => ({
     supabase: {
         rpc,
         // Owner-scoped RPCs are guarded by hasLiveSession(). These suites are
         // about RPC behaviour, so the session is simply live.
         auth: { getSession: async () => ({ data: { session: { access_token: 't' } }, error: null }) },
+        channel: (name: string) => {
+            const handlers: (() => void)[] = []
+            const ch = {
+                name,
+                filters: [] as unknown[],
+                fire: () => handlers.forEach(h => h()),
+                on: (_e: string, cfg: unknown, cb: () => void) => { ch.filters.push(cfg); handlers.push(cb); return ch },
+                subscribe: () => ch,
+                unsubscribe,
+            }
+            channels.push(ch)
+            return ch
+        },
     },
 }))
 
@@ -36,6 +53,8 @@ describe('social store', () => {
     beforeEach(() => {
         setActivePinia(createPinia())
         rpc.mockReset()
+        channels.length = 0
+        unsubscribe.mockReset()
     })
 
     it('splits one list into friends, requests received and requests sent', async () => {
@@ -154,5 +173,82 @@ describe('social store', () => {
         listReturns([])
         await social.respond('asked-me', false)
         expect(social.incoming).toHaveLength(0)
+    })
+
+    describe('notices', () => {
+        it('announces an unanswered request, newest first, even one that arrived while away', async () => {
+            listReturns([
+                row({ user_id: 'older', status: 'pending', incoming: true, created_at: '2026-08-15T09:00:00Z' }),
+                row({ user_id: 'newer', status: 'pending', incoming: true, created_at: '2026-08-15T11:00:00Z' }),
+            ])
+            const social = useSocialStore()
+            await social.refresh()
+
+            expect(social.notice).toEqual({ kind: 'request', row: expect.objectContaining({ user_id: 'newer' }) })
+        })
+
+        it('does not announce the same request twice once dismissed', async () => {
+            listReturns([row({ user_id: 'asked-me', status: 'pending', incoming: true })])
+            const social = useSocialStore()
+            await social.refresh()
+            social.dismissNotice()
+            expect(social.notice).toBeNull()
+
+            await social.refresh()
+            expect(social.notice).toBeNull()
+        })
+
+        it('tells the sender when a request they sent is accepted', async () => {
+            listReturns([row({ user_id: 'i-asked', status: 'pending', incoming: false })])
+            const social = useSocialStore()
+            await social.refresh()
+            expect(social.notice).toBeNull()
+
+            listReturns([row({ user_id: 'i-asked', status: 'accepted', incoming: false })])
+            await social.refresh()
+            expect(social.notice).toEqual({ kind: 'accepted', row: expect.objectContaining({ user_id: 'i-asked' }) })
+        })
+
+        it('does not call an existing friend newly accepted', async () => {
+            listReturns([row({ user_id: 'friend', status: 'accepted' })])
+            const social = useSocialStore()
+            await social.refresh()
+            await social.refresh()
+            expect(social.notice).toBeNull()
+        })
+    })
+
+    describe('live updates', () => {
+        it('re-reads when a friendship row changes for the signed-in player', async () => {
+            listReturns([])
+            const social = useSocialStore()
+            const auth = useAuthStore()
+            auth.user = { id: 'me' } as never
+            await nextTick()
+
+            const ch = channels.find(c => c.name === 'friendships:me')
+            expect(ch).toBeDefined()
+            // Requests to me arrive as inserts; my requests being accepted
+            // arrive as updates.
+            expect(ch!.filters).toEqual(expect.arrayContaining([
+                expect.objectContaining({ table: 'friendships', event: 'INSERT', filter: 'addressee_id=eq.me' }),
+                expect.objectContaining({ table: 'friendships', event: 'UPDATE', filter: 'requester_id=eq.me' }),
+            ]))
+
+            listReturns([row({ user_id: 'asked-me', status: 'pending', incoming: true })])
+            ch!.fire()
+            await vi.waitFor(() => expect(social.incoming).toHaveLength(1))
+        })
+
+        it('closes the channel on sign-out', async () => {
+            listReturns([])
+            useSocialStore()
+            const auth = useAuthStore()
+            auth.user = { id: 'me' } as never
+            await nextTick()
+            auth.user = null
+            await nextTick()
+            expect(unsubscribe).toHaveBeenCalled()
+        })
     })
 })
