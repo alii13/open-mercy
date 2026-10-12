@@ -223,11 +223,12 @@ async function join(invite = showing.value) {
   transform: translate(-50%, 12px);
 }
 
-/* Top centre, under the game's own top bar: the hand and the draw pile own
-   the bottom of the table. */
+/* Top centre, clear of the game's top bar and of the voice prompt that hangs
+   under its mic button (bottom edge measured at 121px, 390 and 1440 wide):
+   the hand and the draw pile own the bottom of the table. */
 .invite-chip {
   position: fixed;
-  top: calc(env(safe-area-inset-top, 0px) + 64px);
+  top: calc(env(safe-area-inset-top, 0px) + 132px);
   left: 50%;
   transform: translateX(-50%);
   /* Under modals: the results screen and the colour picker win. */
