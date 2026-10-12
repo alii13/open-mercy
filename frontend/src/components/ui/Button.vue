@@ -3,7 +3,7 @@ import { vFocusRing } from '@/directives/focusRing'
 
 withDefaults(
   defineProps<{
-    variant?: 'primary' | 'secondary' | 'ghost' | 'danger'
+    variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'hazard'
     size?: 'sm' | 'md' | 'lg'
     type?: 'button' | 'submit' | 'reset'
     disabled?: boolean
@@ -134,5 +134,16 @@ withDefaults(
 .btn--danger:hover:not(:disabled) {
   background: var(--color-alert-dim);
   box-shadow: var(--shadow-glow-red);
+}
+
+/* hazard — solid yellow, for answering someone (accept) rather than playing */
+.btn--hazard {
+  background: var(--color-hazard);
+  border-color: var(--color-hazard);
+  color: var(--bg-concrete);
+}
+.btn--hazard:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-glow-yellow);
 }
 </style>

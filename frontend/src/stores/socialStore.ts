@@ -9,8 +9,12 @@
  * `unavailable` is true and each screen hides its friends section rather than
  * showing a broken one.
  *
- * No realtime here. Requests arrive on a load, not a push - the socket for
- * that lands with invites.
+ * Live: a Realtime channel on friendships nudges a re-read, the same way
+ * inviteStore treats room_invites - the payload is a trigger, not data. Each
+ * read is compared with the last one to raise a `notice` for the toast: a
+ * request nobody has seen yet, or a request you sent that is now a friendship.
+ * Comparing reads rather than reading payloads also catches the request that
+ * landed while the player was away, which is most of them.
  */
 
 import { defineStore } from 'pinia'
@@ -38,6 +42,11 @@ export type SendResult =
     | 'sent' | 'accepted' | 'already' | 'blocked' | 'declined' | 'self'
     | 'rate_limited' | 'not_found' | 'unauthorized' | 'failed'
 
+export interface FriendNotice {
+    kind: 'request' | 'accepted'
+    row: FriendRow
+}
+
 export const useSocialStore = defineStore('social', () => {
     const rows = ref<FriendRow[]>([])
     const loading = ref(false)
@@ -45,6 +54,14 @@ export const useSocialStore = defineStore('social', () => {
     const unavailable = ref(false)
     /** User ids with a request in flight, so a button can disable itself. */
     const pendingIds = ref<Set<string>>(new Set())
+    /** The one thing the toast shows. */
+    const notice = ref<FriendNotice | null>(null)
+    /** Requests already shown once this session, so a dismissed one stays
+     *  dismissed. Keyed on the request, not the person: someone unfriended who
+     *  asks again has sent a new request. */
+    let announced = new Set<string>()
+    const requestKey = (r: FriendRow) => `${r.user_id}:${r.created_at}`
+    let channel: { unsubscribe: () => void } | null = null
 
     const friends = computed(() => rows.value.filter(r => r.status === 'accepted'))
     const incoming = computed(() => rows.value.filter(r => r.status === 'pending' && r.incoming))
@@ -55,22 +72,57 @@ export const useSocialStore = defineStore('social', () => {
      *  buttons that must not offer ADD twice. */
     const knownIds = computed(() => new Set(rows.value.map(r => r.user_id)))
 
+    /** Bumped by every read and every account change. A read answers only if
+     *  it is still the latest - a slow one landing after a newer one would
+     *  roll a friendship back to pending, and one landing after a sign-out
+     *  would put the last account's requests on the next account's screen. */
+    let readSeq = 0
+
     async function refresh(): Promise<void> {
         if (unavailable.value) return
+        const seq = ++readSeq
         loading.value = true
         try {
             if (!(await hasLiveSession())) return
             const { data, error } = await supabase.rpc('my_friends')
+            if (seq !== readSeq) return
             if (error) {
-                if (isFatalSchemaError(error)) unavailable.value = true
+                if (isFatalSchemaError(error)) {
+                    unavailable.value = true
+                    stop()
+                }
                 return
             }
-            rows.value = (data ?? []) as FriendRow[]
+            const next = (data ?? []) as FriendRow[]
+            raiseNotice(rows.value, next)
+            rows.value = next
         } catch {
             /* transient - keep whatever list is on screen */
         } finally {
             loading.value = false
         }
+    }
+
+    function raiseNotice(prev: FriendRow[], next: FriendRow[]): void {
+        const wasPendingOut = new Set(prev.filter(r => r.status === 'pending' && !r.incoming).map(r => r.user_id))
+        const accepted = next.find(r => r.status === 'accepted' && wasPendingOut.has(r.user_id))
+        if (accepted) {
+            // A request on screen gives way, but is not spent: it comes back
+            // on the next read.
+            if (notice.value?.kind === 'request') announced.delete(requestKey(notice.value.row))
+            notice.value = { kind: 'accepted', row: accepted }
+            return
+        }
+        const fresh = next
+            .filter(r => r.status === 'pending' && r.incoming && !announced.has(requestKey(r)))
+            .sort((a, b) => b.created_at.localeCompare(a.created_at))[0]
+        if (!fresh) return
+        announced.add(requestKey(fresh))
+        notice.value = { kind: 'request', row: fresh }
+    }
+
+    function dismissNotice(): void {
+        notice.value = null
     }
 
     async function call(fn: string, args: Record<string, unknown>): Promise<string> {
@@ -129,20 +181,47 @@ export const useSocialStore = defineStore('social', () => {
         await refresh()
     }
 
+    function stop(): void {
+        channel?.unsubscribe()
+        channel = null
+    }
+
+    function start(userId: string): void {
+        stop()
+        if (unavailable.value) return
+        const nudge = () => { void refresh() }
+        channel = supabase
+            .channel(`friendships:${userId}`)
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'friendships', filter: `addressee_id=eq.${userId}` }, nudge)
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'friendships', filter: `requester_id=eq.${userId}` }, nudge)
+            // A request re-sent after a decline turns the existing row around
+            // rather than inserting one.
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'friendships', filter: `addressee_id=eq.${userId}` }, nudge)
+            // A row written while the socket was down is never replayed.
+            .subscribe((status: string) => { if (status === 'SUBSCRIBED') nudge() })
+    }
+
     function reset(): void {
+        readSeq++
         rows.value = []
         pendingIds.value = new Set()
+        notice.value = null
+        announced = new Set()
     }
 
     // A Pinia store outlives a sign-out, because nothing reloads the page.
     // Without this, signing in as someone else on the same device shows the
     // previous account's friends, requests and block list until a read
     // returns - another person's social graph on a stranger's screen.
-    watch(() => useAuthStore().user?.id, reset)
+    watch(() => useAuthStore().user?.id, (id) => {
+        reset()
+        if (id) start(id)
+        else stop()
+    }, { immediate: true })
 
     return {
-        rows, loading, unavailable, pendingIds,
+        rows, loading, unavailable, pendingIds, notice,
         friends, incoming, outgoing, blocked, knownIds,
-        refresh, sendRequest, respond, remove, block, unblock, reset,
+        refresh, sendRequest, respond, remove, block, unblock, reset, dismissNotice,
     }
 })

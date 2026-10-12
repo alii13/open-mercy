@@ -2009,8 +2009,8 @@ function copyLink() {
   height: 16px;
   padding: 0 4px;
   border-radius: 999px;
-  background: var(--color-neon-blue);
-  color: #04252a;
+  background: var(--color-hazard);
+  color: var(--bg-concrete);
   font-family: var(--font-mono);
   font-size: 0.58rem;
   font-weight: 700;

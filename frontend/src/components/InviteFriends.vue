@@ -39,11 +39,14 @@ onMounted(() => { void social.refresh() })
 // "online" threw away half the point of having a middle state. Someone last
 // seen an hour ago still gets nothing: that is a notification they would read
 // tomorrow, in a room that died ten minutes after it was sent.
-const online = computed(() =>
-  social.unavailable || invitesStore.unavailable
-    ? []
-    : byPresence(social.friends).filter(f => presenceState(f.last_seen_at) !== 'offline').slice(0, 6),
-)
+// Someone already sitting at this table is not someone to invite to it.
+const online = computed(() => {
+  if (social.unavailable || invitesStore.unavailable) return []
+  const seated = new Set(mpStore.presentUserIds)
+  return byPresence(social.friends)
+    .filter(f => !seated.has(f.user_id) && presenceState(f.last_seen_at) !== 'offline')
+    .slice(0, 6)
+})
 
 async function invite(userId: string) {
   if (pending.value.has(userId)) return
