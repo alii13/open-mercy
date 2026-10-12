@@ -50,7 +50,7 @@
         </ul>
       </div>
 
-      <p v-if="!social.friends.length" class="fs-empty">
+      <p v-if="!social.friends.length && !social.incoming.length" class="fs-empty">
         No friends yet. The quickest way in is the game-over screen - add whoever you just played.
       </p>
     </div>
@@ -73,7 +73,7 @@
             </div>
             <div class="fs-request-actions">
               <Button variant="hazard" size="sm" class="fs-accept" @click="social.respond(r.user_id, true)">ACCEPT</Button>
-              <button class="fs-text-btn" @click="social.respond(r.user_id, false)">Not now</button>
+              <button class="fs-text-btn" @click="social.respond(r.user_id, false)">Decline</button>
             </div>
           </div>
         </div>
