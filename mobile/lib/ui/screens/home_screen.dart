@@ -30,7 +30,12 @@ class _HomeScreenState extends State<HomeScreen> {
   late StackingMode _mode = widget.store.stackingMode;
   late BotProfile _opponent = widget.store.nextBot;
 
+  bool _starting = false;
+
   Future<void> _play({bool daily = false}) async {
+    // A second tap before the route covers the button would push a 2nd game.
+    if (_starting) return;
+    _starting = true;
     final controller = GameController(widget.store, sounds: SoundEffects.instance);
     // App.vue startLocalGame / startDailyGame.
     if (daily) {
@@ -41,6 +46,7 @@ class _HomeScreenState extends State<HomeScreen> {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => GameScreen(controller: controller, store: widget.store)),
     );
+    _starting = false;
     if (!mounted) return;
     // A win may have unlocked the next rung.
     setState(() => _opponent = widget.store.nextBot);

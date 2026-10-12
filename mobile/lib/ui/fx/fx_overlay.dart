@@ -231,12 +231,25 @@ class FxOverlayState extends State<FxOverlay> with TickerProviderStateMixin {
 
   // ---- transient widgets (GSAP clones / overlays) --------------------------
 
-  Future<void> _transient(Duration duration, Widget Function(BuildContext, double t) builder) {
+  /// [onImpact] fires once when the animation passes [impactAt] (0..1). It is
+  /// called from the controller's tick, never from build: impact handlers add
+  /// further transients, which must not happen while build iterates _items.
+  Future<void> _transient(
+    Duration duration,
+    Widget Function(BuildContext, double t) builder, {
+    double impactAt = 1,
+    VoidCallback? onImpact,
+  }) {
     final c = AnimationController(vsync: this, duration: duration);
     final item = _Transient(c, builder);
     setState(() => _items.add(item));
     final done = Completer<void>();
+    var impacted = onImpact == null;
     c.addListener(() {
+      if (!impacted && c.value >= impactAt) {
+        impacted = true;
+        onImpact!();
+      }
       if (mounted) setState(() {});
     });
     c.forward().whenCompleteOrCancel(() {
@@ -317,10 +330,9 @@ class FxOverlayState extends State<FxOverlay> with TickerProviderStateMixin {
     final dx = target.dx - a.left, dy = target.dy - a.top;
     final arc = math.max(80.0, math.sqrt(dx * dx + dy * dy) * 0.22);
     final landRot = _r(-20, 20) * math.pi / 180;
-    var impacted = false;
-    // 0.07 + 0.32 + 0.045 + 0.14 = 0.575s
+    // 0.07 + 0.32 + 0.045 + 0.14 = 0.575s; impact lands at 0.39s.
     const total = 0.575;
-    return _transient(const Duration(milliseconds: 575), (context, v) {
+    return _transient(const Duration(milliseconds: 575), impactAt: 0.39 / total, onImpact: onImpact, (context, v) {
       final t = v * total;
       Offset off;
       double scale, rot;
@@ -336,10 +348,6 @@ class FxOverlayState extends State<FxOverlay> with TickerProviderStateMixin {
         scale = 0.96 + (0.92 - 0.96) * p;
         rot = landRot * p;
       } else {
-        if (!impacted) {
-          impacted = true;
-          onImpact?.call();
-        }
         final p = t < 0.435 ? 0.0 : const Cubic(0.34, 1.56, 0.64, 1).transform(((t - 0.435) / 0.14).clamp(0.0, 1.0));
         off = Offset(dx, dy);
         scale = 0.92 + (0.82 - 0.92) * p;
@@ -373,9 +381,8 @@ class FxOverlayState extends State<FxOverlay> with TickerProviderStateMixin {
     final arc = math.max(60.0, math.sqrt(dx * dx + dy * dy) * 0.2);
     final rot0 = _r(-25, 25) * math.pi / 180;
     final rot1 = _r(-18, 18) * math.pi / 180;
-    var impacted = false;
-    // 0.08 + 0.36 + 0.045 + 0.13 = 0.615s
-    return _transient(const Duration(milliseconds: 615), (context, v) {
+    // 0.08 + 0.36 + 0.045 + 0.13 = 0.615s; impact lands at 0.44s.
+    return _transient(const Duration(milliseconds: 615), impactAt: 0.44 / 0.615, onImpact: onImpact, (context, v) {
       final t = v * 0.615;
       Offset off;
       double scale, rot;
@@ -390,10 +397,6 @@ class FxOverlayState extends State<FxOverlay> with TickerProviderStateMixin {
         scale = 0.48 + (0.95 - 0.48) * p;
         rot = rot0 + (rot1 - rot0) * p;
       } else {
-        if (!impacted) {
-          impacted = true;
-          onImpact?.call();
-        }
         final p = t < 0.485 ? 0.0 : const Cubic(0.34, 1.56, 0.64, 1).transform(((t - 0.485) / 0.13).clamp(0.0, 1.0));
         off = Offset(dx, dy);
         scale = 0.95 + (0.86 - 0.95) * p;
@@ -763,7 +766,7 @@ class FxOverlayState extends State<FxOverlay> with TickerProviderStateMixin {
           Positioned.fill(
             child: CustomPaint(painter: _ParticlePainter(_particles, _rings, _repaint)),
           ),
-          for (final item in _items) item.builder(context, item.controller.value),
+          for (final item in List.of(_items)) item.builder(context, item.controller.value),
         ],
       ),
     );

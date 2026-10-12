@@ -54,7 +54,12 @@ class _SettingsDrawerHostState extends State<SettingsDrawerHost> {
     } else if (!settings.isOpen && _route != null) {
       final route = _route!;
       _route = null;
-      if (route.isActive) nav.removeRoute(route);
+      // Pop when on top so the drawer slides out, as every web close does.
+      if (route.isCurrent) {
+        nav.pop();
+      } else if (route.isActive) {
+        nav.removeRoute(route);
+      }
     }
   }
 
@@ -246,7 +251,13 @@ class _Panel extends StatelessWidget {
     alignment: PlaceholderAlignment.baseline,
     baseline: TextBaseline.alphabetic,
     child: GestureDetector(
-      onTap: () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+      onTap: () async {
+        try {
+          await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+        } catch (_) {
+          // No browser to open it: nothing useful to show.
+        }
+      },
       child: Container(
         decoration: const BoxDecoration(
           border: Border(bottom: BorderSide(color: Color(0x6600F3FF))),

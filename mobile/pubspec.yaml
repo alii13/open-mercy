@@ -68,6 +68,9 @@ flutter:
     - assets/badges/
     - assets/audio/sfx/
     - assets/audio/music/
+    # The OFL requires its licence to travel with every copy of the fonts.
+    - assets/fonts/OFL-BlackOpsOne.txt
+    - assets/fonts/OFL-ChakraPetch.txt
 
   # Bundled (OFL, licenses alongside) rather than fetched, so the app needs
   # no network for its type.

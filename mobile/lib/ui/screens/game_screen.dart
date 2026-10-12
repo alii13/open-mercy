@@ -714,7 +714,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       },
       child: table,
     );
-    if (_desaturate) view = ColorFiltered(colorFilter: _koDesat, child: view);
+    // Always wrapped, so toggling the KO beat never remounts the table.
+    view = ColorFiltered(colorFilter: _desaturate ? _koDesat : _identity, child: view);
 
     return PopScope(
       canPop: false,
@@ -726,10 +727,10 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         body: Stack(
           children: [
             Positioned.fill(child: view),
+            // Stack vignette is z-index 50 on the web, under the modal.
             Positioned.fill(child: StackVignette(drawStack: s.drawStack)),
-            Positioned.fill(child: StackCam(key: _stackCam, fx: _fx)),
-            Positioned.fill(child: FxOverlay(key: _fx)),
-            Positioned.fill(child: Stack(children: [BadgeUpBanner(key: _badgeUp, fx: _fx)])),
+            // Web z-order: GameOverModal (--z-modal 1000) sits under the FX
+            // canvas, stack cam and badge-up banner (2100-2400).
             if (s.gameState == GameState.gameOver)
               Positioned.fill(
                 child: GameOverModal(
@@ -748,6 +749,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                   onUpgradeAccount: store.returnToLobby,
                 ),
               ),
+            Positioned.fill(child: StackCam(key: _stackCam, fx: _fx)),
+            Positioned.fill(child: FxOverlay(key: _fx)),
+            Positioned.fill(child: Stack(children: [BadgeUpBanner(key: _badgeUp, fx: _fx)])),
           ],
         ),
       ),
@@ -821,6 +825,13 @@ class _TurnHaloState extends State<_TurnHalo> with SingleTickerProviderStateMixi
     );
   }
 }
+
+const _identity = ColorFilter.matrix(<double>[
+  1, 0, 0, 0, 0,
+  0, 1, 0, 0, 0,
+  0, 0, 1, 0, 0,
+  0, 0, 0, 1, 0,
+]);
 
 /// saturate(0.2) brightness(0.88)
 const _koDesat = ColorFilter.matrix(<double>[

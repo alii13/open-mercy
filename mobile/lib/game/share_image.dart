@@ -152,7 +152,13 @@ Future<Uint8List?> generateShareImage(ShareImagePayload p) async {
       const TextStyle(fontFamily: fontBody, fontSize: 34, fontWeight: FontWeight.bold, color: Color(0xFF00F3FF)),
       bottom: true);
 
-  final img = await rec.endRecording().toImage(_w.toInt(), _h.toInt());
-  final data = await img.toByteData(format: ui.ImageByteFormat.png);
-  return data?.buffer.asUint8List();
+  final pic = rec.endRecording();
+  final img = await pic.toImage(_w.toInt(), _h.toInt());
+  pic.dispose();
+  try {
+    final data = await img.toByteData(format: ui.ImageByteFormat.png);
+    return data?.buffer.asUint8List();
+  } finally {
+    img.dispose();
+  }
 }

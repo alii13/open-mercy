@@ -36,7 +36,7 @@ class DailyRecord {
       date: json['date'] as String,
       result: result.first,
       turns: json['turns'] as int,
-      log: json['log'] as String?,
+      log: json['log'] is String ? json['log'] as String : null,
     );
   }
 }

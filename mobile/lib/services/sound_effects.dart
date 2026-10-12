@@ -24,18 +24,16 @@ const _files = {
 
 /// One shared engine for SFX and music.
 class AudioEngine {
-  static bool _started = false;
-  static bool get ready => _started && SoLoud.instance.isInitialized;
+  static Future<void>? _init;
+  static bool get ready => SoLoud.instance.isInitialized;
 
-  static Future<void> init() async {
-    if (_started) return;
-    _started = true;
-    try {
-      await SoLoud.instance.init();
-    } catch (e) {
-      debugPrint('audio init failed: $e');
-    }
-  }
+  /// One shared start-up: every caller awaits the same future, so a game that
+  /// starts while the preload is still initialising waits instead of finding
+  /// the engine "not ready". A failure clears it so the next call retries.
+  static Future<void> init() => _init ??= SoLoud.instance.init().catchError((Object e) {
+        debugPrint('audio init failed: $e');
+        _init = null;
+      });
 }
 
 class SoundEffects extends ChangeNotifier implements GameSounds {

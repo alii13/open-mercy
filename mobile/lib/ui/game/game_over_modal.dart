@@ -152,6 +152,9 @@ class _GameOverModalState extends State<GameOverModal> with TickerProviderStateM
     setState(() => _sharingX = true);
     try {
       await _shareWithImage();
+    } catch (e) {
+      // A cancelled or failed share sheet is not worth an error to the player.
+      debugPrint('share failed: $e');
     } finally {
       if (mounted) setState(() => _sharingX = false);
     }
@@ -162,6 +165,9 @@ class _GameOverModalState extends State<GameOverModal> with TickerProviderStateM
     setState(() => _sharingWa = true);
     try {
       await _shareWithImage();
+    } catch (e) {
+      // A cancelled or failed share sheet is not worth an error to the player.
+      debugPrint('share failed: $e');
     } finally {
       if (mounted) setState(() => _sharingWa = false);
     }
@@ -175,6 +181,8 @@ class _GameOverModalState extends State<GameOverModal> with TickerProviderStateM
       if (file != null) {
         await SharePlus.instance.share(ShareParams(files: [file], title: 'Open Mercy', text: 'I just won at Open Mercy.'));
       }
+    } catch (e) {
+      debugPrint('share failed: $e');
     } finally {
       if (mounted) setState(() => _generating = false);
     }

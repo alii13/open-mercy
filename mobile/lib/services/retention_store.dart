@@ -28,9 +28,12 @@ class GameResult {
   final String mode;
 }
 
-int _daysBetween(String a, String b) {
-  final da = DateTime.parse('${a}T00:00:00');
-  final db = DateTime.parse('${b}T00:00:00');
+/// Whole days from a to b, or null for an unparseable date (the web's
+/// `new Date('x')` is NaN there, and every comparison with NaN is false).
+int? _daysBetween(String a, String b) {
+  final da = DateTime.tryParse('${a}T00:00:00');
+  final db = DateTime.tryParse('${b}T00:00:00');
+  if (da == null || db == null) return null;
   return (db.difference(da).inHours / 24).round();
 }
 
@@ -70,7 +73,8 @@ class RetentionStore extends ChangeNotifier {
   int get effectiveStreak {
     final last = lastPlayedDate;
     if (last == null || currentStreak == 0) return 0;
-    if (_daysBetween(last, localDateString()) >= 2) return 0;
+    final gap = _daysBetween(last, localDateString());
+    if (gap != null && gap >= 2) return 0;
     return currentStreak;
   }
 
@@ -91,7 +95,9 @@ class RetentionStore extends ChangeNotifier {
       currentStreak = 1;
     } else {
       final gap = _daysBetween(last, today);
-      if (gap == 1) {
+      if (gap == null) {
+        currentStreak = 1;
+      } else if (gap == 1) {
         currentStreak += 1;
       } else if (gap != 0) {
         currentStreak = 1;

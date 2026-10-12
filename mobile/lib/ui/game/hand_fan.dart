@@ -74,6 +74,12 @@ class HandFanState extends State<HandFan> {
   final GlobalKey _previewKey = GlobalKey();
   final _shake = ValueNotifier<int>(0);
 
+  // The lifted preview and its tap-outside catcher float over the pit, far
+  // outside this widget's box, where Flutter would not hit-test them (the web
+  // gets this for free from position: absolute). They render through the
+  // app's Overlay instead, placed from the band's on-screen rect.
+  final _portal = OverlayPortalController();
+
   @override
   void initState() {
     super.initState();
@@ -273,29 +279,36 @@ class HandFanState extends State<HandFan> {
       final previewIndex = _peek.phase == PeekPhase.peeking || _peek.phase == PeekPhase.selected ? _peek.index : -1;
       final previewCard = previewIndex >= 0 && previewIndex < widget.cards.length ? widget.cards[previewIndex] : null;
 
-      return Stack(
-        clipBehavior: Clip.none,
-        children: [
-          // .hand-fan: padding 20 5 5 at phone width, cards bottom-aligned.
-          Positioned.fill(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(5, 20, 5, 5),
-              child: Align(alignment: Alignment.bottomCenter, child: scroller),
-            ),
-          ),
-          if (_peek.phase == PeekPhase.selected)
-            Positioned(
-              left: -size.width,
-              right: -size.width,
-              top: -size.height,
-              bottom: -size.height,
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTapDown: (_) => _dispatch(const Dismiss()),
-              ),
-            ),
-          if (previewCard != null) _preview(previewCard, size, box.maxHeight),
-        ],
+      if (previewCard != null) {
+        if (!_portal.isShowing) WidgetsBinding.instance.addPostFrameCallback((_) => _syncPortal());
+      } else if (_portal.isShowing) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => _syncPortal());
+      }
+
+      return OverlayPortal(
+        controller: _portal,
+        overlayChildBuilder: (context) {
+          final band = _bandRect();
+          final card = _previewCard;
+          if (band == null || card == null) return const SizedBox.shrink();
+          return Stack(
+            children: [
+              if (_peek.phase == PeekPhase.selected)
+                Positioned.fill(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTapDown: (_) => _dispatch(const Dismiss()),
+                  ),
+                ),
+              _preview(card, size, band),
+            ],
+          );
+        },
+        // .hand-fan: padding 20 5 5 at phone width, cards bottom-aligned.
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(5, 20, 5, 5),
+          child: Align(alignment: Alignment.bottomCenter, child: scroller),
+        ),
       );
     });
   }
@@ -347,7 +360,28 @@ class HandFanState extends State<HandFan> {
     );
   }
 
-  Widget _preview(Card card, Size screen, double bandHeight) {
+  Card? get _previewCard {
+    final i = _peek.phase == PeekPhase.peeking || _peek.phase == PeekPhase.selected ? _peek.index : -1;
+    return i >= 0 && i < widget.cards.length ? widget.cards[i] : null;
+  }
+
+  void _syncPortal() {
+    if (!mounted) return;
+    if (_previewCard != null) {
+      _portal.show();
+    } else {
+      _portal.hide();
+    }
+  }
+
+  /// The hand band's rect in the overlay's coordinates.
+  Rect? _bandRect() {
+    final box = context.findRenderObject() as RenderBox?;
+    if (box == null || !box.attached || !box.hasSize) return null;
+    return box.localToGlobal(Offset.zero) & box.size;
+  }
+
+  Widget _preview(Card card, Size screen, Rect band) {
     var w = math.min(190.0, math.max(120.0, screen.width * 0.34));
     var h = w * 1.4;
     final hCap = screen.height * 0.6;
@@ -366,7 +400,8 @@ class HandFanState extends State<HandFan> {
       left: 0,
       right: 0,
       // bottom: calc(100% - 48px) - float above the band, over the pit.
-      bottom: bandHeight - 48,
+      // bottom: calc(100% - 48px) of the hand band, in screen terms.
+      bottom: screen.height - band.top - 48,
       child: Center(
         child: TweenAnimationBuilder<double>(
           key: _previewKey,

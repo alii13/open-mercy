@@ -14,7 +14,8 @@ class OuterGlow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (shadows.isEmpty) return child;
+    // Always the same wrapper, even with no shadows, so a glow turning on or
+    // off never remounts the child.
     return CustomPaint(painter: _OuterShadowPainter(radius, shadows), child: child);
   }
 }
@@ -27,6 +28,7 @@ class _OuterShadowPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (shadows.isEmpty) return;
     final rect = Offset.zero & size;
     final rrect = radius.toRRect(rect);
     var reach = 0.0;

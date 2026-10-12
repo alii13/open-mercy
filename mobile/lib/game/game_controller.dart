@@ -492,7 +492,10 @@ class GameController extends ChangeNotifier {
       final card = _drawToHand(p);
       if (card == null) return _advanceTurn();
 
-      if (canPlayCard(card, top, s.currentColor, 0, s.stackingMode)) {
+      // Re-read after the draw, as the web does: a mercy elimination dumps
+      // the hand onto the pile and changes the top card.
+      final liveTop = topCard ?? top;
+      if (canPlayCard(card, liveTop, s.currentColor, 0, s.stackingMode)) {
         _later(Timings.drawnPlayableAutoPlay, () {
           if (card.isWild && card.type != CardType.wildColorRoulette && !p.isBot) {
             pendingDrawnWildCard = card;

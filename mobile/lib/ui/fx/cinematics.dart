@@ -49,8 +49,10 @@ class StackCamState extends State<StackCam> with TickerProviderStateMixin {
   void _rampTimeScale(double from, double to, int ms) {
     _ramp?.dispose();
     timeDilation = 1 / from;
-    _ramp = createTicker((elapsed) {
-      final t = math.min(1.0, elapsed.inMilliseconds / ms);
+    // Ticker time is itself dilated; measure the ramp in real time.
+    final clock = Stopwatch()..start();
+    _ramp = createTicker((_) {
+      final t = math.min(1.0, clock.elapsedMilliseconds / ms);
       final eased = 1 - math.pow(1 - t, 3).toDouble();
       timeDilation = 1 / (from + (to - from) * eased);
       if (t >= 1) {

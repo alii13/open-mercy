@@ -2,7 +2,7 @@
 // volume + mute persisted as 'uno_music_settings_v1' (volume 0.35 default),
 // 1.2s fade in, 0.6s fade out, ducked to 35% for the game-over sting.
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_soloud/flutter_soloud.dart';
 
 import 'prefs.dart';
@@ -13,6 +13,9 @@ const _musicAsset = 'assets/audio/music/loop.mp3';
 
 class Music extends ChangeNotifier {
   Music._() {
+    // flutter_soloud keeps playing in the background; a browser tab's audio
+    // stops with the page, so pause the loop while the app is hidden.
+    _life = AppLifecycleListener(onHide: _pauseForBackground, onShow: _resumeFromBackground);
     final json = Prefs.instance.getJson(_storageKey);
     if (json is Map) {
       final v = json['volume'];
@@ -31,7 +34,9 @@ class Music extends ChangeNotifier {
   // Held down while a voice channel is live (multiplayer).
   bool isVoiceDucked = false;
 
+  late final AppLifecycleListener _life;
   AudioSource? _source;
+  Future<AudioSource>? _loading;
   SoundHandle? _handle;
   // Incremented on stop(); an in-flight start() that sees a newer value was
   // cancelled while loading and must not fade up.
@@ -55,8 +60,10 @@ class Music extends ChangeNotifier {
     await AudioEngine.init();
     if (!AudioEngine.ready) return;
     try {
-      _source ??= await SoLoud.instance.loadAsset(_musicAsset);
+      // Shared load, so two overlapping starts (a quick rematch) load once.
+      _source ??= await (_loading ??= SoLoud.instance.loadAsset(_musicAsset));
     } catch (e) {
+      _loading = null;
       debugPrint('music load failed: $e');
       return;
     }
@@ -86,6 +93,22 @@ class Music extends ChangeNotifier {
       SoLoud.instance.scheduleStop(h, const Duration(milliseconds: 600));
     }
     notifyListeners();
+  }
+
+  void _pauseForBackground() {
+    final h = _handle;
+    if (h != null && AudioEngine.ready) SoLoud.instance.setPause(h, true);
+  }
+
+  void _resumeFromBackground() {
+    final h = _handle;
+    if (h != null && AudioEngine.ready && isPlaying && !isMuted) SoLoud.instance.setPause(h, false);
+  }
+
+  @override
+  void dispose() {
+    _life.dispose();
+    super.dispose();
   }
 
   void duck() {
