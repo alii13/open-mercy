@@ -158,7 +158,7 @@
             </li>
             <li v-if="badgeInfo?.progress.next" class="pp-upgrade pp-upgrade--next">
               <span class="pp-upgrade-link pp-upgrade-link--pending" aria-hidden="true"></span>
-              <span class="pp-upgrade-pending" :style="{ borderColor: badgeInfo.progress.next.color }" aria-hidden="true"></span>
+              <Badge class="pp-upgrade-mark pp-upgrade-mark--locked" :badge="badgeInfo.progress.next" size="mark" aria-hidden="true" />
               <span class="pp-upgrade-name" :style="{ color: badgeInfo.progress.next.color }">{{ badgeInfo.progress.next.title }}</span>
               <span class="pp-upgrade-when">{{ badgeInfo.progress.needed.toLocaleString() }} to go</span>
             </li>
@@ -821,26 +821,23 @@ watch(() => props.code, (code) => {
    either one. */
 .pp-upgrade-link {
   position: absolute;
-  top: calc(var(--spacing-4) + 11px);
+  top: calc(var(--spacing-4) + 15px);
   right: calc(50% + 16px);
   width: calc(100% - 32px);
   height: 1px;
   background: #3f3f46;
 }
 
-/* The tier not yet taken: a dashed run-up to a dashed hexagon. */
+/* The tier not yet taken: a dashed run-up to its own emblem, greyed out. */
 .pp-upgrade-link--pending {
   background: repeating-linear-gradient(to right, #3f3f46 0 4px, transparent 4px 8px);
 }
 
-.pp-upgrade-pending {
-  width: 22px;
-  height: 22px;
-  border: 1.5px dashed currentColor;
-  opacity: 0.75;
-  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
-}
+.pp-upgrade-mark--locked { filter: grayscale(1) brightness(0.6); }
 
+/* One slot height for every emblem, so the bigger current one does not push
+   its label below the rest of the row. */
+.pp-upgrade-mark { height: 30px; display: flex; align-items: center; }
 .pp-upgrade-mark :deep(.badge-emblem) { width: 22px; height: 22px; }
 .pp-upgrade--current .pp-upgrade-mark :deep(.badge-emblem) { width: 30px; height: 30px; }
 

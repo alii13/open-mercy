@@ -43,15 +43,15 @@ export const BADGES: Badge[] = [
     // Prestige ranks: x1.4 per rank, rounded. At the fastest player's pace
     // when these shipped (~140k points a month) the top is well over a year
     // away - reachable, so it still pulls, but nobody walks into it.
-    { tier: 11, threshold: 140_000, title: 'Tyrant', color: '#ff7a1a' },
-    { tier: 12, threshold: 196_000, title: 'Butcher', color: '#ff2440' },
-    { tier: 13, threshold: 274_000, title: 'Dreadlord', color: '#39ff88' },
-    { tier: 14, threshold: 384_000, title: 'Harbinger', color: '#3fa9ff' },
-    { tier: 15, threshold: 538_000, title: 'Annihilator', color: '#ff5a00' },
-    { tier: 16, threshold: 753_000, title: 'Wraith', color: '#7fe9ff' },
-    { tier: 17, threshold: 1_050_000, title: 'Reaper', color: '#e8e2d0' },
-    { tier: 18, threshold: 1_480_000, title: 'Doombringer', color: '#ff2a2a' },
-    { tier: 19, threshold: 2_070_000, title: 'Apocalypse', color: '#b56bff' },
+    { tier: 11, threshold: 140_000, title: 'Tyrant', color: '#d4a73a' },
+    { tier: 12, threshold: 196_000, title: 'Butcher', color: '#d0383c' },
+    { tier: 13, threshold: 274_000, title: 'Dreadlord', color: '#9aa4ac' },
+    { tier: 14, threshold: 384_000, title: 'Harbinger', color: '#5b84d6' },
+    { tier: 15, threshold: 538_000, title: 'Annihilator', color: '#d08a4a' },
+    { tier: 16, threshold: 753_000, title: 'Wraith', color: '#4fb0a8' },
+    { tier: 17, threshold: 1_050_000, title: 'Reaper', color: '#c9d0d6' },
+    { tier: 18, threshold: 1_480_000, title: 'Doombringer', color: '#d0453a' },
+    { tier: 19, threshold: 2_070_000, title: 'Apocalypse', color: '#9b6bd6' },
     { tier: 20, threshold: 2_890_000, title: 'God of No Mercy', color: '#ffcc33' },
 ]
 
