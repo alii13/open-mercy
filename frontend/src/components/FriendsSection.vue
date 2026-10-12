@@ -2,7 +2,8 @@
   <!-- Hidden entirely until friends.sql is run: an empty panel that cannot
        work is worse than no panel. -->
   <section v-if="!social.unavailable" class="fs">
-    <div class="fs-main">
+    <!-- No friends yet but a request waiting: the request is the page. -->
+    <div v-if="social.friends.length || !social.incoming.length" class="fs-main">
       <div v-if="online.length" class="fs-group">
         <div class="fs-label">
           <span>Online now</span>
@@ -42,7 +43,7 @@
               :disabled="busy === f.user_id || !!asked[f.user_id]"
               @click="play(f)"
             >
-              <Send :size="15" :stroke-width="2" aria-hidden="true" />
+              <Send :size="16" :stroke-width="2" aria-hidden="true" />
               {{ titleCase(asked[f.user_id] ?? 'INVITE') }}
             </button>
             <FriendMore :friend="f" :open="menuFor === f.user_id" :confirming="confirming" @toggle="toggleMenu(f.user_id)" @arm="arm" />
@@ -68,7 +69,7 @@
               <Badge v-if="badges[r.user_id]" v-bind="badgeProps(r)" size="mark" :style="{ '--emblem-size': '56px' }" />
               <div class="fs-who">
                 <button class="fs-name fs-name--lg" @click="openProfile(r)">{{ r.username }}</button>
-                <span class="fs-status">Asked {{ relativeTime(r.created_at, now) || 'just now' }}</span>
+                <span class="fs-status">Asked {{ askedAgo(r) }}</span>
               </div>
             </div>
             <div class="fs-request-actions">
@@ -86,7 +87,7 @@
             <Badge v-if="badges[o.user_id]" v-bind="badgeProps(o)" size="mark" :style="{ '--emblem-size': '34px' }" />
             <div class="fs-who">
               <button class="fs-name" @click="openProfile(o)">{{ o.username }}</button>
-              <span class="fs-status">Asked {{ relativeTime(o.created_at, now) || 'just now' }}</span>
+              <span class="fs-status">Asked {{ askedAgo(o) }}</span>
             </div>
             <button class="fs-text-btn fs-text-btn--quiet" @click="social.remove(o.user_id)">Cancel</button>
           </li>
@@ -161,6 +162,13 @@ function onlineLabel(f: FriendRow): string {
   return title ? `Online · ${title}` : 'Online'
 }
 
+/** Under a few seconds - or a server clock a moment ahead - relativeTime
+ *  says "in 0 seconds". */
+function askedAgo(r: FriendRow): string {
+  if (now.value - Date.parse(r.created_at) < 5000) return 'just now'
+  return relativeTime(r.created_at, now.value) || 'just now'
+}
+
 function seenLabel(f: FriendRow): string {
   const rel = relativeTime(f.last_seen_at, now.value)
   return rel ? `Last seen ${rel}` : 'Offline'
@@ -205,12 +213,16 @@ onUnmounted(() => { if (armedTimer) clearTimeout(armedTimer) })
 .fs {
   display: flex;
   align-items: flex-start;
+  justify-content: center;
   gap: var(--spacing-8);
 }
 
+/* Capped at its two-column width, so a page with nothing in the side column
+   does not stretch one row across the whole screen. */
 .fs-main {
   flex: 1.6;
   min-width: 0;
+  max-width: 40rem;
   display: flex;
   flex-direction: column;
   gap: var(--spacing-6);
@@ -219,6 +231,7 @@ onUnmounted(() => { if (armedTimer) clearTimeout(armedTimer) })
 .fs-side {
   flex: 1;
   min-width: 0;
+  max-width: 24rem;
   display: flex;
   flex-direction: column;
   gap: var(--spacing-6);
@@ -460,6 +473,7 @@ onUnmounted(() => { if (armedTimer) clearTimeout(armedTimer) })
   .fs-main,
   .fs-side {
     width: 100%;
+    max-width: none;
   }
 
   /* Requests are the rows that need an answer, so on a phone they lead. */
@@ -469,7 +483,17 @@ onUnmounted(() => { if (armedTimer) clearTimeout(armedTimer) })
 
   .fs-row {
     min-height: 68px;
+    gap: var(--spacing-2);
     padding: var(--spacing-2) var(--spacing-2);
+  }
+
+  /* A typical 15-character name has to fit beside PLAY at 390px. */
+  .fs-row .btn {
+    padding-inline: var(--spacing-3);
+  }
+
+  .fs-name {
+    font-size: 0.95rem;
   }
 }
 </style>

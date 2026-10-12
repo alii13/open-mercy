@@ -4,7 +4,7 @@ import { nextTick } from 'vue'
 
 const { rpc, channels, unsubscribe } = vi.hoisted(() => ({
     rpc: vi.fn(),
-    channels: [] as { name: string, filters: unknown[], fire: () => void }[],
+    channels: [] as { name: string, filters: unknown[], fire: (i?: number) => void }[],
     unsubscribe: vi.fn(),
 }))
 vi.mock('../../lib/supabase', () => ({
@@ -18,7 +18,8 @@ vi.mock('../../lib/supabase', () => ({
             const ch = {
                 name,
                 filters: [] as unknown[],
-                fire: () => handlers.forEach(h => h()),
+                // One change matches one filter, so Realtime calls one handler.
+                fire: (i = 0) => handlers[i]?.(),
                 on: (_e: string, cfg: unknown, cb: () => void) => { ch.filters.push(cfg); handlers.push(cb); return ch },
                 subscribe: () => ch,
                 unsubscribe,
@@ -140,6 +141,7 @@ describe('social store', () => {
         const social = useSocialStore()
         const auth = useAuthStore()
         auth.user = { id: 'first' } as never
+        await nextTick()
         await social.refresh()
         expect(social.friends).toHaveLength(1)
 
@@ -198,6 +200,18 @@ describe('social store', () => {
             expect(social.notice).toBeNull()
         })
 
+        it('announces a new request from someone whose earlier one was already shown', async () => {
+            listReturns([row({ user_id: 'asked-me', status: 'pending', incoming: true, created_at: '2026-08-15T09:00:00Z' })])
+            const social = useSocialStore()
+            await social.refresh()
+            social.dismissNotice()
+
+            // Unfriended, then asked again: a new request, not the old one.
+            listReturns([row({ user_id: 'asked-me', status: 'pending', incoming: true, created_at: '2026-08-15T12:00:00Z' })])
+            await social.refresh()
+            expect(social.notice?.kind).toBe('request')
+        })
+
         it('tells the sender when a request they sent is accepted', async () => {
             listReturns([row({ user_id: 'i-asked', status: 'pending', incoming: false })])
             const social = useSocialStore()
@@ -207,6 +221,27 @@ describe('social store', () => {
             listReturns([row({ user_id: 'i-asked', status: 'accepted', incoming: false })])
             await social.refresh()
             expect(social.notice).toEqual({ kind: 'accepted', row: expect.objectContaining({ user_id: 'i-asked' }) })
+        })
+
+        it('brings back a request that an accepted toast pushed off screen', async () => {
+            listReturns([
+                row({ user_id: 'asked-me', status: 'pending', incoming: true }),
+                row({ user_id: 'i-asked', status: 'pending', incoming: false }),
+            ])
+            const social = useSocialStore()
+            await social.refresh()
+            expect(social.notice?.kind).toBe('request')
+
+            listReturns([
+                row({ user_id: 'asked-me', status: 'pending', incoming: true }),
+                row({ user_id: 'i-asked', status: 'accepted', incoming: false }),
+            ])
+            await social.refresh()
+            expect(social.notice?.kind).toBe('accepted')
+
+            social.dismissNotice()
+            await social.refresh()
+            expect(social.notice).toEqual({ kind: 'request', row: expect.objectContaining({ user_id: 'asked-me' }) })
         })
 
         it('does not call an existing friend newly accepted', async () => {
@@ -233,11 +268,70 @@ describe('social store', () => {
             expect(ch!.filters).toEqual(expect.arrayContaining([
                 expect.objectContaining({ table: 'friendships', event: 'INSERT', filter: 'addressee_id=eq.me' }),
                 expect.objectContaining({ table: 'friendships', event: 'UPDATE', filter: 'requester_id=eq.me' }),
+                // A request re-sent after a decline is an update that turns
+                // the row around, not a new row.
+                expect.objectContaining({ table: 'friendships', event: 'UPDATE', filter: 'addressee_id=eq.me' }),
             ]))
 
             listReturns([row({ user_id: 'asked-me', status: 'pending', incoming: true })])
             ch!.fire()
             await vi.waitFor(() => expect(social.incoming).toHaveLength(1))
+        })
+
+        it('closes the channel once the friends SQL turns out to be missing', async () => {
+            rpc.mockResolvedValue({ data: null, error: { code: 'PGRST202' } })
+            const social = useSocialStore()
+            const auth = useAuthStore()
+            auth.user = { id: 'me' } as never
+            await nextTick()
+            await social.refresh()
+            expect(social.unavailable).toBe(true)
+            expect(unsubscribe).toHaveBeenCalled()
+        })
+
+        it('drops a read that started before a sign-out', async () => {
+            let release: (v: unknown) => void = () => {}
+            const social = useSocialStore()
+            const auth = useAuthStore()
+            auth.user = { id: 'first' } as never
+            await nextTick()
+            rpc.mockReset()
+            rpc.mockImplementationOnce(() => new Promise(res => { release = res }))
+            const pending = social.refresh()
+            await vi.waitFor(() => expect(rpc).toHaveBeenCalled())
+
+            auth.user = { id: 'second' } as never
+            await nextTick()
+            release({ data: [row({ user_id: 'asked-first', status: 'pending', incoming: true })], error: null })
+            await pending
+
+            // The first account's request must not land on the second account's screen.
+            expect(social.rows).toHaveLength(0)
+            expect(social.notice).toBeNull()
+        })
+
+        it('ignores a slow read that lands after a newer one', async () => {
+            listReturns([row({ user_id: 'i-asked', status: 'pending', incoming: false })])
+            const social = useSocialStore()
+            await social.refresh()
+
+            let release: (v: unknown) => void = () => {}
+            rpc.mockImplementationOnce(() => new Promise(res => { release = res }))
+            const slow = social.refresh()
+            await vi.waitFor(() => expect(rpc).toHaveBeenCalledTimes(2))
+
+            listReturns([row({ user_id: 'i-asked', status: 'accepted', incoming: false })])
+            await social.refresh()
+            expect(social.notice?.kind).toBe('accepted')
+            social.dismissNotice()
+
+            release({ data: [row({ user_id: 'i-asked', status: 'pending', incoming: false })], error: null })
+            await slow
+            expect(social.friends).toHaveLength(1)
+
+            // And the friendship is not announced a second time.
+            await social.refresh()
+            expect(social.notice).toBeNull()
         })
 
         it('closes the channel on sign-out', async () => {

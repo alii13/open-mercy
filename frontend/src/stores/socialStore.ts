@@ -56,8 +56,11 @@ export const useSocialStore = defineStore('social', () => {
     const pendingIds = ref<Set<string>>(new Set())
     /** The one thing the toast shows. */
     const notice = ref<FriendNotice | null>(null)
-    /** Requests already shown once this session, so a dismissed one stays dismissed. */
+    /** Requests already shown once this session, so a dismissed one stays
+     *  dismissed. Keyed on the request, not the person: someone unfriended who
+     *  asks again has sent a new request. */
     let announced = new Set<string>()
+    const requestKey = (r: FriendRow) => `${r.user_id}:${r.created_at}`
     let channel: { unsubscribe: () => void } | null = null
 
     const friends = computed(() => rows.value.filter(r => r.status === 'accepted'))
@@ -69,14 +72,25 @@ export const useSocialStore = defineStore('social', () => {
      *  buttons that must not offer ADD twice. */
     const knownIds = computed(() => new Set(rows.value.map(r => r.user_id)))
 
+    /** Bumped by every read and every account change. A read answers only if
+     *  it is still the latest - a slow one landing after a newer one would
+     *  roll a friendship back to pending, and one landing after a sign-out
+     *  would put the last account's requests on the next account's screen. */
+    let readSeq = 0
+
     async function refresh(): Promise<void> {
         if (unavailable.value) return
+        const seq = ++readSeq
         loading.value = true
         try {
             if (!(await hasLiveSession())) return
             const { data, error } = await supabase.rpc('my_friends')
+            if (seq !== readSeq) return
             if (error) {
-                if (isFatalSchemaError(error)) unavailable.value = true
+                if (isFatalSchemaError(error)) {
+                    unavailable.value = true
+                    stop()
+                }
                 return
             }
             const next = (data ?? []) as FriendRow[]
@@ -93,14 +107,17 @@ export const useSocialStore = defineStore('social', () => {
         const wasPendingOut = new Set(prev.filter(r => r.status === 'pending' && !r.incoming).map(r => r.user_id))
         const accepted = next.find(r => r.status === 'accepted' && wasPendingOut.has(r.user_id))
         if (accepted) {
+            // A request on screen gives way, but is not spent: it comes back
+            // on the next read.
+            if (notice.value?.kind === 'request') announced.delete(requestKey(notice.value.row))
             notice.value = { kind: 'accepted', row: accepted }
             return
         }
         const fresh = next
-            .filter(r => r.status === 'pending' && r.incoming && !announced.has(r.user_id))
+            .filter(r => r.status === 'pending' && r.incoming && !announced.has(requestKey(r)))
             .sort((a, b) => b.created_at.localeCompare(a.created_at))[0]
         if (!fresh) return
-        announced.add(fresh.user_id)
+        announced.add(requestKey(fresh))
         notice.value = { kind: 'request', row: fresh }
     }
 
@@ -177,11 +194,15 @@ export const useSocialStore = defineStore('social', () => {
             .channel(`friendships:${userId}`)
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'friendships', filter: `addressee_id=eq.${userId}` }, nudge)
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'friendships', filter: `requester_id=eq.${userId}` }, nudge)
+            // A request re-sent after a decline turns the existing row around
+            // rather than inserting one.
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'friendships', filter: `addressee_id=eq.${userId}` }, nudge)
             // A row written while the socket was down is never replayed.
             .subscribe((status: string) => { if (status === 'SUBSCRIBED') nudge() })
     }
 
     function reset(): void {
+        readSeq++
         rows.value = []
         pendingIds.value = new Set()
         notice.value = null

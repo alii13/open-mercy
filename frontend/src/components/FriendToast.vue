@@ -1,6 +1,16 @@
 <template>
   <Transition name="friend-toast">
-    <div v-if="notice" :key="key" class="ft" role="status">
+    <div
+      v-if="notice"
+      :key="key"
+      class="ft"
+      :class="{ 'ft--paused': paused }"
+      role="status"
+      @mouseenter="pause"
+      @mouseleave="resume"
+      @focusin="pause"
+      @focusout="resume"
+    >
       <div class="ft-head">
         <Badge
           v-if="info"
@@ -15,7 +25,7 @@
           <span class="ft-name">{{ title }}</span>
           <span class="ft-sub" :class="{ 'ft-sub--live': notice.kind === 'accepted' && online }">{{ subtitle }}</span>
         </div>
-        <button class="ft-close" aria-label="Dismiss" @click="social.dismissNotice()">
+        <button class="ft-close" aria-label="Dismiss notification" @click="social.dismissNotice()">
           <X :size="16" :stroke-width="2" aria-hidden="true" />
         </button>
       </div>
@@ -34,7 +44,7 @@
           class="ft-primary"
           :disabled="busy !== null"
           @click="play"
-        >{{ busy ? '…' : 'PLAY NOW' }}</Button>
+        >{{ busy ? '…' : (asked[notice.row.user_id] === 'TRY AGAIN' ? 'TRY AGAIN' : 'PLAY NOW') }}</Button>
         <button class="ft-later" @click="social.dismissNotice()">
           {{ notice.kind === 'request' ? 'Not now' : 'Later' }}
         </button>
@@ -45,7 +55,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onUnmounted, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { X } from 'lucide-vue-next'
 import Badge from './Badge.vue'
 import Button from './ui/Button.vue'
@@ -56,7 +66,7 @@ import { isOnline, relativeTime } from '../utils/relativeTime'
 
 const social = useSocialStore()
 const { badges, fetchBadges } = useBadges()
-const { busy, playWith } = usePlayWithFriend()
+const { busy, asked, playWith } = usePlayWithFriend()
 
 /** Long enough to read and reach for, short enough not to camp on the
  *  screen. The username chip count keeps it after this. */
@@ -77,19 +87,56 @@ const subtitle = computed(() => {
   const n = notice.value
   if (!n) return ''
   if (n.kind === 'accepted') return online.value ? "You're friends · online now" : "You're friends"
-  const when = relativeTime(n.row.created_at)
+  // Under a few seconds - or a server clock a moment ahead - reads as
+  // "in 0 seconds" from relativeTime, so call it what it is.
+  const age = Date.now() - Date.parse(n.row.created_at)
+  const when = age < 5000 ? 'just now' : relativeTime(n.row.created_at)
   return when ? `wants to be friends · ${when}` : 'wants to be friends'
 })
 
+// The clock stops while a pointer or keyboard focus is on the toast, so
+// nobody loses ACCEPT on the way to it, and it never runs out mid-PLAY.
 let hideTimer: ReturnType<typeof setTimeout> | null = null
-watch(key, (k) => {
+let remaining = HIDE_MS
+let startedAt = 0
+const paused = ref(false)
+
+function clearHide(): void {
   if (hideTimer) clearTimeout(hideTimer)
   hideTimer = null
+}
+
+function runHide(): void {
+  clearHide()
+  startedAt = Date.now()
+  hideTimer = setTimeout(() => {
+    if (busy.value) return
+    social.dismissNotice()
+  }, remaining)
+}
+
+function pause(): void {
+  if (paused.value || !hideTimer) return
+  paused.value = true
+  remaining = Math.max(0, remaining - (Date.now() - startedAt))
+  clearHide()
+}
+
+function resume(): void {
+  if (!paused.value) return
+  paused.value = false
+  runHide()
+}
+
+watch(key, (k) => {
+  clearHide()
+  paused.value = false
+  remaining = HIDE_MS
   if (!k || !notice.value) return
   void fetchBadges([notice.value.row.user_id])
-  hideTimer = setTimeout(() => social.dismissNotice(), HIDE_MS)
+  runHide()
 }, { immediate: true })
-onUnmounted(() => { if (hideTimer) clearTimeout(hideTimer) })
+onUnmounted(clearHide)
 
 async function accept() {
   const n = notice.value
@@ -108,13 +155,13 @@ async function play() {
 
 <style scoped>
 /* Bottom-right on desktop, where it sits beside the lobby rather than over
-   CREATE GAME; full width at the top on a phone. Above InviteToast's layer,
-   below modals. */
+   CREATE GAME; full width at the top on a phone. On the toast layer, under
+   modals - a confirmation dialog always wins. */
 .ft {
   position: fixed;
   right: var(--spacing-6);
   bottom: calc(env(safe-area-inset-bottom, 0px) + var(--spacing-16));
-  z-index: 2210;
+  z-index: var(--z-toast);
   width: 26rem;
   display: flex;
   flex-direction: column;
@@ -214,6 +261,10 @@ async function play() {
   animation: ft-drain linear forwards;
 }
 
+.ft--paused .ft-timer span {
+  animation-play-state: paused;
+}
+
 @keyframes ft-drain {
   from { transform: scaleX(1); }
   to { transform: scaleX(0); }
@@ -221,7 +272,7 @@ async function play() {
 
 /* Top on a phone: the bottom edge already carries the poll card and the
    invite toast, and three things stacked there read as one pile. */
-@media (max-width: 640px) {
+@media (max-width: 900px) {
   .ft {
     left: var(--spacing-3);
     right: var(--spacing-3);
@@ -257,7 +308,7 @@ async function play() {
 }
 
 /* After the base rule, so the phone version slides down from the top. */
-@media (max-width: 640px) {
+@media (max-width: 900px) {
   .friend-toast-enter-from,
   .friend-toast-leave-to {
     transform: translateY(-12px);
