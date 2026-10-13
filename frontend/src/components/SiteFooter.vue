@@ -23,6 +23,11 @@ import { openPrivacySettings } from '../utils/consent'
     <span class="footer-sep">·</span>
     <a href="/contact/" class="footer-link">Contact</a>
     <span class="footer-sep">·</span>
+    <a href="https://t.me/openmercy" target="_blank" rel="noopener noreferrer" class="footer-link">
+      <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14" aria-hidden="true"><path d="M21.7 2.3a1 1 0 0 0-1.05-.23L2.6 9.1a1 1 0 0 0 .06 1.9l4.9 1.63 1.9 5.9a1 1 0 0 0 1.7.4l2.7-2.9 4.4 3.3a1 1 0 0 0 1.57-.6l3-15.2a1 1 0 0 0-.13-.73ZM9.9 14.2l-.9 3.1-1.2-3.7 8.9-6.3Z"/></svg>
+      Telegram
+    </a>
+    <span class="footer-sep">·</span>
     <a href="/privacy/" class="footer-link">Privacy</a>
     <span class="footer-sep">·</span>
     <a href="/terms/" class="footer-link">Terms</a>
