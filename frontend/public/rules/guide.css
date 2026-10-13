@@ -208,6 +208,8 @@ li { margin-bottom: 0.5rem; }
   color: var(--yellow);
 }
 .card-table tbody tr:hover { background: rgba(0, 243, 255, 0.03); }
+.card-table a { color: var(--blue); text-decoration: none; }
+.card-table a:hover { text-decoration: underline; }
 .card-table td:first-child { color: var(--text); font-weight: 600; min-width: 180px; }
 
 /* Callouts */
@@ -286,4 +288,5 @@ footer a:hover { color: var(--yellow); }
   .card-table { font-size: 0.85rem; }
   .card-table th, .card-table td { padding: 0.6rem 0.5rem; }
   .card-table td:first-child { min-width: 110px; }
+
 }
