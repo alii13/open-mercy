@@ -9,6 +9,8 @@
       <p class="guide-intro">
         Open Mercy is a free card game you play in your browser, built on the No Mercy rules:
         bigger draw cards, stacking, and a hard limit on how many cards you can hold.
+        The ruleset was popularized by Mattel's UNO Show 'Em No Mercy&reg; card game;
+        Open Mercy is independent and not affiliated with Mattel.
       </p>
       <p class="guide-intro">
         It is made for friend groups who want a quick game over a call, but you can also
@@ -51,6 +53,7 @@
       <nav class="guide-links" aria-label="Guides">
         <a href="/how-to-play/">How to play</a>
         <a href="/rules/">Full rules</a>
+        <a href="/rules/how-to-play/">Rules step by step</a>
         <a href="/rules/cards/">Every card</a>
         <a href="/rules/stacking/">Stacking rules</a>
         <a href="/strategy/">Strategy</a>
