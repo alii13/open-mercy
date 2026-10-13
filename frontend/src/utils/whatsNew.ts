@@ -8,7 +8,8 @@
  * Ids are ISO dates, so a plain string compare orders them.
  */
 
-import type { ChangelogEntry } from '../data/changelog'
+import type { ChangelogEntry, ChangelogCta } from '../data/changelog'
+import type { Route } from './routes'
 
 /** The highest id in the list, whatever order it is written in. */
 export function newestId(entries: readonly ChangelogEntry[]): string | null {
@@ -105,4 +106,14 @@ export function pendingLoud(
     }
     if (newest === null || dismissedIds.includes(newest.id)) return null
     return newest
+}
+
+/** Follow an entry's button: an app route in place, an outside link in a new tab. */
+export function followCta(
+    cta: ChangelogCta,
+    nav: (r: Route) => void,
+    open: (url: string, target: string, features: string) => unknown = (u, t, f) => window.open(u, t, f),
+): void {
+    if ('href' in cta) open(cta.href, '_blank', 'noopener,noreferrer')
+    else nav(cta.route)
 }

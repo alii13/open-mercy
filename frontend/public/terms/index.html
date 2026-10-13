@@ -265,7 +265,8 @@
       &middot; <a href="/contact/">Contact</a>
       &middot; <a href="/privacy/">Privacy</a>
       &middot; <a href="/terms/">Terms</a>
-      &middot; <a href="#" onclick="window.googlefc = window.googlefc || {}; googlefc.callbackQueue = googlefc.callbackQueue || []; googlefc.callbackQueue.push(function () { googlefc.showRevocationMessage(); }); return false;">Privacy settings</a>
+      <span class="fc-settings" hidden>&middot; <a href="#" onclick="window.googlefc = window.googlefc || {}; googlefc.callbackQueue = googlefc.callbackQueue || []; googlefc.callbackQueue.push(function () { googlefc.showRevocationMessage(); }); return false;">Privacy settings</a></span>
+      <script>(window.googlefc = window.googlefc || {}).callbackQueue = window.googlefc.callbackQueue || []; googlefc.callbackQueue.push({ CONSENT_DATA_READY: function () { if (typeof googlefc.showRevocationMessage === 'function') document.querySelector('.fc-settings').hidden = false; } });</script>
     </footer>
   </body>
 </html>

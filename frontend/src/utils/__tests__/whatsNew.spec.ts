@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { newestId, previousId, seedId, unreadEntries, unreadCount, isOnlyUnread, pendingLoud } from '../whatsNew'
+import { describe, it, expect, vi } from 'vitest'
+import { newestId, previousId, seedId, unreadEntries, unreadCount, isOnlyUnread, pendingLoud, followCta } from '../whatsNew'
 import type { ChangelogEntry } from '../../data/changelog'
 
 function entry(id: string, level: ChangelogEntry['level'] = 'quiet'): ChangelogEntry {
@@ -145,5 +145,21 @@ describe('pendingLoud', () => {
 
     it('shows nothing when everything is read', () => {
         expect(pendingLoud(ENTRIES, '2026-08-26', [])).toBeNull()
+    })
+})
+
+describe('followCta', () => {
+    it('navigates inside the app for a route', () => {
+        const nav = vi.fn(), open = vi.fn()
+        followCta({ label: 'X', route: { name: 'badges' } }, nav, open)
+        expect(nav).toHaveBeenCalledWith({ name: 'badges' })
+        expect(open).not.toHaveBeenCalled()
+    })
+
+    it('opens an outside link in a new tab, not the app router', () => {
+        const nav = vi.fn(), open = vi.fn()
+        followCta({ label: 'JOIN', href: 'https://t.me/openmercy' }, nav, open)
+        expect(open).toHaveBeenCalledWith('https://t.me/openmercy', '_blank', 'noopener,noreferrer')
+        expect(nav).not.toHaveBeenCalled()
     })
 })

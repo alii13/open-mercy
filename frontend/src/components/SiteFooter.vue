@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import { openPrivacySettings } from '../utils/consent'
+import { onMounted, ref } from 'vue'
+import { openPrivacySettings, privacySettingsAvailable } from '../utils/consent'
+
+const privacySettings = ref(false)
+onMounted(() => { void privacySettingsAvailable().then(v => { privacySettings.value = v }) })
 </script>
 
 <template>
@@ -32,8 +36,10 @@ import { openPrivacySettings } from '../utils/consent'
     <span class="footer-sep">·</span>
     <a href="/terms/" class="footer-link">Terms</a>
     <span class="footer-sep">·</span>
-    <button type="button" class="footer-link footer-button" @click="openPrivacySettings()">Privacy settings</button>
-    <span class="footer-sep">·</span>
+    <template v-if="privacySettings">
+      <button type="button" class="footer-link footer-button" @click="openPrivacySettings()">Privacy settings</button>
+      <span class="footer-sep">·</span>
+    </template>
     <span class="footer-attribution">
       Music: <a href="https://incompetech.com/" target="_blank" rel="noopener noreferrer" class="footer-attribution-link">Kevin MacLeod</a>
       (<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer" class="footer-attribution-link">CC BY 4.0</a>)

@@ -62,6 +62,7 @@ import { Sparkles, X, ArrowRight } from 'lucide-vue-next'
 import { useWhatsNew } from '../composables/useWhatsNew'
 import { relativeTime } from '../utils/relativeTime'
 import { navigate, type Route } from '../utils/routes'
+import { followCta } from '../utils/whatsNew'
 import { track } from '../utils/analytics'
 import type { ChangelogEntry } from '../data/changelog'
 
@@ -111,7 +112,7 @@ function go(route: Route) {
 function goEntry(entry: ChangelogEntry) {
     if (!entry.cta) return
     track('whatsnew_entry_clicked', { entry_id: entry.id })
-    go(entry.cta.route)
+    followCta(entry.cta, go)
 }
 
 function goChangelog() {

@@ -20,6 +20,8 @@ import type { Route } from '../utils/routes'
 export type ChangelogLevel = 'quiet' | 'loud'
 export type ChangelogTag = 'NEW' | 'IMPROVED' | 'FIXED'
 
+export type ChangelogCta = { label: string; route: Route } | { label: string; href: string }
+
 export interface ChangelogEntry {
     /** ISO date, sortable. */
     id: string
@@ -36,7 +38,8 @@ export interface ChangelogEntry {
      */
     bodySignedOut?: string
     /** Optional. No link beats a link to the home page. */
-    cta?: { label: string; route: Route }
+    /** An app route, or `href` for a page outside the app (opens a new tab). */
+    cta?: ChangelogCta
     /**
      * Overrides the CTA label for a signed-out reader. Same rule as
      * `bodySignedOut`: only when the normal label assumes an account
@@ -53,6 +56,14 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+    {
+        id: '2026-10-13',
+        level: 'loud',
+        tag: 'NEW',
+        title: 'Join Open Mercy on Telegram',
+        body: "We now have a Telegram channel. New ranks, rule changes and events land there first. Join to hear about them before anyone else.",
+        cta: { label: 'JOIN ON TELEGRAM', href: 'https://t.me/openmercy' },
+    },
     {
         id: '2026-10-12T22:00Z',
         level: 'quiet',
