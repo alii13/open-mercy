@@ -63,6 +63,7 @@ import type { Poll } from '../data/polls'
 import { useAuthStore } from '../stores/authStore'
 import { supabase } from '../lib/supabase'
 import { navigate } from '../utils/routes'
+import { followCta } from '../utils/whatsNew'
 import { track } from '../utils/analytics'
 
 const { card, dismissCard, markAllRead } = useWhatsNew()
@@ -156,12 +157,12 @@ function skipQuestion() {
 
 function go() {
     if (!entry.value) return
-    const route = entry.value.cta?.route
+    const cta = entry.value.cta
     track('release_card_taken', { entry_id: entry.value.id })
     dismissCard(entry.value.id)
     // Acting on the card is a stronger read receipt than opening the panel.
     markAllRead()
-    if (route) navigate(route)
+    if (cta) followCta(cta, navigate)
 }
 </script>
 

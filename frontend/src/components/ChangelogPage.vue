@@ -38,7 +38,7 @@
             <span class="cl-tag" :class="`cl-tag--${e.tag.toLowerCase()}`">{{ e.tag }}</span>
             <h4 class="cl-entry-title">{{ e.title }}</h4>
             <p class="cl-text">{{ e.body }}</p>
-            <button v-if="e.cta" class="cl-cta" type="button" @click="navigate(e.cta.route)">
+            <button v-if="e.cta" class="cl-cta" type="button" @click="followCta(e.cta, navigate)">
               {{ e.cta.label }}
               <ArrowRight :size="14" :stroke-width="2" aria-hidden="true" />
             </button>
@@ -56,6 +56,7 @@ import { ref, computed } from 'vue'
 import { ChevronLeft, ArrowRight } from 'lucide-vue-next'
 import { CHANGELOG, type ChangelogTag, type ChangelogEntry } from '../data/changelog'
 import { navigate } from '../utils/routes'
+import { followCta } from '../utils/whatsNew'
 import SiteFooter from './SiteFooter.vue'
 
 type Filter = 'ALL' | ChangelogTag
