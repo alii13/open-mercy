@@ -113,7 +113,9 @@ export function followCta(
     cta: ChangelogCta,
     nav: (r: Route) => void,
     open: (url: string, target: string, features: string) => unknown = (u, t, f) => window.open(u, t, f),
+    ownCode?: string | null,
 ): void {
     if ('href' in cta) open(cta.href, '_blank', 'noopener,noreferrer')
+    else if ('ownProfile' in cta) { if (ownCode) nav({ name: 'profile', code: ownCode }) }
     else nav(cta.route)
 }

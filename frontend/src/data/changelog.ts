@@ -20,7 +20,11 @@ import type { Route } from '../utils/routes'
 export type ChangelogLevel = 'quiet' | 'loud'
 export type ChangelogTag = 'NEW' | 'IMPROVED' | 'FIXED'
 
-export type ChangelogCta = { label: string; route: Route } | { label: string; href: string }
+export type ChangelogCta =
+    | { label: string; route: Route }
+    | { label: string; href: string }
+    /** The reader's own profile page, which no fixed route can name. */
+    | { label: string; ownProfile: true }
 
 export interface ChangelogEntry {
     /** ISO date, sortable. */
@@ -56,6 +60,14 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+    {
+        id: '2026-10-14',
+        level: 'loud',
+        tag: 'NEW',
+        title: 'Change your name from your profile',
+        body: "Don't like your name? Open your profile and tap the pencil next to it. Type a new one, save, and it shows everywhere: the table, the leaderboard and your friends list.",
+        cta: { label: 'EDIT MY NAME', ownProfile: true },
+    },
     {
         id: '2026-10-13',
         level: 'loud',

@@ -33,8 +33,37 @@
     <div v-else-if="p" ref="contentEl" class="pp-content">
       <!-- WHO — name first, so you know whose page this is before the badge -->
       <header class="pp-who">
-        <h1 class="pp-name">
+        <form v-if="editing" class="pp-rename" @submit.prevent="saveName">
+          <input
+            ref="nameInputEl"
+            v-model="nameInput"
+            class="pp-rename-input"
+            :class="{ 'has-error': nameError }"
+            maxlength="20"
+            aria-label="Your name"
+            :aria-invalid="!!nameError"
+            aria-describedby="pp-rename-error"
+            :disabled="saving"
+            @input="nameError = ''; nameSuggestions = []"
+            @keyup.esc="cancelEdit"
+          />
+          <button type="submit" class="pp-rename-btn pp-rename-save" :disabled="saving" aria-label="Save name">
+            <Check :size="22" :stroke-width="2.5" aria-hidden="true" />
+          </button>
+          <button type="button" class="pp-rename-btn" :disabled="saving" aria-label="Cancel" @click="cancelEdit">
+            <X :size="22" :stroke-width="2.5" aria-hidden="true" />
+          </button>
+          <p v-if="nameError" id="pp-rename-error" class="pp-rename-error" role="alert">{{ nameError }}</p>
+          <div v-if="nameSuggestions.length" class="pp-rename-suggest">
+            <span>Free:</span>
+            <button v-for="n in nameSuggestions" :key="n" type="button" class="pp-rename-chip" @click="nameInput = n; saveName()">{{ n }}</button>
+          </div>
+        </form>
+        <h1 v-else class="pp-name">
           {{ p.username }}<span v-if="flagEmoji(p.country)" class="pp-flag" :title="p.country ?? ''">{{ flagEmoji(p.country) }}</span>
+          <button v-if="isOwn" type="button" class="pp-rename-pencil" aria-label="Edit your name" title="Edit name" @click="startEdit">
+            <Pencil :size="22" :stroke-width="2" aria-hidden="true" />
+          </button>
         </h1>
         <p class="pp-meta">
           <span v-if="presenceOnline" class="pp-live">Online now</span>
@@ -236,7 +265,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
-import { ArrowRight, Check, ChevronLeft, UserPlus } from 'lucide-vue-next'
+import { ArrowRight, Check, ChevronLeft, Pencil, UserPlus, X } from 'lucide-vue-next'
 import gsap from 'gsap'
 import { useProfile } from '../composables/useProfile'
 import { useMotion } from '../composables/useMotion'
@@ -269,6 +298,45 @@ const contentEl = ref<HTMLElement | null>(null)
 
 const p = computed(() => pp.profile.value)
 const isOwn = computed(() => !!authStore.profile?.share_code && authStore.profile.share_code === props.code)
+
+// Rename from your own page: the menu's "Edit name" is easy to miss, and this
+// is where people look at their name. Same store call and failure help as the
+// lobby chip.
+const editing = ref(false)
+const saving = ref(false)
+const nameInput = ref('')
+const nameError = ref('')
+const nameSuggestions = ref<string[]>([])
+const nameInputEl = ref<HTMLInputElement | null>(null)
+
+function startEdit() {
+  nameInput.value = p.value?.username ?? ''
+  nameError.value = ''
+  nameSuggestions.value = []
+  editing.value = true
+  track('profile_rename_opened')
+  void nextTick(() => { nameInputEl.value?.focus(); nameInputEl.value?.select() })
+}
+
+function cancelEdit() {
+  editing.value = false
+}
+
+async function saveName() {
+  const name = nameInput.value.trim()
+  if (!name || name === p.value?.username) { cancelEdit(); return }
+  saving.value = true
+  const res = await authStore.updateUsername(name)
+  saving.value = false
+  if (!res.success) {
+    nameError.value = res.error || 'Could not save that name'
+    nameSuggestions.value = await authStore.suggestUsernames(name)
+    return
+  }
+  if (pp.profile.value) pp.profile.value = { ...pp.profile.value, username: authStore.username }
+  editing.value = false
+  track('profile_renamed')
+}
 
 const { badges, fetchBadges } = useBadges()
 watch(() => p.value?.user_id, (id) => { if (id) void fetchBadges([id]) }, { immediate: true })
@@ -1024,6 +1092,114 @@ watch(() => props.code, (code) => {
   color: var(--text-primary);
   overflow-wrap: anywhere;
 }
+
+.pp-rename-pencil {
+  flex: none;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.pp-rename-pencil:hover,
+.pp-rename-pencil:focus-visible {
+  color: var(--color-hazard);
+  border-color: rgba(255, 204, 0, 0.35);
+}
+
+.pp-rename {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-2);
+  margin: 0;
+}
+
+.pp-rename-input {
+  flex: 1 1 14rem;
+  /* Size from the row, not from 20 characters of display type, or the input's
+     natural width pushes the header past a phone's edge. */
+  width: 0;
+  min-width: 0;
+  max-width: 26rem;
+  padding: var(--spacing-2) var(--spacing-3);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--radius-md);
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  line-height: 1.1;
+  color: var(--text-primary);
+}
+
+.pp-rename-input:focus {
+  outline: none;
+  border-color: var(--color-hazard);
+}
+
+.pp-rename-input.has-error { border-color: var(--color-alert); }
+
+.pp-rename-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.pp-rename-save {
+  background: var(--color-hazard);
+  border-color: var(--color-hazard);
+  color: #000;
+}
+
+.pp-rename-btn:disabled { opacity: 0.5; cursor: default; }
+
+.pp-rename-error {
+  flex-basis: 100%;
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  color: var(--color-alert);
+}
+
+.pp-rename-suggest {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-2);
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.pp-rename-chip {
+  padding: 4px 10px;
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  font: inherit;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.pp-rename-chip:hover { border-color: var(--color-hazard); }
 
 /* 1em from painted pixels, matching the all-time board's measurement. */
 .pp-flag {
