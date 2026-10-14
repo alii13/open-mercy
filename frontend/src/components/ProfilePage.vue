@@ -727,46 +727,66 @@ watch(() => props.code, (code) => {
   margin: 0;
 }
 
+/* Forged steel plate, the same material as the rank emblems: square corners,
+   the display face in capitals, a gold mark. Quiet next to the name, but
+   clearly a control. */
 .pp-friend {
   flex: none;
   align-self: center;
   display: inline-flex;
   align-items: center;
-  gap: var(--spacing-2);
-  min-height: 40px;
-  padding: 0 var(--spacing-4);
-  background: rgba(0, 243, 255, 0.08);
-  border: 1px solid rgba(0, 243, 255, 0.45);
-  border-radius: 999px;
-  font-family: var(--font-body);
-  font-size: 0.9rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  gap: 10px;
+  height: 44px;
+  padding: 0 18px;
+  background: linear-gradient(180deg, #2a2d31 0%, #16181b 55%, #0e0f11 100%);
+  border: 1px solid #3a3e44;
+  border-radius: var(--radius-sm);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.6),
+    0 6px 18px rgba(0, 0, 0, 0.55);
+  font-family: var(--font-display);
+  font-size: 15px;
+  letter-spacing: 0.12em;
   line-height: 1;
-  color: var(--color-neon-blue);
+  text-transform: uppercase;
+  color: var(--text-primary);
   white-space: nowrap;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
 }
 
+.pp-friend svg { color: var(--color-hazard); }
+
 .pp-friend:hover:not(:disabled) {
-  background: rgba(0, 243, 255, 0.16);
-  border-color: var(--color-neon-blue);
+  border-color: rgba(255, 204, 0, 0.55);
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.6),
+    0 8px 22px rgba(0, 0, 0, 0.6);
 }
 
 .pp-friend:disabled { cursor: default; }
 
 .pp-friend--done {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: none;
   color: var(--text-secondary);
 }
 
+.pp-friend--done svg { color: var(--color-neon-green); }
+
+/* Answering someone is the game's solid gold. */
 .pp-friend--accept {
-  background: var(--color-hazard);
-  border-color: var(--color-hazard);
-  color: #000;
+  background: linear-gradient(180deg, #ffd633 0%, #ffcc00 45%, #e0a800 100%);
+  border-color: #ffdf5e;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 6px 20px rgba(255, 204, 0, 0.25);
+  color: var(--bg-concrete);
 }
+
+.pp-friend--accept svg { color: var(--bg-concrete); }
 
 .pp-own-link {
   display: inline-flex;
