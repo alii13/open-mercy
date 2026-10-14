@@ -162,7 +162,7 @@ function go() {
     dismissCard(entry.value.id)
     // Acting on the card is a stronger read receipt than opening the panel.
     markAllRead()
-    if (cta) followCta(cta, navigate)
+    if (cta) followCta(cta, navigate, undefined, authStore.profile?.share_code)
 }
 </script>
 

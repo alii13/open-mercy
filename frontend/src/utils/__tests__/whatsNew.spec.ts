@@ -163,3 +163,17 @@ describe('followCta', () => {
         expect(nav).not.toHaveBeenCalled()
     })
 })
+
+describe('followCta to your own profile', () => {
+    it('opens the viewer\'s own profile page', () => {
+        const nav = vi.fn()
+        followCta({ label: 'EDIT', ownProfile: true }, nav, vi.fn(), 'abc123')
+        expect(nav).toHaveBeenCalledWith({ name: 'profile', code: 'abc123' })
+    })
+
+    it('does nothing for a viewer with no profile yet', () => {
+        const nav = vi.fn()
+        followCta({ label: 'EDIT', ownProfile: true }, nav, vi.fn(), undefined)
+        expect(nav).not.toHaveBeenCalled()
+    })
+})
