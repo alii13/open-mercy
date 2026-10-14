@@ -64,6 +64,26 @@
           <button v-if="isOwn" type="button" class="pp-rename-pencil" aria-label="Edit your name" title="Edit name" @click="startEdit">
             <Pencil :size="22" :stroke-width="2" aria-hidden="true" />
           </button>
+          <!-- Where a shared friend link lands, so it sits by the name rather
+               than at the bottom of the rail. -->
+          <template v-if="!isOwn && !social.unavailable && p.user_id">
+            <button v-if="friendState === 'asked-me'" type="button" class="pp-friend pp-friend--accept" @click="acceptFromProfile">
+              <UserPlus :size="18" :stroke-width="2.2" aria-hidden="true" />
+              Accept request
+            </button>
+            <button
+              v-else
+              type="button"
+              class="pp-friend"
+              :class="{ 'pp-friend--done': friendState === 'friends' || friendState === 'asked' }"
+              :disabled="friendState !== 'none' || adding"
+              @click="addFriend"
+            >
+              <Check v-if="friendState === 'friends' || friendState === 'asked'" :size="18" :stroke-width="2.2" aria-hidden="true" />
+              <UserPlus v-else :size="18" :stroke-width="2" aria-hidden="true" />
+              {{ addLabel === 'Add as friend' ? 'Add friend' : addLabel }}
+            </button>
+          </template>
         </h1>
         <p class="pp-meta">
           <span v-if="presenceOnline" class="pp-live">Online now</span>
@@ -113,31 +133,14 @@
         </ol>
       </aside>
 
-      <!-- The growth loop: visitors get the challenge, the owner gets tools -->
-      <section v-if="!isOwn" class="pp-cta">
-        <div class="pp-cta-head">
-          <span class="pp-cta-title">TAKE THEM ON</span>
-        </div>
-        <p class="pp-cta-line">Think you can beat {{ p.username }}?</p>
-        <Button variant="primary" size="md" block @click="$emit('back')">PLAY</Button>
-        <!-- Where a shared friend link lands, so it has to convert here. -->
-        <template v-if="!social.unavailable && p.user_id">
-          <Button v-if="friendState === 'asked-me'" variant="hazard" size="md" block @click="acceptFromProfile">ACCEPT FRIEND REQUEST</Button>
-          <button v-else class="pp-add-friend" :disabled="friendState !== 'none' || adding" @click="addFriend">
-            <Check v-if="friendState === 'friends' || friendState === 'asked'" :size="16" :stroke-width="2.2" aria-hidden="true" />
-            <UserPlus v-else :size="16" :stroke-width="2" aria-hidden="true" />
-            {{ addLabel }}
-          </button>
-        </template>
-      </section>
-      <section v-else class="pp-cta pp-cta--own">
+      <section v-if="isOwn" class="pp-cta pp-cta--own">
         <div class="pp-cta-head">
           <span class="pp-cta-title">YOUR PROFILE</span>
         </div>
         <p v-if="authStore.isAnonymous" class="pp-cta-line">This is your guest profile - claim it from the lobby (CLAIM ACCOUNT) and everything here is yours forever.</p>
         <Button v-if="authStore.isAnonymous" variant="secondary" size="md" block @click="$emit('back')">GO TO LOBBY</Button>
         <!-- The one owner tool that is not on the page already: a PNG of these
-             numbers, worth posting. Renaming lives in the lobby. -->
+             numbers, worth posting. Renaming is the pencil by the name. -->
         <button v-if="p.games > 0" class="pp-own-link" @click="showShareCard = true">
           SHARE A STATS CARD <ArrowRight :size="14" :stroke-width="2" aria-hidden="true" />
         </button>
@@ -724,30 +727,66 @@ watch(() => props.code, (code) => {
   margin: 0;
 }
 
-.pp-add-friend {
+/* Forged steel plate, the same material as the rank emblems: square corners,
+   the display face in capitals, a gold mark. Quiet next to the name, but
+   clearly a control. */
+.pp-friend {
+  flex: none;
+  align-self: center;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: var(--spacing-2);
-  min-height: 44px;
-  padding: 0 var(--spacing-4);
-  background: none;
-  border: none;
-  font-family: var(--font-body);
-  font-size: 0.875rem;
-  font-weight: 600;
+  gap: 10px;
+  height: 44px;
+  padding: 0 18px;
+  background: linear-gradient(180deg, #2a2d31 0%, #16181b 55%, #0e0f11 100%);
+  border: 1px solid #3a3e44;
+  border-radius: var(--radius-sm);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.6),
+    0 6px 18px rgba(0, 0, 0, 0.55);
+  font-family: var(--font-display);
+  font-size: 15px;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  text-transform: uppercase;
   color: var(--text-primary);
+  white-space: nowrap;
   cursor: pointer;
+  transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
 }
 
-.pp-add-friend:hover:not(:disabled) {
-  color: var(--color-neon-blue);
+.pp-friend svg { color: var(--color-hazard); }
+
+.pp-friend:hover:not(:disabled) {
+  border-color: rgba(255, 204, 0, 0.55);
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.6),
+    0 8px 22px rgba(0, 0, 0, 0.6);
 }
 
-.pp-add-friend:disabled {
+.pp-friend:disabled { cursor: default; }
+
+.pp-friend--done {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: none;
   color: var(--text-secondary);
-  cursor: default;
 }
+
+.pp-friend--done svg { color: var(--color-neon-green); }
+
+/* Answering someone is the game's solid gold. */
+.pp-friend--accept {
+  background: linear-gradient(180deg, #ffd633 0%, #ffcc00 45%, #e0a800 100%);
+  border-color: #ffdf5e;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 6px 20px rgba(255, 204, 0, 0.25);
+  color: var(--bg-concrete);
+}
+
+.pp-friend--accept svg { color: var(--bg-concrete); }
 
 .pp-own-link {
   display: inline-flex;
@@ -1082,6 +1121,7 @@ watch(() => props.code, (code) => {
 
 .pp-name {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   gap: var(--spacing-3);
   margin: 0;
