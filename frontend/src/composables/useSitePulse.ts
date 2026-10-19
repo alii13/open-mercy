@@ -7,9 +7,10 @@
  * (see useOnlineCount). Seven days is always a big number, and it is true.
  *
  * Fetched once per page view, no polling: the figure moves by the hour, not
- * the minute. Hidden below PULSE_FLOOR for the same reason as the online
- * count, and hidden until the SQL has been run: the rpc errors and nothing
- * renders.
+ * the minute. The state is module-level because the landing page mounts
+ * more than once while auth starts up, and each mount must not ask again.
+ * Hidden below PULSE_FLOOR for the same reason as the online count, and
+ * hidden until the SQL has been run: the rpc errors and nothing renders.
  */
 
 import { ref, computed } from 'vue'
@@ -22,23 +23,28 @@ interface PulseRow {
     games_7d?: number
 }
 
+const players = ref(0)
+const games = ref(0)
+let started = false
+
+async function load() {
+    try {
+        const { supabase } = await import('../lib/supabase')
+        const { data, error } = await supabase.rpc('site_pulse')
+        if (error) return
+        const row = (Array.isArray(data) ? data[0] : data) as PulseRow | null
+        players.value = row?.players_7d ?? 0
+        games.value = row?.games_7d ?? 0
+    } catch {
+        /* transient - the line stays hidden */
+    }
+}
+
 export function useSitePulse() {
-    const players = ref(0)
-    const games = ref(0)
-
-    void (async () => {
-        try {
-            const { supabase } = await import('../lib/supabase')
-            const { data, error } = await supabase.rpc('site_pulse')
-            if (error) return
-            const row = (Array.isArray(data) ? data[0] : data) as PulseRow | null
-            players.value = row?.players_7d ?? 0
-            games.value = row?.games_7d ?? 0
-        } catch {
-            /* transient - the line stays hidden */
-        }
-    })()
-
+    if (!started) {
+        started = true
+        void load()
+    }
     return {
         players,
         games,
