@@ -61,6 +61,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: '2026-10-19',
+        level: 'loud',
+        tag: 'NEW',
+        title: 'Star Open Mercy on GitHub',
+        body: "Open Mercy is free, with no download, and one person builds it. A star on GitHub costs you one tap and helps more players find the game, which is what keeps it running and free for everyone.",
+        cta: { label: 'STAR ON GITHUB', href: 'https://github.com/alii13/open-mercy' },
+    },
+    {
         id: '2026-10-14',
         level: 'loud',
         tag: 'NEW',
