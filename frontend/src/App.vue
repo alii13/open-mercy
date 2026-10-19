@@ -209,6 +209,7 @@ import ReleaseCard from './components/ReleaseCard.vue'
 const authStore = useAuthStore()
 const mpStore = useMultiplayerStore()
 const localGameStore = useGameStore()
+const retention = useRetentionStore()
 
 // Stamps this player's last-seen while the tab is visible. App-level, so it
 // covers every screen and outlives any single one of them.
@@ -384,7 +385,7 @@ function startLocalGame(mode?: 'official' | 'house' | 'casual') {
   const opponent = nextBot()
   localGameStore.initializeGame(['You', opponent.name], mode, {
     botIds: [opponent.id],
-    warmUp: useRetentionStore().gamesPlayed < WARM_UP_GAMES,
+    warmUp: retention.gamesPlayed < WARM_UP_GAMES,
   })
 }
 

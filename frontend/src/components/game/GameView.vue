@@ -653,7 +653,11 @@ const opponentDisplayName = computed(() => {
 })
 
 function restart() {
-  store.initializeGame(['You', 'Terminator'], undefined, { warmUp: retention.gamesPlayed < WARM_UP_GAMES })
+  const prof = store.botProfiles[opponents.value[0]?.id ?? '']
+  store.initializeGame(['You', prof?.name ?? 'Terminator'], undefined, {
+    botIds: prof ? [prof.id] : undefined,
+    warmUp: retention.gamesPlayed < WARM_UP_GAMES,
+  })
 }
 
 const showLeaveConfirm = ref(false)

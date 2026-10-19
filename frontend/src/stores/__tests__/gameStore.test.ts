@@ -455,4 +455,15 @@ describe('daily and ladder analytics', () => {
         expect(track).toHaveBeenCalledWith('bot_defeated', { bot_id: 'scrap', rung: 1 })
         expect(track).not.toHaveBeenCalledWith('daily_finished', expect.anything())
     })
+
+    it('tags a warm-up practice game on both ends', async () => {
+        vi.useFakeTimers()
+        const store = useGameStore()
+        store.initializeGame(['You', 'Scrap'], 'official', { botIds: ['scrap'], warmUp: true })
+
+        await winAsHuman(store)
+
+        expect(track).toHaveBeenCalledWith('sp_game_started', expect.objectContaining({ warm_up: true }))
+        expect(track).toHaveBeenCalledWith('sp_game_finished', expect.objectContaining({ warm_up: true }))
+    })
 })

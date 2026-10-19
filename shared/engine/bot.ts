@@ -85,9 +85,10 @@ export function dailyBot(): BotProfile {
 /**
  * A newcomer who meets the sharp policy on game one mostly does not come
  * back: three-day return for players whose first game was solo runs at about
- * half the rate it does when the bottom rung plays loose. The first few solo
- * games therefore use these dials, under whichever name the ladder offers, so
- * a first game is a coin flip and the unlock path is unchanged.
+ * half the rate it does when the bottom rung plays loose. A newcomer's first
+ * few games (any mode counts) therefore seat these dials under whichever name
+ * the ladder offers, so a first game is a coin flip and the unlock path is
+ * unchanged.
  */
 export const WARM_UP_GAMES = 3
 
