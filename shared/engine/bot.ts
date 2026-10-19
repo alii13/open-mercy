@@ -82,6 +82,20 @@ export function dailyBot(): BotProfile {
     return botById(DAILY_BOT_ID)
 }
 
+/**
+ * A newcomer who meets the sharp policy on game one mostly does not come
+ * back: three-day return for players whose first game was solo runs at about
+ * half the rate it does when the bottom rung plays loose. A newcomer's first
+ * few games (any mode counts) therefore seat these dials under whichever name
+ * the ladder offers, so a first game is a coin flip and the unlock path is
+ * unchanged.
+ */
+export const WARM_UP_GAMES = 3
+
+export function warmUp(profile: BotProfile): BotProfile {
+    return { ...profile, skill: 0, search: 0, catchRate: 0.15 }
+}
+
 export interface BotContext {
     /** Cards the bot may legally play right now. */
     playable: Card[]

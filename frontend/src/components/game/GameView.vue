@@ -198,7 +198,7 @@ import { useAuthStore } from '../../stores/authStore'
 import { canPlayCard } from '../../utils/gameRules'
 import { countByColor } from '../../utils/gameHelpers'
 import { botBadge } from '../../utils/badges'
-import { BOT_LADDER } from '@engine/bot'
+import { BOT_LADDER, WARM_UP_GAMES } from '@engine/bot'
 import type { Card as CardType, CardColor } from '../../types/card'
 import { soundEffects } from '../../composables/useSoundEffects'
 import { useCardAnimations } from '../../composables/useCardAnimations'
@@ -653,7 +653,11 @@ const opponentDisplayName = computed(() => {
 })
 
 function restart() {
-  store.initializeGame(['You', 'Terminator'])
+  const prof = store.botProfiles[opponents.value[0]?.id ?? '']
+  store.initializeGame(['You', prof?.name ?? 'Terminator'], undefined, {
+    botIds: prof ? [prof.id] : undefined,
+    warmUp: retention.gamesPlayed < WARM_UP_GAMES,
+  })
 }
 
 const showLeaveConfirm = ref(false)

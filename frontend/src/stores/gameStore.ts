@@ -5,7 +5,7 @@ import * as engine from '@engine'
 import type { EngineEvent, EngineState } from '@engine'
 import { canPlayCard, getDrawValue, generateFullDeck, shuffleDeck, DEFAULT_STACKING_MODE } from '@engine'
 import {
-    BOT_LADDER, botById, dailyBot, chooseSwapTarget, chooseWildColor, chooseDiscardAllTop,
+    BOT_LADDER, botById, dailyBot, warmUp, chooseSwapTarget, chooseWildColor, chooseDiscardAllTop,
     chooseRouletteColor, wantsSwap, willCatchMercy,
     type BotProfile,
 } from '@engine/bot'
@@ -236,6 +236,7 @@ export const useGameStore = defineStore('game', () => {
     // outlives its game can't keep mutating the next game's state.
     let dealGeneration = 0
     let spStartedAt = 0
+    let warmGame = false
 
     // The host's randomness source. The daily challenge swaps in a
     // date-seeded PRNG so shuffle, deals, and bot decisions replay
@@ -253,7 +254,7 @@ export const useGameStore = defineStore('game', () => {
     function initializeGame(
         playerNames: string[],
         mode?: StackingMode,
-        opts?: { dailySeed?: string; botIds?: string[] },
+        opts?: { dailySeed?: string; botIds?: string[]; warmUp?: boolean },
     ) {
         dailyDate.value = opts?.dailySeed ?? null
         hostRng = dailyDate.value ? seededRng(`uno-daily-${dailyDate.value}`) : Math.random
@@ -261,7 +262,8 @@ export const useGameStore = defineStore('game', () => {
         closeCatchWindow()
         if (mode) setStackingMode(mode)
         spStartedAt = Date.now()
-        track('sp_game_started', { rules: stackingMode.value })
+        warmGame = !dailyDate.value && opts?.warmUp === true
+        track('sp_game_started', { rules: stackingMode.value, warm_up: warmGame })
         players.value = playerNames.map((name, index) => ({
             id: `p-${index}`,
             name,
@@ -272,11 +274,13 @@ export const useGameStore = defineStore('game', () => {
         }))
         // The daily forces its opponent rather than accepting one, so no
         // caller — and no unlock state — can change who the world plays.
+        const seat = (i: number): BotProfile => {
+            if (dailyDate.value) return dailyBot()
+            const prof = botById(opts?.botIds?.[i] ?? BOT_LADDER[0]!.id)
+            return warmGame ? warmUp(prof) : prof
+        }
         botProfiles.value = Object.fromEntries(
-            players.value.filter(p => p.isBot).map((p, i) => [
-                p.id,
-                dailyDate.value ? dailyBot() : botById(opts?.botIds?.[i] ?? BOT_LADDER[0]!.id),
-            ]),
+            players.value.filter(p => p.isBot).map((p, i) => [p.id, seat(i)]),
         )
 
         const rawDeck = generateFullDeck()
@@ -750,6 +754,7 @@ export const useGameStore = defineStore('game', () => {
                 result: human && winnerId.value === human.id ? 'won' : 'lost',
                 duration_seconds: spStartedAt ? Math.round((Date.now() - spStartedAt) / 1000) : undefined,
                 rules: stackingMode.value,
+                warm_up: warmGame,
             })
             // Ladder progress is solo-only and never from the daily: the daily
             // pins its own opponent, so clearing it would otherwise unlock the

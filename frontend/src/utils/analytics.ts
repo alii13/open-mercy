@@ -20,8 +20,9 @@
  *   mp_spectate_start  {}
  *   mp_spectate_end    { seconds }
  *   mp_spectate_rematch_joined {}
- *   sp_game_started    { rules }
- *   sp_game_finished   { result: won|lost, duration_seconds, rules }
+ *   sp_game_started    { rules, warm_up }  — warm_up: a newcomer's first few
+ *                            games, played against loosened dials (engine/bot.ts)
+ *   sp_game_finished   { result: won|lost, duration_seconds, rules, warm_up }
  *   voice_joined       {}
  *   voice_left         { duration_seconds }
  *   share              { method: whatsapp|x|image|native|clipboard,

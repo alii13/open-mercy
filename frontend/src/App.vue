@@ -175,6 +175,7 @@ import { ref, computed, watch, onMounted, onUnmounted, defineAsyncComponent } fr
 import { track, trackScreen } from './utils/analytics'
 import { localDateString } from './utils/seededRng'
 import { nextBot } from './utils/botLadder'
+import { WARM_UP_GAMES } from '@engine/bot'
 import { adoptProfileEquip, applyEquipped } from './utils/cosmetics'
 import { currentRoute, navigate } from './utils/routes'
 import { isRoomCode } from '@roomCode'
@@ -199,6 +200,7 @@ import { useAuthStore } from './stores/authStore'
 import { supabase } from './lib/supabase'
 import { useMultiplayerStore } from './stores/multiplayerStore'
 import { useGameStore } from './stores/gameStore'
+import { useRetentionStore } from './stores/retentionStore'
 import { usePresenceHeartbeat } from './composables/usePresenceHeartbeat'
 import InviteToast from './components/InviteToast.vue'
 import FriendToast from './components/FriendToast.vue'
@@ -207,6 +209,7 @@ import ReleaseCard from './components/ReleaseCard.vue'
 const authStore = useAuthStore()
 const mpStore = useMultiplayerStore()
 const localGameStore = useGameStore()
+const retention = useRetentionStore()
 
 // Stamps this player's last-seen while the tab is visible. App-level, so it
 // covers every screen and outlives any single one of them.
@@ -380,7 +383,10 @@ function retryGuestSignin() {
 function startLocalGame(mode?: 'official' | 'house' | 'casual') {
   // Solo faces the next unbeaten rung, so the practice mode has somewhere to go.
   const opponent = nextBot()
-  localGameStore.initializeGame(['You', opponent.name], mode, { botIds: [opponent.id] })
+  localGameStore.initializeGame(['You', opponent.name], mode, {
+    botIds: [opponent.id],
+    warmUp: retention.gamesPlayed < WARM_UP_GAMES,
+  })
 }
 
 // The daily challenge: official rules, date-seeded so the whole world gets
