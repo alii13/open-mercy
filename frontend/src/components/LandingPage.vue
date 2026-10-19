@@ -77,6 +77,10 @@
         <button type="button" class="rules-peek" @click="navigate({ name: 'leaderboard' })">
           Today's leaderboard <ArrowRight :size="14" :stroke-width="2" aria-hidden="true" />
         </button>
+        <!-- Hidden below a floor and until the SQL exists; see useSitePulse. -->
+        <p v-if="pulse.show.value" class="hero-pulse">
+          <span class="live-dot" aria-hidden="true" />{{ pulse.players.value.toLocaleString() }} PLAYERS · {{ pulse.games.value.toLocaleString() }} GAMES THIS WEEK
+        </p>
       </div>
 
       <LandingStatsBadge class="hero-stats" />
@@ -124,6 +128,7 @@ import SiteFooter from './SiteFooter.vue'
 import FeedbackModal from './FeedbackModal.vue'
 import RulesModal from './RulesModal.vue'
 import LandingStatsBadge from './LandingStatsBadge.vue'
+import { useSitePulse } from '../composables/useSitePulse'
 import Card from './game/Card.vue'
 import Button from './ui/Button.vue'
 import { useScreenSize } from '../composables/useScreenSize'
@@ -154,6 +159,7 @@ const wordmarkRef = ref<HTMLElement>()
 const strikeRef = ref<SVGSVGElement>()
 const taglineRef = ref<HTMLElement>()
 const heroCtaRef = ref<HTMLElement>()
+const pulse = useSitePulse()
 
 const emit = defineEmits<{
   (e: 'showAuth', mode: 'login' | 'signup'): void
@@ -706,6 +712,36 @@ function runHeroChoreography() {
   margin-bottom: var(--spacing-2);
 }
 .invite-banner strong { color: #00ff66; letter-spacing: 0.1em; }
+
+.hero-pulse {
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  color: var(--color-neon-green);
+  white-space: nowrap;
+}
+
+.live-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: var(--spacing-2);
+  border-radius: 50%;
+  background: var(--color-neon-green);
+  animation: live-pulse 2s ease-in-out infinite;
+}
+
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-dot { animation: none; }
+}
 
 .hero-stats {
   z-index: var(--z-base);
