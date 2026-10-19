@@ -379,6 +379,23 @@ describe('bot personalities', () => {
         store.initializeGame(['You', 'A'], 'official', { botIds: ['rook'] })
         expect(Object.keys(store.botProfiles)).toHaveLength(1)
     })
+
+    it('softens the dials for a warm-up game but keeps the opponent', () => {
+        const store = useGameStore()
+        store.initializeGame(['You', 'X'], 'official', { botIds: ['scrap'], warmUp: true })
+        const bot = store.players.find(p => p.isBot)!
+        const prof = store.botProfiles[bot.id]!
+        expect(prof.id).toBe('scrap')
+        expect(prof.skill).toBe(0)
+        expect(prof.search).toBe(0)
+    })
+
+    it('never warms up the daily', () => {
+        const store = useGameStore()
+        store.initializeGame(['You', 'X'], 'official', { dailySeed: '2026-08-09', warmUp: true })
+        const bot = store.players.find(p => p.isBot)!
+        expect(store.botProfiles[bot.id]?.skill).toBe(1)
+    })
 })
 
 /**

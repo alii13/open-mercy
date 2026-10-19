@@ -5,7 +5,7 @@ import * as engine from '@engine'
 import type { EngineEvent, EngineState } from '@engine'
 import { canPlayCard, getDrawValue, generateFullDeck, shuffleDeck, DEFAULT_STACKING_MODE } from '@engine'
 import {
-    BOT_LADDER, botById, dailyBot, chooseSwapTarget, chooseWildColor, chooseDiscardAllTop,
+    BOT_LADDER, botById, dailyBot, warmUp, chooseSwapTarget, chooseWildColor, chooseDiscardAllTop,
     chooseRouletteColor, wantsSwap, willCatchMercy,
     type BotProfile,
 } from '@engine/bot'
@@ -253,7 +253,7 @@ export const useGameStore = defineStore('game', () => {
     function initializeGame(
         playerNames: string[],
         mode?: StackingMode,
-        opts?: { dailySeed?: string; botIds?: string[] },
+        opts?: { dailySeed?: string; botIds?: string[]; warmUp?: boolean },
     ) {
         dailyDate.value = opts?.dailySeed ?? null
         hostRng = dailyDate.value ? seededRng(`uno-daily-${dailyDate.value}`) : Math.random
@@ -261,7 +261,8 @@ export const useGameStore = defineStore('game', () => {
         closeCatchWindow()
         if (mode) setStackingMode(mode)
         spStartedAt = Date.now()
-        track('sp_game_started', { rules: stackingMode.value })
+        const warm = !dailyDate.value && opts?.warmUp === true
+        track('sp_game_started', { rules: stackingMode.value, warm_up: warm })
         players.value = playerNames.map((name, index) => ({
             id: `p-${index}`,
             name,
@@ -273,10 +274,10 @@ export const useGameStore = defineStore('game', () => {
         // The daily forces its opponent rather than accepting one, so no
         // caller — and no unlock state — can change who the world plays.
         botProfiles.value = Object.fromEntries(
-            players.value.filter(p => p.isBot).map((p, i) => [
-                p.id,
-                dailyDate.value ? dailyBot() : botById(opts?.botIds?.[i] ?? BOT_LADDER[0]!.id),
-            ]),
+            players.value.filter(p => p.isBot).map((p, i) => {
+                const prof = botById(opts?.botIds?.[i] ?? BOT_LADDER[0]!.id)
+                return [p.id, dailyDate.value ? dailyBot() : warm ? warmUp(prof) : prof]
+            }),
         )
 
         const rawDeck = generateFullDeck()
