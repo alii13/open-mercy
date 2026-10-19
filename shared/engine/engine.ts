@@ -141,7 +141,6 @@ export interface PlayResult {
 
 export function playCard(s: EngineState, playerId: string, cardId: string, opts: PlayCardOpts = {}): PlayResult {
     const ev: EngineEvent[] = []
-    const rng = opts.rng ?? Math.random
 
     const player = s.players.find(p => p.id === playerId)
     if (!player) return { ok: false, events: ev }
@@ -153,7 +152,6 @@ export function playCard(s: EngineState, playerId: string, cardId: string, opts:
     const card = player.hand[cardIndex]!
     if (!canPlayCard(card, top, s.currentColor, s.drawStack, s.stackingMode)) return { ok: false, events: ev }
 
-    const handSizeBeforePlay = player.hand.length
     player.hand.splice(cardIndex, 1)
     s.discardPile.push(card)
 
@@ -182,18 +180,10 @@ export function playCard(s: EngineState, playerId: string, cardId: string, opts:
     // the turn from stranding and still lets it count as a winning last card.
     if (card.type === 'discardAll' && discardAllMatches > 0) return { ok: true, events: ev }
 
-    // Win / UNO-penalty checks run for EVERY card type, roulette included.
+    // Going out wins for EVERY card type, roulette included. A missed UNO call
+    // is punished only through the catch window opened by AT_ONE_UNCALLED
+    // below; once a player is down to one card uncaught, playing it wins.
     if (player.hand.length === 0) {
-        // UNO penalty only applies if player went from exactly 2→1→0
-        const neededUno = handSizeBeforePlay === 2
-        if (neededUno && !s.hasCalledUno[player.id]) {
-            ev.push({ t: 'UNO_PENALTY', playerId: player.id })
-            drawCardToHand(s, player.id, ev, rng)
-            drawCardToHand(s, player.id, ev, rng)
-            // The penalty draws can mercy-eliminate the player and end the game.
-            if (s.gameState !== 'GAME_OVER') advanceTurn(s, ev)
-            return { ok: true, events: ev }
-        }
         endGame(s, player.id, ev)
         return { ok: true, events: ev }
     }
@@ -231,7 +221,9 @@ export function applyCardEffect(s: EngineState, card: Card, ev: EngineEvent[], o
     // Handle special number cards (0 and 7)
     if (card.type === 'number') {
         if (card.value === 0) {
-            rotateActiveHands(s)
+            // A 0 that empties the hand is a win; rotating first would hand the
+            // empty hand to the next seat and the winner a full one.
+            if (currentPlayer(s)?.hand.length) rotateActiveHands(s)
             return
         }
         if (card.value === 7) {
