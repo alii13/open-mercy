@@ -68,6 +68,33 @@ describe('roulette draw with an exhausted deck', () => {
     })
 })
 
+describe('draw until playable at the mercy limit', () => {
+    it('passes the turn when the drawn card is playable but eliminates the drawer', () => {
+        vi.useFakeTimers()
+        const store = useGameStore()
+        const filler = (i: number): Card => ({ id: `h-${i}`, color: 'blue', type: 'number', value: 1 })
+        store.players = [
+            makePlayer('p-0', 'You', [red5]),
+            makePlayer('p-1', 'Full', Array.from({ length: 24 }, (_, i) => filler(i))),
+            makePlayer('p-2', 'Third', [red5]),
+        ]
+        store.gameState = 'PLAYING'
+        store.discardPile = [{ id: 'top', color: 'red', type: 'number', value: 9 }]
+        store.currentColor = 'red'
+        store.deck = [{ id: 'red-2', color: 'red', type: 'number', value: 2 }]
+        store.currentPlayerIndex = 1
+        store.turnState = 'WAITING_FOR_ACTION'
+
+        store.drawCardsForCurrentPlayer()
+        vi.runAllTimers()
+
+        expect(store.players[1]!.isEliminated).toBe(true)
+        expect(store.gameState).toBe('PLAYING')
+        expect(store.currentPlayerIndex).toBe(2)
+        expect(store.actionInProgress).toBe(false)
+    })
+})
+
 describe('initializeGame', () => {
     it('clears in-flight flags leaked from the previous game', () => {
         const store = useGameStore()

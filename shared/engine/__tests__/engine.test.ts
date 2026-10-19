@@ -223,6 +223,24 @@ describe('playCard', () => {
         expect(s.winnerId).toBe('p-0')
         expect(s.gameState).toBe('GAME_OVER')
     })
+
+    it('wins with a 0 as the last card instead of rotating the empty hand away', () => {
+        const s = makeState({
+            players: [
+                player('p-0', 'You', [card('c-red-0', 'red', 'number', 0)]),
+                player('p-1', 'B1', [red5, card('c-x', 'blue', 'number', 3)]),
+                player('p-2', 'B2', [card('c-y', 'green', 'number', 4)]),
+            ],
+            hasCalledUno: { 'p-0': true },
+        })
+
+        playCard(s, 'p-0', 'c-red-0')
+
+        expect(s.winnerId).toBe('p-0')
+        expect(s.gameState).toBe('GAME_OVER')
+        expect(s.players[1]!.hand.length).toBe(2)
+        expect(s.players[2]!.hand.length).toBe(1)
+    })
 })
 
 describe('roulette', () => {

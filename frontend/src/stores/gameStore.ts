@@ -550,6 +550,12 @@ export const useGameStore = defineStore('game', () => {
                 // Draw 1
                 const card = drawCardToHand(p)
                 if (!card) { advanceTurn(); return }
+                // The draw that reaches 25 eliminates before any play: the drawn
+                // card is already in the discard pile, so it cannot be played.
+                if (p.isEliminated) {
+                    if (gameState.value !== 'GAME_OVER') advanceTurn()
+                    return
+                }
 
                 // Check if playable
                 if (canPlayCard(card, topCard.value, currentColor.value, 0, stackingMode.value)) {
@@ -570,11 +576,6 @@ export const useGameStore = defineStore('game', () => {
                     }, TIMINGS.drawnPlayableAutoPlay)
                     return
                 } else {
-                    // Not playable, check mercy rule (handled in drawCardToHand).
-                    if (p.isEliminated) {
-                        advanceTurn()
-                        return
-                    }
                     // Draw again
                     setTimeout(drawUntilPlayable, TIMINGS.drawUntilPlayableRetry)
                 }
