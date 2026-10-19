@@ -56,6 +56,9 @@
         <a href="/rules/how-to-play/">Rules step by step</a>
         <a href="/rules/cards/">Every card</a>
         <a href="/rules/stacking/">Stacking rules</a>
+        <a href="/rules/draw-10/">Draw 10 card</a>
+        <a href="/rules/mercy-rule/">The mercy rule</a>
+        <a href="/rules/7-0-rule/">7 and 0 rule</a>
         <a href="/strategy/">Strategy</a>
         <a href="/faq/">FAQ</a>
         <a href="/about/">About</a>
