@@ -34,6 +34,36 @@
     <priority>0.7</priority>
   </url>
   <url>
+    <loc>https://open-mercy.com/rules/draw-10/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://open-mercy.com/rules/skip-everyone/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://open-mercy.com/rules/discard-all/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://open-mercy.com/rules/color-roulette/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://open-mercy.com/rules/mercy-rule/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://open-mercy.com/rules/7-0-rule/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://open-mercy.com/leaderboard</loc>
     <changefreq>daily</changefreq>
     <priority>0.6</priority>
