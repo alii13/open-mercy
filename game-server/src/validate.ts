@@ -9,7 +9,7 @@ import type { CardColor, StackingMode } from '../../shared/engine'
 const STACKING_MODES: readonly StackingMode[] = ['official', 'house', 'casual']
 const WILD_COLORS: readonly CardColor[] = ['red', 'yellow', 'green', 'blue']
 
-export const NAME_MAX = 20
+export const NAME_MAX = 40
 export const SKIN_MAX = 32
 
 export function isStackingMode(v: unknown): v is StackingMode {
