@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { normalizeDir, dirCodes, liveTables, DIR_STALE_MS } from './directory'
+import { normalizeDir, dirCodes, liveTables, dirRegister, DIR_STALE_MS, DIR_MAX_ENTRIES, type DirEntry } from './directory'
+import { ROOM_CODE_ALPHABET } from '../../shared/roomCode'
 
 const NOW = 1_700_000_000_000
 
@@ -152,5 +153,44 @@ describe('liveTables', () => {
         }, NOW)
         expect(out.find((t) => t.code === 'WAITING')?.status).toBe('lobby')
         expect(out.find((t) => t.code === 'RUNNING')?.status).toBe('playing')
+    })
+})
+
+describe('dirRegister', () => {
+    const code = (i: number) => {
+        const a = ROOM_CODE_ALPHABET
+        return 'AA' + a[i % a.length] + a[Math.floor(i / a.length) % a.length] + 'AA'
+    }
+
+    it('refuses a new room once the directory is full, but still refreshes listed ones', () => {
+        const dir: Record<string, DirEntry> = {}
+        for (let i = 0; i < DIR_MAX_ENTRIES; i++) expect(dirRegister(dir, code(i), {}, NOW)).toBe(true)
+        expect(dirRegister(dir, code(DIR_MAX_ENTRIES), {}, NOW)).toBe(false)
+        expect(Object.keys(dir)).toHaveLength(DIR_MAX_ENTRIES)
+        expect(dirRegister(dir, code(0), { players: 2 }, NOW + 1)).toBe(true)
+        expect(dir[code(0)]).toMatchObject({ at: NOW, updatedAt: NOW + 1, players: 2 })
+    })
+
+    it('keeps only known, bounded snapshot fields', () => {
+        const dir: Record<string, DirEntry> = {}
+        dirRegister(dir, 'ABCDEF', {
+            players: 1e9, connected: -4, seatsFree: 'x', mode: 'm'.repeat(1000),
+            skins: Array.from({ length: 1000 }, () => 'ember').concat(['s'.repeat(100)]),
+            status: 'pwned', junk: 'x'.repeat(100_000),
+        }, NOW)
+        const e = dir.ABCDEF as DirEntry & { junk?: string }
+        expect(e.players).toBe(20)
+        expect(e.connected).toBe(0)
+        expect(e.seatsFree).toBeUndefined()
+        expect(e.mode!.length).toBeLessThanOrEqual(16)
+        expect(e.skins).toHaveLength(20)
+        expect(e.status).toBeUndefined()
+        expect(e.junk).toBeUndefined()
+    })
+
+    it('refuses a code that is not a room code', () => {
+        const dir: Record<string, DirEntry> = {}
+        expect(dirRegister(dir, 'x'.repeat(5000), {}, NOW)).toBe(false)
+        expect(dir).toEqual({})
     })
 })

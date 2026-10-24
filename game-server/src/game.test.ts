@@ -1,5 +1,78 @@
-import { describe, it, expect } from 'vitest'
-import { startGame, applyIntent } from './game'
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import { startGame, applyIntent, forceEliminate, persistResults } from './game'
+import type { CardColor } from '../../shared/engine'
+
+const twoPlayers = () => startGame(
+  [
+    { userId: 'u1', name: 'Alice' },
+    { userId: 'u2', name: 'Bob' },
+  ],
+  'official',
+)
+
+describe('wild colour validation', () => {
+  it('rejects a PLAY_CARD whose chosenColor is not a suit colour, without touching state', () => {
+    const { game } = twoPlayers()
+    const me = game.engine.players[game.engine.currentPlayerIndex]!
+    me.hand.push({ id: 'w-test', color: 'wild', type: 'wild' } as any)
+    const before = JSON.stringify(game.engine)
+    for (const bad of ['wild', 'purple', '', { x: 1 }]) {
+      const res = applyIntent(game, me.id, { kind: 'PLAY_CARD', cardId: 'w-test', chosenColor: bad as CardColor })
+      expect(res).toMatchObject({ ok: false, errorCode: 'invalid-intent' })
+    }
+    expect(JSON.stringify(game.engine)).toBe(before)
+  })
+
+  it('rejects a bad drawn-wild colour and leaves the pick pending', () => {
+    const { game } = twoPlayers()
+    const me = game.engine.players[game.engine.currentPlayerIndex]!
+    me.hand.push({ id: 'w-drawn', color: 'wild', type: 'wild' } as any)
+    game.pendingDrawnWildCardId = 'w-drawn'
+    game.engine.turnState = 'CHOOSING_DRAWN_WILD_COLOR'
+    const res = applyIntent(game, me.id, { kind: 'CHOOSE_DRAWN_WILD_COLOR', color: 'wild' })
+    expect(res.ok).toBe(false)
+    expect(game.pendingDrawnWildCardId).toBe('w-drawn')
+    expect(game.engine.turnState).toBe('CHOOSING_DRAWN_WILD_COLOR')
+  })
+
+  it('rejects a bad roulette colour', () => {
+    const { game } = twoPlayers()
+    const me = game.engine.players[game.engine.currentPlayerIndex]!
+    game.engine.turnState = 'CHOOSING_ROULETTE_COLOR'
+    const res = applyIntent(game, me.id, { kind: 'SET_ROULETTE_COLOR', color: 'black' as CardColor })
+    expect(res.ok).toBe(false)
+    expect(game.engine.rouletteTargetColor).toBeNull()
+  })
+})
+
+describe('persistResults and kicks', () => {
+  const env = { SUPABASE_URL: 'https://example.invalid', SUPABASE_SERVICE_KEY: 'test-key' }
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('does not score a game that ended by kicking a seat', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const { game } = twoPlayers()
+    forceEliminate(game, 'u2')
+    expect(game.engine.gameState).toBe('GAME_OVER')
+    expect(await persistResults(game, 'ABCDEF', env)).toBe(false)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('still scores a game that ended without a kick', async () => {
+    const fetchMock = vi.fn(async () => new Response(null, { status: 201 }))
+    vi.stubGlobal('fetch', fetchMock)
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    const { game } = twoPlayers()
+    game.engine.gameState = 'GAME_OVER'
+    game.engine.winnerId = 'u1'
+    expect(await persistResults(game, 'ABCDEF', env)).toBe(true)
+    expect(fetchMock).toHaveBeenCalledOnce()
+  })
+})
 
 // The client can't derive who ate a penalty stack (the snapshot arrives after
 // the turn has advanced and drawStack is back to 0), so the server tags it with

@@ -1,6 +1,7 @@
 import * as engine from '../../shared/engine'
 import type { Card, EngineEvent, EngineState, StackingMode } from '../../shared/engine'
 import type { GameEvent, IntentAction, PersonalView, SnapshotPlayer } from './protocol'
+import { isWildColor } from './validate'
 
 export interface PlayerGameStats {
     cardsPlayedTotal: number
@@ -31,6 +32,9 @@ export interface GameRecord {
     /** Per-player stats, persisted to game_results at game end. */
     stats?: Record<string, PlayerGameStats>
     resultsLogged?: boolean
+    /** A seat was kicked out of this game. Such games are not scored: a host
+     *  could otherwise kick the table and farm wins. */
+    hadKick?: boolean
 }
 
 export function statsFor(game: GameRecord, userId: string): PlayerGameStats {
@@ -145,6 +149,7 @@ export function applyIntent(game: GameRecord, userId: string, action: IntentActi
     switch (action.kind) {
         case 'PLAY_CARD': {
             if (s.turnState !== 'WAITING_FOR_ACTION') return invalid
+            if (action.chosenColor !== undefined && !isWildColor(action.chosenColor)) return invalid
             const card = engine.currentPlayer(s)?.hand.find(c => c.id === action.cardId)
             if (!card) return invalid
             const res = engine.playCard(s, userId, action.cardId, { selectedColor: action.chosenColor })
@@ -173,6 +178,7 @@ export function applyIntent(game: GameRecord, userId: string, action: IntentActi
 
         case 'CHOOSE_DRAWN_WILD_COLOR': {
             if (s.turnState !== 'CHOOSING_DRAWN_WILD_COLOR' || !game.pendingDrawnWildCardId) return invalid
+            if (!isWildColor(action.color)) return invalid
             const cardId = game.pendingDrawnWildCardId
             const card = engine.currentPlayer(s)?.hand.find(c => c.id === cardId)
             game.pendingDrawnWildCardId = null
@@ -190,6 +196,7 @@ export function applyIntent(game: GameRecord, userId: string, action: IntentActi
         }
 
         case 'SET_ROULETTE_COLOR': {
+            if (!isWildColor(action.color)) return invalid
             if (!engine.setRouletteColor(s, action.color)) return invalid
             // Resolve the whole spin synchronously; clients pace the reveal
             // from the per-draw events.
@@ -364,7 +371,7 @@ export async function persistResults(
     roomCode: string,
     env: { SUPABASE_URL: string; SUPABASE_SERVICE_KEY?: string },
 ): Promise<boolean> {
-    if (!env.SUPABASE_SERVICE_KEY || game.resultsLogged) return false
+    if (!env.SUPABASE_SERVICE_KEY || game.resultsLogged || game.hadKick) return false
     const s = game.engine
     if (s.gameState !== 'GAME_OVER') return false
     game.resultsLogged = true
@@ -424,6 +431,7 @@ export function applyUnoCatch(game: GameRecord, targetUserId: string): GameEvent
 export function forceEliminate(game: GameRecord, userId: string): GameEvent[] | null {
     const ev: EngineEvent[] = []
     if (!engine.eliminatePlayer(game.engine, userId, ev)) return null
+    game.hadKick = true
     return translateEngineEvents(ev)
 }
 

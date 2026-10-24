@@ -3,7 +3,10 @@
 import { verifySupabaseToken, type AuthEnv } from './auth'
 import type { ClientMsg, GameEvent, PresencePlayer, ServerMsg } from './protocol'
 import { applyIntent, applyUnoCatch, autoResolveAbsentTurn, forceEliminate, persistResults, personalView, startGame, updateStats, viewEventFor, type GameRecord } from './game'
-import { dirCodes, liveTables, normalizeDir, type DirEntry } from './directory'
+import { dirCodes, dirRegister, liveTables, normalizeDir } from './directory'
+import { cleanName, cleanSkin, isStackingMode } from './validate'
+import { newBucket, socketVerdict, type Bucket } from './socketLimit'
+import { createAllowed } from './createLimit'
 import { addParticipant, createMeeting, deactivateMeeting, voiceConfigured, type VoiceEnv } from './voice'
 import { gcWindowMs } from './roomGc'
 import { ROOM_CODE_ALPHABET, isRoomCode, normalizeRoomCode } from '../../shared/roomCode'
@@ -133,7 +136,12 @@ export default {
             const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '')
             const creator = await verifySupabaseToken(token, env)
             if (!creator) return withCors(new Response('unauthorized', { status: 401 }), req)
+            const allowed = await directoryStub(env).fetch('https://do/create-allow', {
+                method: 'POST', body: JSON.stringify({ userId: creator.userId }),
+            })
+            if (!(await allowed.json<boolean>())) return withCors(new Response('too many rooms', { status: 429 }), req)
             const opts = await req.json<{ public?: boolean; stackingMode?: string }>().catch(() => ({} as { public?: boolean; stackingMode?: string }))
+            const stackingMode: StackingMode = isStackingMode(opts.stackingMode) ? opts.stackingMode : 'official'
             const code = generateRoomCode()
             const timings = await Promise.all(
                 Array.from({ length: CANDIDATES }, async (_, i) => {
@@ -150,7 +158,7 @@ export default {
             const winner = timings[0]!
             await candidateStub(env, code, winner.i).fetch('https://do/activate', {
                 method: 'POST',
-                body: JSON.stringify({ code, hostUserId: creator.userId, stackingMode: opts.stackingMode ?? 'official', isPublic: !!opts.public }),
+                body: JSON.stringify({ code, hostUserId: creator.userId, stackingMode, isPublic: !!opts.public }),
             })
             if (opts.public) {
                 await directoryStub(env).fetch('https://do/dir-register', { method: 'POST', body: JSON.stringify({ code }) })
@@ -199,21 +207,7 @@ export default {
             return stub.fetch('https://do/room-ws', req)
         }
 
-        // Phase 0 diagnostics: echo WS + latency page.
-        if (url.pathname === '/ws') {
-            if (req.headers.get('Upgrade') !== 'websocket') {
-                return new Response('expected websocket', { status: 426 })
-            }
-            const room = url.searchParams.get('room') ?? 'phase0'
-            const id = env.ROOM.idFromName(room)
-            return env.ROOM.get(id, hint ? { locationHint: hint as DurableObjectLocationHint } : undefined)
-                .fetch('https://do/echo-ws', req)
-        }
-
-        const colo = (req.cf?.colo as string) ?? 'unknown'
-        return new Response(PAGE.replace('{{COLO}}', colo), {
-            headers: { 'content-type': 'text/html; charset=utf-8' },
-        })
+        return new Response('not found', { status: 404 })
     },
 }
 
@@ -251,7 +245,7 @@ interface RoomTimers {
     startBumps?: number
 }
 
-type SocketTag = { echo: true } | { userId: string } | null
+type SocketTag = { userId: string } | null
 
 export class GameRoomDO {
     // In-memory game cache; undefined = not loaded from storage yet (fresh
@@ -265,6 +259,13 @@ export class GameRoomDO {
     // Per-user quick-chat timestamps. In-memory: hibernation clears it, which
     // is acceptable for a best-effort spam guard.
     private chatTimes = new Map<string, number[]>()
+    // Per-socket message buckets (see socketLimit.ts).
+    private buckets = new WeakMap<WebSocket, Bucket>()
+    // Voice tokens already minted this wake, so a repeated voice-join reuses
+    // one instead of adding another RealtimeKit participant.
+    private voiceTokens = new Map<string, { meetingId: string; token: string }>()
+    // Room creations per user; only the '!directory' instance uses this.
+    private createTimes = new Map<string, number[]>()
 
     constructor(private ctx: DurableObjectState, private env: Env) {}
 
@@ -422,7 +423,7 @@ export class GameRoomDO {
                 const body = await req.json<{ code: string; hostUserId: string; stackingMode?: string; isPublic?: boolean }>()
                 const room: RoomRecord = {
                     code: body.code, createdAt: Date.now(), hostUserId: body.hostUserId,
-                    stackingMode: body.stackingMode ?? 'official', isPublic: !!body.isPublic,
+                    stackingMode: isStackingMode(body.stackingMode) ? body.stackingMode : 'official', isPublic: !!body.isPublic,
                 }
                 await this.ctx.storage.put('room', room)
                 this.roomIsPublic = !!body.isPublic
@@ -432,19 +433,20 @@ export class GameRoomDO {
 
             // --- Public-rooms directory (this DO under the reserved '!directory' name) ---
             case '/dir-register': {
-                const body = await req.json<{ code: string; snapshot?: Partial<DirEntry> }>()
+                const body = await req.json<{ code: string; snapshot?: unknown }>()
                 const dir = normalizeDir(await this.ctx.storage.get('dir'))
-                const prev = dir[body.code]
-                dir[body.code] = {
-                    // Keep the original registration time: it is the ordering
-                    // key for quick match, and a re-register on every roster
-                    // change would otherwise send a room to the back forever.
-                    at: prev?.at ?? Date.now(),
-                    updatedAt: Date.now(),
-                    ...body.snapshot,
+                if (!dirRegister(dir, body.code, body.snapshot, Date.now())) {
+                    return new Response('directory full', { status: 409 })
                 }
                 await this.ctx.storage.put('dir', dir)
                 return new Response('ok')
+            }
+            case '/create-allow': {
+                const { userId } = await req.json<{ userId: string }>()
+                const times = this.createTimes.get(userId) ?? []
+                const ok = createAllowed(times, Date.now())
+                this.createTimes.set(userId, times)
+                return Response.json(ok)
             }
             case '/dir-unregister': {
                 const { code } = await req.json<{ code: string }>()
@@ -471,26 +473,22 @@ export class GameRoomDO {
                 return new Response(null, { status: 101, webSocket: pair[0] })
             }
 
-            // Echo mode for the latency diagnostics page.
-            case '/echo-ws': {
-                const pair = new WebSocketPair()
-                this.ctx.acceptWebSocket(pair[1])
-                pair[1].serializeAttachment({ echo: true })
-                return new Response(null, { status: 101, webSocket: pair[0] })
-            }
-
             default:
                 return new Response('not found', { status: 404 })
         }
     }
 
     async webSocketMessage(ws: WebSocket, raw: ArrayBuffer | string) {
-        const tag = ws.deserializeAttachment() as SocketTag
-
-        if (tag && 'echo' in tag) {
-            ws.send(raw)
+        let bucket = this.buckets.get(ws)
+        if (!bucket) this.buckets.set(ws, bucket = newBucket(Date.now()))
+        const verdict = socketVerdict(bucket, Date.now())
+        if (verdict === 'close') {
+            ws.close(1008, 'rate limited')
             return
         }
+        if (verdict === 'drop') return
+
+        const tag = ws.deserializeAttachment() as SocketTag
 
         let msg: ClientMsg
         try {
@@ -526,11 +524,13 @@ export class GameRoomDO {
                 return
             }
             const entry = roster[verified.userId]
+            const name = cleanName(msg.name)
+            const skin = cleanSkin(msg.skin)
             if (entry) {
-                entry.name = msg.name || entry.name
-                entry.skin = msg.skin || entry.skin
+                if (name !== 'PLAYER') entry.name = name
+                entry.skin = skin || entry.skin
             } else {
-                roster[verified.userId] = { name: msg.name || 'PLAYER', joinedAt: Date.now(), skin: msg.skin }
+                roster[verified.userId] = { name, joinedAt: Date.now(), skin }
             }
             await this.ctx.storage.put('roster', roster)
             ws.serializeAttachment({ userId: verified.userId })
@@ -569,11 +569,12 @@ export class GameRoomDO {
                 const roster = (await this.ctx.storage.get<Record<string, RosterEntry>>('roster')) ?? {}
                 const entry = roster[tag.userId]
                 if (entry && msg.name) {
-                    entry.name = msg.name
+                    const name = cleanName(msg.name)
+                    entry.name = name
                     await this.ctx.storage.put('roster', roster)
                     await this.loadGame()
                     const seated = this.game?.engine.players.find(p => p.id === tag.userId)
-                    if (seated) seated.name = msg.name
+                    if (seated) seated.name = name
                     await this.saveGame()
                 }
                 await this.broadcastPresence(roster)
@@ -603,12 +604,19 @@ export class GameRoomDO {
                             await this.ctx.storage.put('room', latest)
                         }
                     }
-                    const roster = (await this.ctx.storage.get<Record<string, RosterEntry>>('roster')) ?? {}
-                    const name = roster[tag.userId]?.name ?? 'PLAYER'
-                    // The room host gets the moderation preset (mute others).
-                    const token = await addParticipant(this.env, meetingId, {
-                        name, customParticipantId: tag.userId, isHost: tag.userId === room.hostUserId,
-                    })
+                    const minted = this.voiceTokens.get(tag.userId)
+                    let token: string
+                    if (minted?.meetingId === meetingId) {
+                        token = minted.token
+                    } else {
+                        const roster = (await this.ctx.storage.get<Record<string, RosterEntry>>('roster')) ?? {}
+                        const name = roster[tag.userId]?.name ?? 'PLAYER'
+                        // The room host gets the moderation preset (mute others).
+                        token = await addParticipant(this.env, meetingId, {
+                            name, customParticipantId: tag.userId, isHost: tag.userId === room.hostUserId,
+                        })
+                        this.voiceTokens.set(tag.userId, { meetingId, token })
+                    }
                     this.send(ws, { t: 'voice-token', token, meetingId })
                     await this.touchGc()
                 } catch (err) {
@@ -693,7 +701,9 @@ export class GameRoomDO {
                     this.send(ws, { t: 'error', code: 'need-players' })
                     return
                 }
-                const { game, events } = startGame(seated, msg.stackingMode ?? (roomRec.stackingMode as StackingMode) ?? 'official')
+                const mode = isStackingMode(msg.stackingMode) ? msg.stackingMode
+                    : isStackingMode(roomRec.stackingMode) ? roomRec.stackingMode : 'official'
+                const { game, events } = startGame(seated, mode)
                 this.game = game
                 {
                     // A manual start beats the countdown to the punch —
@@ -997,49 +1007,3 @@ export class GameRoomDO {
         }
     }
 }
-
-const PAGE = `<!doctype html>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>UNO latency test</title>
-<style>
-  body { font-family: ui-monospace, monospace; background: #111; color: #eee; padding: 2rem; max-width: 34rem; margin: auto; }
-  h1 { font-size: 1.1rem; }
-  .big { font-size: 2.4rem; margin: 1rem 0; }
-  .dim { color: #888; }
-  td { padding: 0.15rem 0.8rem 0.15rem 0; }
-</style>
-<h1>UNO game-server latency test</h1>
-<p class="dim">edge colo: {{COLO}} &middot; room: <span id="room"></span></p>
-<div class="big" id="status">connecting&hellip;</div>
-<table>
-  <tr><td>median</td><td id="p50">-</td></tr>
-  <tr><td>p95</td><td id="p95">-</td></tr>
-  <tr><td>min</td><td id="min">-</td></tr>
-</table>
-<p class="dim">20 pings over one WebSocket to a Durable Object. The room is shared:
-whoever opens the link first decides where the object lives, everyone else
-measures their distance to it - same as a real game.</p>
-<script>
-  const room = new URLSearchParams(location.search).get('room') || 'phase0'
-  document.getElementById('room').textContent = room
-  const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws?room=' + room)
-  const samples = []
-  const WARMUP = 3, COUNT = 20
-  let sent = 0
-  const ping = () => { ws.send(String(performance.now())); sent++ }
-  ws.onopen = ping
-  ws.onerror = () => { document.getElementById('status').textContent = 'connection failed' }
-  ws.onmessage = (e) => {
-    const rtt = performance.now() - Number(e.data)
-    if (sent > WARMUP) samples.push(rtt)
-    if (sent < WARMUP + COUNT) { ping(); return }
-    samples.sort((a, b) => a - b)
-    const at = (q) => samples[Math.min(samples.length - 1, Math.floor(q * samples.length))].toFixed(1) + ' ms'
-    document.getElementById('status').textContent = at(0.5)
-    document.getElementById('p50').textContent = at(0.5)
-    document.getElementById('p95').textContent = at(0.95)
-    document.getElementById('min').textContent = samples[0].toFixed(1) + ' ms'
-  }
-</script>
-`
