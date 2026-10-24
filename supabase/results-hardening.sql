@@ -12,8 +12,8 @@
 -- numbers, backdate played_at, and take #1 on every board and the top badge.
 -- The browser still reports its own solo games (there is no server for them),
 -- but now through one function that owns user_id, played_at and is_bot_game,
--- clamps every stat to what real games produce, and spaces results out so a
--- script can't write wins faster than games can be played.
+-- clamps every stat to what real games produce, and caps how many results a
+-- player can file per 10 minutes so a script can't flood the boards.
 
 -- ============================== STEP 1 ==============================
 
@@ -56,14 +56,16 @@ begin
         end if;
     end if;
 
-    -- ponytail: one result per 10 seconds per player. Real bot games run
-    -- about 50s at the median; this caps a script at ~6 fake wins a minute.
-    -- A replay check of the daily's turn log is the upgrade if that matters.
-    if exists (
-        select 1 from game_results
+    -- ponytail: at most 40 results per player per 10 minutes. Real players
+    -- peak at 36 (99.9th percentile over 30 days); a script is capped at
+    -- 4 fake results a minute. Spacing results out instead would drop real
+    -- ones: 10% arrive under 10s apart. A replay check of the daily's turn
+    -- log is the upgrade if that matters.
+    if (
+        select count(*) from game_results
         where user_id = me and is_bot_game
-          and played_at > now() - interval '10 seconds'
-    ) then return 'too_soon'; end if;
+          and played_at > now() - interval '10 minutes'
+    ) >= 40 then return 'too_soon'; end if;
 
     -- Ceilings sit well above anything a real game has produced (max seen:
     -- 100 cards played, 25 draw cards, 46-card stack survived).
