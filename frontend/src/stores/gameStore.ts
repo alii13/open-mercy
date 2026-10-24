@@ -812,24 +812,24 @@ export const useGameStore = defineStore('game', () => {
 
         const gameId = dailyDate.value ? `daily-${dailyDate.value}` : `bot-${Date.now()}`
 
-        await supabase.from('game_results').insert({
-            game_id: gameId,
-            user_id: user.id,
-            opponent_count: players.value.length - 1,
-            result,
-            cards_remaining: humanPlayer.hand.length,
-            peak_cards: s.peakCards,
-            draw_cards_played: s.drawCardsPlayed,
-            wild_cards_played: s.wildCardsPlayed,
-            cards_played_total: s.cardsPlayedTotal,
-            skips_dealt: s.skipsDealt,
-            swaps_made: s.swapsMade,
-            draws_taken: s.drawsTaken,
-            biggest_stack_survived: s.biggestStackSurvived,
-            uno_calls: s.unoCalls,
-            uno_penalties: s.unoPenalties,
-            game_duration_secs: duration,
-            is_bot_game: true
+        // Through a definer function, not a table insert: it owns user_id,
+        // played_at and is_bot_game and clamps the stats (supabase/results-hardening.sql).
+        await supabase.rpc('record_bot_result', {
+            p_game_id: gameId,
+            p_result: result,
+            p_opponent_count: players.value.length - 1,
+            p_cards_remaining: humanPlayer.hand.length,
+            p_peak_cards: s.peakCards,
+            p_draw_cards_played: s.drawCardsPlayed,
+            p_wild_cards_played: s.wildCardsPlayed,
+            p_cards_played_total: s.cardsPlayedTotal,
+            p_skips_dealt: s.skipsDealt,
+            p_swaps_made: s.swapsMade,
+            p_draws_taken: s.drawsTaken,
+            p_biggest_stack_survived: s.biggestStackSurvived,
+            p_uno_calls: s.unoCalls,
+            p_uno_penalties: s.unoPenalties,
+            p_game_duration_secs: duration,
         })
     }
 

@@ -36,7 +36,9 @@ export async function connectWebMcp(catalog: ToolCatalog): Promise<void> {
     // any modelContext setup it performs can't clobber our native tools.
     try {
         const server = new BrowserMcpServer({ name: catalog.serverName, version: catalog.serverVersion })
-        await server.connect(new TabServerTransport({ allowedOrigins: ['*'] }))
+        // Same-origin only: with '*', any site that window.open()s the game
+        // could postMessage tool calls into the player's signed-in tab.
+        await server.connect(new TabServerTransport({ allowedOrigins: [location.origin] }))
         for (const t of catalog.tools) {
             server.registerTool({
                 name: t.name,
