@@ -13,6 +13,9 @@
  * are visible only after someone chooses to spectate.
  */
 
+import { MAX_PLAYERS } from './seats'
+import { isRoomCode } from '../../shared/roomCode'
+
 export type RoomPhase = 'lobby' | 'playing' | 'finished'
 
 export interface DirEntry {
@@ -123,4 +126,57 @@ export function liveTables(
             skins: e.skins ?? [],
             status: entryStatus(e),
         }))
+}
+
+/** Most rooms the directory will hold. Sized well past real traffic; it only
+ *  keeps the single stored `dir` value under the storage value limit. */
+export const DIR_MAX_ENTRIES = 500
+const MODE_MAX = 16
+const SKIN_MAX = 32
+const STATUSES: readonly RoomPhase[] = ['lobby', 'playing', 'finished']
+
+function count(v: unknown): number | undefined {
+    return typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.min(MAX_PLAYERS, Math.floor(v))) : undefined
+}
+
+/** Keep only known snapshot fields, each bounded in size. */
+export function cleanSnapshot(raw: unknown): Partial<DirEntry> {
+    const s = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+    const out: Partial<DirEntry> = {}
+    const players = count(s.players)
+    if (players !== undefined) out.players = players
+    const connected = count(s.connected)
+    if (connected !== undefined) out.connected = connected
+    const seatsFree = count(s.seatsFree)
+    if (seatsFree !== undefined) out.seatsFree = seatsFree
+    if (typeof s.inProgress === 'boolean') out.inProgress = s.inProgress
+    if (typeof s.mode === 'string') out.mode = s.mode.slice(0, MODE_MAX)
+    if (Array.isArray(s.skins)) {
+        out.skins = s.skins
+            .filter((k): k is string => typeof k === 'string' && k.length <= SKIN_MAX)
+            .slice(0, MAX_PLAYERS)
+    }
+    if (typeof s.status === 'string' && (STATUSES as readonly string[]).includes(s.status)) {
+        out.status = s.status as RoomPhase
+    }
+    return out
+}
+
+/**
+ * Register or refresh one room in place. A code not already listed is refused
+ * once the directory holds DIR_MAX_ENTRIES; listed rooms always refresh.
+ */
+export function dirRegister(dir: Record<string, DirEntry>, code: string, snapshot: unknown, now: number): boolean {
+    if (typeof code !== 'string' || !isRoomCode(code)) return false
+    const prev = dir[code]
+    if (!prev && Object.keys(dir).length >= DIR_MAX_ENTRIES) return false
+    dir[code] = {
+        // Keep the original registration time: it is the ordering key for
+        // quick match, and a re-register on every roster change would
+        // otherwise send a room to the back forever.
+        at: prev?.at ?? now,
+        updatedAt: now,
+        ...cleanSnapshot(snapshot),
+    }
+    return true
 }
