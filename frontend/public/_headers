@@ -1,0 +1,11 @@
+# Security headers for every page.
+# ponytail: no script-src CSP yet. Ads, GA, consent and voice load scripts
+# from several Google and Cloudflare hosts; a full allowlist needs a
+# report-only rollout first. frame-ancestors alone stops clickjacking.
+/*
+  Content-Security-Policy: frame-ancestors 'none'
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  Permissions-Policy: camera=(), geolocation=(), payment=()
