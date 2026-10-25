@@ -191,17 +191,30 @@
          footer's Privacy settings keep working here. -->
     <meta name="google-adsense-account" content="ca-pub-5481263585202262">
     <script>
-      // The consent message loads after the page is idle, like analytics below:
-      // Consent Mode keeps Google tags denied in the EEA and UK until it records a choice.
-      window.addEventListener('load', function () {
-        var loadCmp = function () {
-          var s = document.createElement('script');
-          s.async = true;
-          s.src = 'https://fundingchoicesmessages.google.com/i/pub-5481263585202262?ers=1';
-          document.head.appendChild(s);
+      // Google's consent message and tags (~500 KB of script) were all of the
+      // page's blocking time in PageSpeed. They load on the visitor's first
+      // scroll, tap or key press, or after 15 s if there is none. Consent Mode
+      // keeps tags denied in the EEA and UK until the message records a choice,
+      // and gtag() calls made before then wait in dataLayer.
+      // ponytail: a visit that leaves within 15 s without touching the page is
+      // not counted in GA; shorten the fallback if that number matters.
+      window.whenEngaged = function (fn) {
+        var events = ['scroll', 'pointerdown', 'keydown', 'touchstart'];
+        var done = false;
+        var run = function () {
+          if (done) return;
+          done = true;
+          events.forEach(function (e) { window.removeEventListener(e, run); });
+          fn();
         };
-        if (window.requestIdleCallback) requestIdleCallback(loadCmp, { timeout: 3000 });
-        else setTimeout(loadCmp, 1500);
+        events.forEach(function (e) { window.addEventListener(e, run, { passive: true }); });
+        setTimeout(run, 15000);
+      };
+      whenEngaged(function () {
+        var s = document.createElement('script');
+        s.async = true;
+        s.src = 'https://fundingchoicesmessages.google.com/i/pub-5481263585202262?ers=1';
+        document.head.appendChild(s);
       });
     </script>
     <script>(function() {function signalGooglefcPresent() {if (!window.frames['googlefcPresent']) {if (document.body) {const iframe = document.createElement('iframe'); iframe.style = 'width: 0; height: 0; border: none; z-index: -1000; left: -1000px; top: -1000px;'; iframe.style.display = 'none'; iframe.name = 'googlefcPresent'; document.body.appendChild(iframe);} else {setTimeout(signalGooglefcPresent, 0);}}}signalGooglefcPresent();})();</script>
@@ -226,18 +239,11 @@
         wait_for_update: 500
       });
       if (GA_ENABLED) {
-        // Loaded once the page is idle: gtag.js is ~300 KB of script that
-        // PageSpeed counted as most of the startup blocking time. Calls made
-        // before then wait in dataLayer, so no event is lost.
-        var loadGa = function () {
+        whenEngaged(function () {
           var gaLoader = document.createElement('script');
           gaLoader.async = true;
           gaLoader.src = 'https://www.googletagmanager.com/gtag/js?id=G-HF9GCTVQ7J';
           document.head.appendChild(gaLoader);
-        };
-        window.addEventListener('load', function () {
-          if (window.requestIdleCallback) requestIdleCallback(loadGa, { timeout: 3000 });
-          else setTimeout(loadGa, 1500);
         });
         gtag('js', new Date());
         gtag('config', 'G-HF9GCTVQ7J');
