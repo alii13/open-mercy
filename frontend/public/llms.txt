@@ -1,36 +1,43 @@
-# UNO No Mercy Online
+# Open Mercy
 
-> Free, browser-based UNO No Mercy card game. Real-time multiplayer with friends or solo against AI opponents. No download, no account required.
+> Free browser card game with the No Mercy ruleset: draw stacking, Draw 6, Draw 10, Skip Everyone, Discard All, Color Roulette, 7 swap, 0 rotate and elimination at 25 cards. Real-time multiplayer for 2 to 20 players, or solo against AI. No download, no account required.
 
-Play now: https://uno-no-mercy.com/
+Play now: https://open-mercy.com/
 
 ## About
 
-UNO No Mercy Online is an independent, fan-made web implementation of the No Mercy-style UNO card game. It runs entirely in the browser on desktop or mobile, with real-time multiplayer and single-player-vs-AI modes.
+Open Mercy is an independent, open-source web game. Its ruleset was popularized by Mattel's UNO Show 'Em No Mercy card game; this project is not affiliated with, endorsed by, or associated with Mattel or the UNO brand. The last-card call in Open Mercy is "Mercy!".
 
-- Free to play
-- No download or installation
-- No account or registration required to play (guest play; an optional free account saves your stats)
-- 2 to 20 players per game
-- Works on mobile and desktop browsers
-- Open source under the MIT license: https://github.com/alii13/Uno-no-mercy
+- Free to play, no ads inside the game
+- No download or installation, runs in any modern desktop or mobile browser
+- Guest play; an optional free account saves stats, ranks and friends
+- 2 to 20 players per room, with a room code or invite link
+- Solo mode against a ladder of AI opponents, plus a daily deal that everyone plays on the same shuffle
+- Open source under the MIT license: https://github.com/alii13/open-mercy
 
-## Implemented rules and cards
+## Rules implemented
 
-- Draw 6 and Draw 10 action cards
-- Card stacking (draw cards stack onto each other, so a Draw 2 can grow into a much larger penalty)
-- Skip Everyone
-- Color Roulette
-- Discard All (discard every card of one color at once)
-- Number 7 hand swap (swap your entire hand with another player)
-- Number 0 hand rotation (every player passes their hand around the table)
-- 25-card Mercy Rule (a player holding 25 or more cards is eliminated from the game)
+- Draw 2, Draw 4 (colored), Wild Draw 6, Wild Draw 10 and Wild Reverse Draw 4
+- Draw stacking: the host picks official (equal or higher), house (wilds stack on anything) or casual (anything stacks)
+- Skip, Skip Everyone, Reverse
+- Discard All (drop every card of one color at once)
+- Wild Color Roulette (draw until the named color appears)
+- 7 swap (trade hands with any player) and 0 rotate (every hand moves one seat)
+- Mercy rule: a hand of 25 or more cards is eliminated; the last player standing wins
+- Last-card call with a catch window; getting caught costs 10 cards
 
 ## Pages
 
-- Play the game: https://uno-no-mercy.com/
-- Full rules guide: https://uno-no-mercy.com/rules
+- Play: https://open-mercy.com/
+- Complete rules guide (every card, stacking variants, edge cases): https://open-mercy.com/rules/
+- One-page printable cheat sheet (PDF): https://open-mercy.com/rules/cheat-sheet/
+- Every card explained: https://open-mercy.com/rules/cards/
+- Stacking rules: https://open-mercy.com/rules/stacking/
+- How to play, step by step: https://open-mercy.com/how-to-play/
+- Strategy: https://open-mercy.com/strategy/
+- FAQ: https://open-mercy.com/faq/
+- Leaderboard: https://open-mercy.com/leaderboard
 
 ## Affiliation
 
-This is an independent, fan-made project. It is not affiliated with, endorsed by, or associated with Mattel or the official UNO brand.
+Independent project. Not affiliated with, endorsed by, or associated with Mattel or the UNO brand.
