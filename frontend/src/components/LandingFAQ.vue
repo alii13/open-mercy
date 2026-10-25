@@ -189,7 +189,7 @@ function initFaq() {
 .section-label {
   font-family: var(--font-mono);
   font-size: 0.7rem;
-  color: #333;
+  color: var(--text-muted);
   letter-spacing: 6px;
   margin-bottom: 1.5rem;
 }

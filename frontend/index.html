@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#0a0a0b" />
 
     <!-- Primary SEO -->
@@ -213,10 +213,19 @@
         wait_for_update: 500
       });
       if (GA_ENABLED) {
-        var gaLoader = document.createElement('script');
-        gaLoader.async = true;
-        gaLoader.src = 'https://www.googletagmanager.com/gtag/js?id=G-HF9GCTVQ7J';
-        document.head.appendChild(gaLoader);
+        // Loaded once the page is idle: gtag.js is ~300 KB of script that
+        // PageSpeed counted as most of the startup blocking time. Calls made
+        // before then wait in dataLayer, so no event is lost.
+        var loadGa = function () {
+          var gaLoader = document.createElement('script');
+          gaLoader.async = true;
+          gaLoader.src = 'https://www.googletagmanager.com/gtag/js?id=G-HF9GCTVQ7J';
+          document.head.appendChild(gaLoader);
+        };
+        window.addEventListener('load', function () {
+          if (window.requestIdleCallback) requestIdleCallback(loadGa, { timeout: 3000 });
+          else setTimeout(loadGa, 1500);
+        });
         gtag('js', new Date());
         gtag('config', 'G-HF9GCTVQ7J');
         gtag('config', 'AW-18192424425');
@@ -241,7 +250,8 @@
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Chakra+Petch:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Chakra+Petch:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <noscript><link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Chakra+Petch:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300&display=swap" rel="stylesheet"></noscript>
 
     <style>
       /* Boot loading state. Visually identical to App.vue's .loading-screen

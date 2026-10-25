@@ -27,7 +27,7 @@
 
   --text-primary: #e6e6e6;
   --text-secondary: #a1a1aa;
-  --text-muted: #52525b;
+  --text-muted: #808089;
 
   /* Typography */
   --font-display: 'Black Ops One', cursive;
@@ -110,6 +110,8 @@
 }
 
 body {
+  /* Pinch zoom stays available for low vision; double-tap zoom stays off. */
+  touch-action: manipulation;
   font-family: var(--font-body);
   background-color: var(--bg-concrete);
   color: var(--text-primary);

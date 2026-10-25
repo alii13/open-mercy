@@ -2,7 +2,7 @@
 
 > Free browser card game with the No Mercy ruleset: draw stacking, Draw 6, Draw 10, Skip Everyone, Discard All, Color Roulette, 7 swap, 0 rotate and elimination at 25 cards. Real-time multiplayer for 2 to 20 players, or solo against AI. No download, no account required.
 
-Play now: https://open-mercy.com/
+Play now: [open-mercy.com](https://open-mercy.com/)
 
 ## About
 
@@ -13,7 +13,7 @@ Open Mercy is an independent, open-source web game. Its ruleset was popularized 
 - Guest play; an optional free account saves stats, ranks and friends
 - 2 to 20 players per room, with a room code or invite link
 - Solo mode against a ladder of AI opponents, plus a daily deal that everyone plays on the same shuffle
-- Open source under the MIT license: https://github.com/alii13/open-mercy
+- Open source under the MIT license: [github.com/alii13/open-mercy](https://github.com/alii13/open-mercy)
 
 ## Rules implemented
 
@@ -28,15 +28,15 @@ Open Mercy is an independent, open-source web game. Its ruleset was popularized 
 
 ## Pages
 
-- Play: https://open-mercy.com/
-- Complete rules guide (every card, stacking variants, edge cases): https://open-mercy.com/rules/
-- One-page printable cheat sheet (PDF): https://open-mercy.com/rules/cheat-sheet/
-- Every card explained: https://open-mercy.com/rules/cards/
-- Stacking rules: https://open-mercy.com/rules/stacking/
-- How to play, step by step: https://open-mercy.com/how-to-play/
-- Strategy: https://open-mercy.com/strategy/
-- FAQ: https://open-mercy.com/faq/
-- Leaderboard: https://open-mercy.com/leaderboard
+- [Play Open Mercy](https://open-mercy.com/): the game, multiplayer rooms and solo vs AI
+- [Complete rules guide](https://open-mercy.com/rules/): every card, stacking variants and edge cases
+- [One-page cheat sheet](https://open-mercy.com/rules/cheat-sheet/): printable, with a [PDF](https://open-mercy.com/rules/cheat-sheet.pdf)
+- [Every card explained](https://open-mercy.com/rules/cards/): all 168 cards with deck counts
+- [Stacking rules](https://open-mercy.com/rules/stacking/): which draw cards stack on which
+- [How to play](https://open-mercy.com/how-to-play/): a first game, step by step
+- [Strategy](https://open-mercy.com/strategy/): tips for the No Mercy ruleset
+- [FAQ](https://open-mercy.com/faq/): accounts, multiplayer, devices and fixes
+- [Leaderboard](https://open-mercy.com/leaderboard): top players and the daily board
 
 ## Affiliation
 

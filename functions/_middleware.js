@@ -25,5 +25,15 @@ export function onRequest({ request, next }) {
     if (REDIRECT_HOSTS.has(url.hostname)) {
         return Response.redirect(CANONICAL_ORIGIN + url.pathname + url.search, 301)
     }
+    if (url.pathname.startsWith('/.well-known/')) return wellKnown(next)
     return next()
+}
+
+// The SPA fallback answers every unknown path with index.html. Under
+// /.well-known/ that reads as a broken manifest (Lighthouse flagged
+// ai-catalog.json), so a file we don't ship is a plain 404.
+async function wellKnown(next) {
+    const res = await next()
+    const type = res.headers.get('content-type') || ''
+    return type.includes('text/html') ? new Response('Not found', { status: 404 }) : res
 }
