@@ -111,12 +111,16 @@ function playSample(name: SfxName, volume: number): boolean {
     return true
 }
 
-// Kick off sample loads on module init. The fetches resolve in the background;
-// any play calls that fire before the buffer lands fall through to synthesis
-// for that one call.
-for (const name of Object.keys(SFX_FILES) as SfxName[]) {
-    loadSample(name)
+// Sample loads start on the first tap or key press: audio can't play before a
+// gesture anyway, and 66 KB of samples at startup competed with the app code
+// on slow mobile connections. Play calls that fire before a buffer lands fall
+// through to synthesis for that one call.
+const GESTURES = ['pointerdown', 'keydown', 'touchstart'] as const
+function loadSamples() {
+    GESTURES.forEach((e) => window.removeEventListener(e, loadSamples))
+    for (const name of Object.keys(SFX_FILES) as SfxName[]) loadSample(name)
 }
+GESTURES.forEach((e) => window.addEventListener(e, loadSamples, { passive: true }))
 
 // ============================================================
 // LocalStorage persistence for volume + mute
