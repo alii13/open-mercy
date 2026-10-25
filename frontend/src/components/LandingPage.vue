@@ -291,7 +291,6 @@ function runHeroChoreography() {
     gsap.set(el, { opacity: 0, scale: 1, x: 0, y: -600, rotation: 0 })
   })
   gsap.set(counterEl, { opacity: 0, scale: 0.5 })
-  gsap.set(wordmarkRef.value!, { opacity: 0, y: 20 })
   gsap.set(strikeLine, { strokeDasharray: 100, strokeDashoffset: 100 })
   gsap.set(taglineRef.value!, { opacity: 0, y: 12 })
   gsap.set(heroCtaRef.value!, { opacity: 0, y: 16 })
@@ -444,12 +443,9 @@ function runHeroChoreography() {
     explodeAt,
   )
 
-  // BEAT 8: wordmark fades up where the stack was — now uncontested
-  tl.to(
-    wordmarkRef.value!,
-    { opacity: 1, y: 0, duration: 0.5, ease: 'power3.out' },
-    explodeAt + 0.2,
-  )
+  // BEAT 8: the wordmark is on screen from the first frame (it's the page's
+  // LCP element; hiding it until here cost ~2 s of mobile LCP). The cards
+  // slam in front of it and clear it on the explosion.
 
   // BEAT 9: strike-through draws across MERCY
   tl.to(
