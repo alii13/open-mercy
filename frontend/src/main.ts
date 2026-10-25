@@ -2,8 +2,6 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import gsap from 'gsap'
 import { CSSPlugin } from 'gsap/CSSPlugin'
-import { Flip } from 'gsap/Flip'
-import { MotionPathPlugin } from 'gsap/MotionPathPlugin'
 import './style.css'
 import App from './App.vue'
 import { vFocusRing } from './directives/focusRing'
@@ -11,7 +9,9 @@ import { registerMcpTools } from './mcp/registerTools'
 
 // CSSPlugin must be explicitly registered under Vite tree-shaking — without it
 // every x/y/opacity/scale tween logs "Missing plugin?" warnings and no-ops.
-gsap.registerPlugin(CSSPlugin, Flip, MotionPathPlugin)
+// Flip and MotionPath register where the game uses them, so the landing
+// page doesn't download them.
+gsap.registerPlugin(CSSPlugin)
 
 // Global reduced-motion guard. When prefers-reduced-motion: reduce is set
 // (or the user toggles motion off in our settings drawer), shrink every

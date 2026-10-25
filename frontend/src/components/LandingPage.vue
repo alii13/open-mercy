@@ -33,7 +33,7 @@
           class="hero-card"
           :ref="(el) => { if (el) cardRefs[idx] = el as HTMLElement }"
         >
-          <Card :card="card" :size="cardSize" />
+          <Card :card="card" :size="cardSize" :srcset="heroSrcsets[idx]" />
         </div>
 
         <!-- The counter — typographic centerpiece during the stack beats -->
@@ -90,8 +90,11 @@
       <div ref="heroSentinel" class="hero-sentinel" aria-hidden="true"></div>
     </section>
 
-    <!-- Scroll sections (kept from Phase 1) -->
-    <LandingScrollSections @openFeedback="showFeedback = true" />
+    <!-- Scroll sections (kept from Phase 1). Mounted on the first scroll: the
+         story renders ~40 cards, which PageSpeed counted as startup work. The
+         placeholder holds the same 100vh so nothing shifts when it arrives. -->
+    <LandingScrollSections v-if="storyReady" @openFeedback="showFeedback = true" />
+    <div v-else class="story-placeholder" aria-hidden="true"></div>
 
     <LandingGuide />
 
@@ -121,9 +124,8 @@
 
 <script setup lang="ts">
 import { ArrowRight } from 'lucide-vue-next'
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, defineAsyncComponent } from 'vue'
 import gsap from 'gsap'
-import LandingScrollSections from './LandingScrollSections.vue'
 import LandingGuide from './LandingGuide.vue'
 import LandingFAQ from './LandingFAQ.vue'
 import SiteFooter from './SiteFooter.vue'
@@ -135,6 +137,9 @@ import Card from './game/Card.vue'
 import Button from './ui/Button.vue'
 import { useScreenSize } from '../composables/useScreenSize'
 import { navigate } from '../utils/routes'
+import { onFirstScroll } from '../composables/onFirstScroll'
+
+const LandingScrollSections = defineAsyncComponent(() => import('./LandingScrollSections.vue'))
 
 const props = defineProps<{ loading?: boolean }>()
 
@@ -162,6 +167,8 @@ const strikeRef = ref<SVGSVGElement>()
 const taglineRef = ref<HTMLElement>()
 const heroCtaRef = ref<HTMLElement>()
 const pulse = useSitePulse()
+const storyReady = ref(false)
+let cancelStory = () => {}
 
 const emit = defineEmits<{
   (e: 'showAuth', mode: 'login' | 'signup'): void
@@ -182,6 +189,12 @@ const heroCards = [
   { id: 'h4', color: 'wild', type: 'draw10' },
   { id: 'h5', color: 'red', type: 'skipEveryone' },
 ] as const
+
+// The source art is 500 px wide; the hero shows these cards at 84 to 124 px.
+const heroImages = import.meta.glob('../assets/cards-hero/*.webp', { eager: true, query: '?url', import: 'default' }) as Record<string, string>
+const heroSrcsets = ['two-draw-red', 'four-draw-green', 'wild-draw-six', 'wild-ten-draw', 'skip-everyone-red'].map((n) =>
+  [130, 260].map((w) => `${heroImages[`../assets/cards-hero/${n}-${w}.webp`]} ${w}w`).join(', '),
+)
 
 const COUNTER_BEATS = [2, 6, 12, 22, 22] // index-matched to heroCards (5th doesn't add)
 
@@ -207,6 +220,7 @@ const reducedMotion =
   window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 onMounted(() => {
+  cancelStory = onFirstScroll(() => { storyReady.value = true })
   if (heroSentinel.value) {
     observer = new IntersectionObserver(
       (entries) => {
@@ -232,6 +246,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  cancelStory()
   observer?.disconnect()
   observer = null
   masterTl?.kill()
@@ -460,6 +475,10 @@ function runHeroChoreography() {
 </script>
 
 <style scoped>
+.story-placeholder {
+  height: 100vh;
+}
+
 /* The main landmark for screen readers; contents keeps the flex layout unchanged. */
 .landing-main {
   display: contents;
@@ -739,6 +758,7 @@ function runHeroChoreography() {
   border-radius: 50%;
   background: var(--color-neon-green);
   animation: live-pulse 2s ease-in-out infinite;
+  will-change: opacity;
 }
 
 @keyframes live-pulse {

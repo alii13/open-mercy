@@ -40,9 +40,8 @@
 import { ChevronDown } from 'lucide-vue-next'
 import { ref, onMounted, onUnmounted } from 'vue'
 import gsap from 'gsap'
-import { ScrollTrigger } from 'gsap/ScrollTrigger'
-
-gsap.registerPlugin(ScrollTrigger)
+import type { ScrollTrigger } from 'gsap/ScrollTrigger'
+import { onFirstScroll } from '../composables/onFirstScroll'
 
 // Keep this list in sync with the FAQPage JSON-LD in index.html — the
 // structured data must match the visible questions and answers exactly.
@@ -106,12 +105,20 @@ function setRow(i: number, el: unknown) {
 }
 
 let triggers: ScrollTrigger[] = []
+let alive = true
+let cancelWait = () => {}
 
 onMounted(() => {
-  requestAnimationFrame(() => requestAnimationFrame(initFaq))
+  // Below the fold: the reveal animations load on the first scroll.
+  cancelWait = onFirstScroll(async () => {
+    gsap.registerPlugin((await import('gsap/ScrollTrigger')).ScrollTrigger)
+    if (alive) requestAnimationFrame(() => requestAnimationFrame(initFaq))
+  })
 })
 
 onUnmounted(() => {
+  alive = false
+  cancelWait()
   triggers.forEach((t) => t.kill())
   triggers = []
 })
