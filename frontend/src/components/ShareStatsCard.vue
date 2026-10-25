@@ -176,8 +176,7 @@ function copy() {
     align-items: center;
     justify-content: center;
     padding: var(--spacing-4);
-    background: rgba(0, 0, 0, 0.85);
-    backdrop-filter: blur(6px);
+    background: rgba(0, 0, 0, 0.88);
 }
 
 .ssc-modal {

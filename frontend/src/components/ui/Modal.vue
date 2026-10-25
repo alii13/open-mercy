@@ -98,8 +98,9 @@ onUnmounted(() => {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.85);
-  backdrop-filter: blur(6px);
+  /* No backdrop blur: blurring the whole page on open cost ~600 ms of
+     tap-to-paint on a slowed phone CPU, and at 88% black it barely showed. */
+  background: rgba(0, 0, 0, 0.88);
   display: flex;
   align-items: center;
   justify-content: center;
