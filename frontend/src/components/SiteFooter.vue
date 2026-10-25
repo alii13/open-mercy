@@ -103,7 +103,6 @@ onMounted(() => { void privacySettingsAvailable().then(v => { privacySettings.va
 .footer-attribution {
   font-size: 0.68rem;
   color: var(--text-muted);
-  opacity: 0.7;
   letter-spacing: 0.5px;
 }
 

@@ -18,6 +18,7 @@
       </div>
     </header>
 
+    <main class="landing-main">
     <!-- HERO — cinematic card-stack choreography -->
     <section class="hero">
       <div class="hero-bloom" aria-hidden="true"></div>
@@ -95,6 +96,7 @@
     <LandingGuide />
 
     <LandingFAQ />
+    </main>
 
     <!-- The sticky CTA covers the bottom of the screen, so it steps aside once
          the footer arrives; otherwise its links can't be tapped on phones. -->
@@ -458,6 +460,11 @@ function runHeroChoreography() {
 </script>
 
 <style scoped>
+/* The main landmark for screen readers; contents keeps the flex layout unchanged. */
+.landing-main {
+  display: contents;
+}
+
 .landing-container {
   background: var(--bg-concrete);
   color: var(--text-primary);
