@@ -6,6 +6,9 @@
  */
 
 import gsap from 'gsap'
+import { MotionPathPlugin } from 'gsap/MotionPathPlugin'
+
+gsap.registerPlugin(MotionPathPlugin)
 import { useMotion } from './useMotion'
 import { getCardImageUrl } from '../utils/cardGenerator'
 import type { Card, CardColor } from '../types/card'

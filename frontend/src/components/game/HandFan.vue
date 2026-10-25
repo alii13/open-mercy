@@ -81,6 +81,9 @@
 import { ref, computed, inject, watch, nextTick, onMounted, onUnmounted, type Ref, type ComponentPublicInstance } from 'vue'
 import gsap from 'gsap'
 import { Flip } from 'gsap/Flip'
+import { MotionPathPlugin } from 'gsap/MotionPathPlugin'
+
+gsap.registerPlugin(Flip, MotionPathPlugin)
 import type { Card as CardType } from '../../types/card'
 import Card from './Card.vue'
 import { computeHandLayout } from '../../utils/handLayout'

@@ -16,6 +16,8 @@
     <img
       class="card-image"
       :src="cardUrl"
+      :srcset="srcset"
+      :sizes="srcset ? `${size.width}px` : undefined"
       :width="size.width"
       :height="size.height"
       decoding="async"
@@ -36,6 +38,8 @@ interface Props {
   isSelected?: boolean
   isFlipped?: boolean
   size?: { width: number; height: number }
+  /** Smaller encodes for places that show the card small, like the landing hero. */
+  srcset?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {

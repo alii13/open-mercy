@@ -153,12 +153,12 @@ import { Code, Heart, HelpCircle, MessageSquare } from 'lucide-vue-next'
  */
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import gsap from 'gsap'
-import { ScrollTrigger } from 'gsap/ScrollTrigger'
+import type { ScrollTrigger } from 'gsap/ScrollTrigger'
+import { onFirstScroll } from '../composables/onFirstScroll'
 import Card from './game/Card.vue'
 import CardBack from './game/CardBack.vue'
 import type { Card as CardType } from '../types/card'
 
-gsap.registerPlugin(ScrollTrigger)
 
 defineEmits<{
   (e: 'openFeedback'): void
@@ -247,19 +247,30 @@ const victimDirs = [
 
 let master: gsap.core.Timeline | null = null
 let velocityST: ScrollTrigger | null = null
+let ST: typeof ScrollTrigger | null = null
+let alive = true
+let cancelWait = () => {}
 
 onMounted(() => {
   if (reduced) return
   window.addEventListener('resize', onResize)
-  requestAnimationFrame(() => requestAnimationFrame(init))
+  // The story sits below the fold: its plugin and pinned timeline load on the
+  // first scroll instead of during startup, where PageSpeed counted them.
+  cancelWait = onFirstScroll(async () => {
+    ST = (await import('gsap/ScrollTrigger')).ScrollTrigger
+    gsap.registerPlugin(ST)
+    if (alive) requestAnimationFrame(() => requestAnimationFrame(init))
+  })
 })
 
 onUnmounted(() => {
+  alive = false
+  cancelWait()
   window.removeEventListener('resize', onResize)
   velocityST?.kill()
   master?.scrollTrigger?.kill()
   master?.kill()
-  ScrollTrigger.getAll().forEach(t => t.kill())
+  ST?.getAll().forEach(t => t.kill())
 })
 
 const mob = () => window.innerWidth <= 768
@@ -547,7 +558,7 @@ function init() {
   // settles elastically when you stop.
   const skewSetter = gsap.quickSetter(deckEl.value!, 'skewY', 'deg')
   const skewProxy = { v: 0 }
-  velocityST = ScrollTrigger.create({
+  velocityST = ST!.create({
     trigger: rootEl.value,
     start: 'top bottom',
     end: 'bottom top',
