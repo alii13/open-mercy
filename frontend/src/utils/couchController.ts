@@ -2,6 +2,8 @@ import type { TurnState } from '../types/card'
 
 export type RealtimeStatus = 'CONNECTING' | 'SUBSCRIBED' | 'CLOSED'
 
+const LAST_COUCH_NAME_KEY = 'rune_riot_couch_name'
+
 export interface CouchStatusInput {
   realtimeStatus: RealtimeStatus
   turnState: TurnState | string | null | undefined
@@ -34,4 +36,15 @@ export function nextCardSelection(currentId: string | null, cardId: string, play
 
 export function showHandScrollHint(cardCount: number): boolean {
   return cardCount >= 10
+}
+
+export function savedCouchName(storage: Pick<Storage, 'getItem'>, roomCode: string): string {
+  return storage.getItem(`rune_riot_couch_name_${roomCode}`)
+    ?? storage.getItem(LAST_COUCH_NAME_KEY)
+    ?? ''
+}
+
+export function rememberCouchName(storage: Pick<Storage, 'setItem'>, roomCode: string, name: string): void {
+  storage.setItem(`rune_riot_couch_name_${roomCode}`, name)
+  storage.setItem(LAST_COUCH_NAME_KEY, name)
 }

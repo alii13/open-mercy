@@ -10,6 +10,24 @@ const twoPlayers = () => startGame(
   'official',
 )
 
+describe('same-room rematch deal', () => {
+  it('keeps player identities and creates a fresh valid seven-card round', () => {
+    const seats = [
+      { userId: 'u1', name: 'Alice' },
+      { userId: 'u2', name: 'Bob' },
+    ]
+    const first = startGame(seats, 'official').game
+    const rematch = startGame(seats, first.engine.stackingMode).game
+
+    expect(rematch).not.toBe(first)
+    expect(rematch.engine.players.map(player => player.id)).toEqual(['u1', 'u2'])
+    expect(rematch.engine.players.every(player => player.hand.length === 7)).toBe(true)
+    expect(rematch.engine.gameState).toBe('PLAYING')
+    expect(rematch.engine.drawStack).toBe(0)
+    expect(rematch.engine.stackingMode).toBe('official')
+  })
+})
+
 describe('couch display privacy', () => {
   it('cannot receive a private hand or a pending private choice', () => {
     const { game } = twoPlayers()

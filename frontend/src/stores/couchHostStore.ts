@@ -14,6 +14,7 @@ export const useCouchHostStore = defineStore('couchHost', () => {
   const status = ref<'idle' | 'connecting' | 'connected' | 'closed'>('idle')
   const error = ref<string | null>(null)
   const lastEvent = ref<GameEvent | null>(null)
+  const hostActionPending = ref(false)
   let socket: WebSocket | null = null
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
   let intentionalClose = false
@@ -54,6 +55,7 @@ export const useCouchHostStore = defineStore('couchHost', () => {
       if (msg.seq < lastSeq) return
       lastSeq = msg.seq
       view.value = msg.game
+      hostActionPending.value = false
       return
     }
     if (msg.t === 'event') {
@@ -61,12 +63,19 @@ export const useCouchHostStore = defineStore('couchHost', () => {
       return
     }
     if (msg.t === 'error') {
+      hostActionPending.value = false
+      if (msg.code === 'room-closed') {
+        forgetRoom()
+        return
+      }
       const labels: Partial<Record<typeof msg.code, string>> = {
         'room-not-found': 'Der Raum ist nicht mehr verfügbar.',
         unauthorized: 'Die TV-Sitzung konnte nicht authentifiziert werden.',
         'not-host': 'Nur dieser TV-Host darf die Partie starten.',
         'need-players': 'Mindestens zwei verbundene Spieler werden benötigt.',
         'not-ready': 'Alle verbundenen Spieler müssen bereit sein.',
+        'not-in-lobby': 'Diese Host-Aktion ist nur vor dem Spiel erlaubt.',
+        'already-started': 'Die Runde wurde bereits gestartet.',
       }
       error.value = labels[msg.code] || `Serverfehler: ${msg.code}`
     }
@@ -103,8 +112,13 @@ export const useCouchHostStore = defineStore('couchHost', () => {
         if (msg.t === 'snapshot') finish(true)
         if (msg.t === 'error' && ['room-not-found', 'unauthorized', 'not-host'].includes(msg.code)) finish(false)
       }
-      candidate.onclose = () => {
+      candidate.onclose = event => {
         if (socket !== candidate) return
+        if (event.reason === 'room-closed') {
+          forgetRoom()
+          finish(false)
+          return
+        }
         status.value = 'closed'
         if (!settled && !error.value) error.value = 'Die Verbindung zum lokalen Spielserver wurde getrennt.'
         finish(false)
@@ -151,12 +165,44 @@ export const useCouchHostStore = defineStore('couchHost', () => {
     status.value = 'idle'
   }
 
-  function send(message: ClientMsg) {
-    if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message))
+  function send(message: ClientMsg): boolean {
+    if (socket?.readyState !== WebSocket.OPEN) return false
+    socket.send(JSON.stringify(message))
+    return true
   }
 
-  function startGame() { send({ t: 'start', stackingMode: 'official' }) }
-  function kickPlayer(userId: string) { send({ t: 'kick', userId }) }
+  function startGame() {
+    if (hostActionPending.value || view.value?.status === 'playing') return
+    hostActionPending.value = send({ t: 'start', stackingMode: view.value?.stackingMode ?? 'official' })
+  }
+  function returnToLobby() {
+    if (hostActionPending.value || view.value?.status === 'lobby') return
+    hostActionPending.value = send({ t: 'return-lobby' })
+  }
+  function closeRoom() {
+    if (hostActionPending.value) return
+    hostActionPending.value = send({ t: 'close-room' })
+  }
+  function kickPlayer(userId: string) {
+    if (view.value?.status !== 'lobby') return
+    send({ t: 'kick', userId })
+  }
+  function forgetRoom() {
+    intentionalClose = true
+    if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null }
+    const previous = socket
+    socket = null
+    try { previous?.close() } catch { /* already closed */ }
+    localStorage.removeItem(HOST_ROOM_KEY)
+    roomCode.value = ''
+    view.value = null
+    presence.value = []
+    status.value = 'idle'
+    error.value = null
+    lastEvent.value = null
+    hostActionPending.value = false
+    lastSeq = 0
+  }
   function retry() { return roomCode.value ? connect(roomCode.value) : createRoom() }
   function dispose() {
     intentionalClose = true
@@ -166,8 +212,8 @@ export const useCouchHostStore = defineStore('couchHost', () => {
   }
 
   return {
-    roomCode, view, presence, status, error, lastEvent, joinUrl,
+    roomCode, view, presence, status, error, lastEvent, hostActionPending, joinUrl,
     readyCount, connectedCount, canStart,
-    initialize, createRoom, retry, startGame, kickPlayer, dispose,
+    initialize, createRoom, retry, startGame, returnToLobby, closeRoom, kickPlayer, dispose,
   }
 })

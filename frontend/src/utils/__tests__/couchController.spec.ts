@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { couchStatusText, drawButtonLabel, nextCardSelection, showHandScrollHint } from '../couchController'
+import { couchStatusText, drawButtonLabel, nextCardSelection, rememberCouchName, savedCouchName, showHandScrollHint } from '../couchController'
 
 describe('Couch controller interaction helpers', () => {
   it('selects, changes and deselects playable cards without selecting blocked cards', () => {
@@ -23,5 +23,16 @@ describe('Couch controller interaction helpers', () => {
     for (const count of [3, 10, 15, 20, 25]) {
       expect(showHandScrollHint(count)).toBe(count >= 10)
     }
+  })
+
+  it('remembers a display name across rooms without using it as identity', () => {
+    const values = new Map<string, string>()
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => { values.set(key, value) },
+    }
+    rememberCouchName(storage, 'ABC234', 'Runenfreund')
+    expect(savedCouchName(storage, 'ABC234')).toBe('Runenfreund')
+    expect(savedCouchName(storage, 'NEU567')).toBe('Runenfreund')
   })
 })

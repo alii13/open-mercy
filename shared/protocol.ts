@@ -32,6 +32,8 @@ export type ClientMsg =
     | { t: 'ready'; ready: boolean }
     | { t: 'kick'; userId: string }
     | { t: 'start'; stackingMode?: StackingMode }
+    | { t: 'return-lobby' }
+    | { t: 'close-room' }
     // Hold the public lobby open a minute longer. Anyone at the table may
     // press it; the allowance is the room's, not the player's.
     | { t: 'extend-start' }
@@ -128,4 +130,4 @@ export type ServerMsg =
     // The outcome of one invite, back to whoever asked. Every value is a
     // normal answer, including the refusals.
     | { t: 'invite-result'; userId: string; result: string }
-    | { t: 'error'; code: 'unauthorized' | 'bad-message' | 'room-not-found' | 'room-full' | 'not-host' | 'not-started' | 'already-started' | 'need-players' | 'not-ready' | 'name-invalid' | 'name-taken' | 'not-in-lobby' | 'invalid-intent' | 'voice-unavailable'; intentId?: string }
+    | { t: 'error'; code: 'unauthorized' | 'bad-message' | 'room-not-found' | 'room-closed' | 'room-full' | 'not-host' | 'not-started' | 'already-started' | 'need-players' | 'not-ready' | 'name-invalid' | 'name-taken' | 'not-in-lobby' | 'invalid-intent' | 'voice-unavailable'; intentId?: string }

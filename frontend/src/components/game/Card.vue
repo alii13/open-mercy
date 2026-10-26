@@ -71,6 +71,7 @@ import {
   Zap,
 } from 'lucide-vue-next'
 import type { Card, CardColor, CardType } from '@/types/card'
+import { cardFamily, cardPresentation } from '@/utils/cardPresentation'
 
 interface Props {
   card: Card
@@ -118,32 +119,10 @@ const ACTION_ICONS: Record<CardType, Component> = {
   wildColorRoulette: CircleDotDashed,
 }
 
-const CARD_TITLES: Record<CardType, string> = {
-  number: 'Rune',
-  skip: 'Ward',
-  reverse: 'Reversal',
-  draw2: 'Draw Two',
-  skipEveryone: 'Time Lock',
-  discardAll: 'Rune Purge',
-  wild: 'Wild Arcana',
-  draw4: 'Draw Four',
-  draw6: 'Draw Six',
-  draw10: 'Draw Ten',
-  wildReverseDraw4: 'Fate Reversal',
-  wildColorRoulette: 'Chaos Wheel',
-}
-
-const COLOR_NAMES: Record<CardColor, string> = {
-  red: 'Flame Rune',
-  blue: 'Frost Seal',
-  green: 'Grove Mark',
-  yellow: 'Storm Glyph',
-  wild: 'Arcane Relic',
-}
-
 const familyIcon = computed(() => FAMILY_ICONS[props.card.color])
 const actionIcon = computed(() => ACTION_ICONS[props.card.type])
-const cardTitle = computed(() => CARD_TITLES[props.card.type])
+const presentation = computed(() => cardPresentation(props.card))
+const cardTitle = computed(() => presentation.value.shortName)
 const drawValue = computed(() => {
   if (props.card.type === 'draw2') return 2
   if (props.card.type === 'draw4' || props.card.type === 'wildReverseDraw4') return 4
@@ -155,18 +134,17 @@ const cornerMark = computed(() => {
   if (props.card.type === 'number') return String(props.card.value ?? '')
   if (drawValue.value) return `+${drawValue.value}`
   const marks: Partial<Record<CardType, string>> = {
-    skip: 'WARD',
-    reverse: 'TURN',
-    skipEveryone: 'LOCK',
-    discardAll: 'PURGE',
-    wild: 'WILD',
+    skip: 'SPERRE',
+    reverse: 'WENDE',
+    skipEveryone: 'BANN',
+    discardAll: 'FLUT',
+    wild: 'WAHL',
     wildColorRoulette: 'CHAOS',
   }
   return marks[props.card.type] ?? 'RUNE'
 })
 const cardAlt = computed(() => {
-  const value = props.card.type === 'number' ? ` ${props.card.value}` : ''
-  return `${COLOR_NAMES[props.card.color]}${value}: ${cardTitle.value}`
+  return `${presentation.value.name}, ${cardFamily(props.card)}. ${presentation.value.effect}`
 })
 
 function handleClick() {

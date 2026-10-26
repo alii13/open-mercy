@@ -16,6 +16,7 @@ import { chatAllowed } from './chatLimit'
 import { sendRoomInvite } from './invites'
 import { quickChatPhrase } from '../../shared/quickChat'
 import type { StackingMode } from '../../shared/engine'
+import { couchHostActionError } from './couchHostActions'
 
 interface Env extends AuthEnv, VoiceEnv {
     ROOM: DurableObjectNamespace
@@ -605,7 +606,7 @@ export class GameRoomDO {
             return
         }
 
-        if (tag.role === 'display' && msg.t !== 'ping' && msg.t !== 'start' && msg.t !== 'kick') {
+        if (tag.role === 'display' && !['ping', 'start', 'kick', 'return-lobby', 'close-room'].includes(msg.t)) {
             this.send(ws, { t: 'error', code: 'bad-message' })
             return
         }
@@ -755,9 +756,83 @@ export class GameRoomDO {
                 return
             }
 
+            case 'return-lobby': {
+                const roomRec = await this.ctx.storage.get<RoomRecord>('room')
+                const denied = roomRec ? couchHostActionError('return-lobby', {
+                    couch: !!roomRec.couch,
+                    hostUserId: roomRec.hostUserId,
+                    socketUserId: tag.userId,
+                    role: tag.role,
+                    phase: this.roomStatus(),
+                }) : 'not-host'
+                if (denied) {
+                    this.send(ws, { t: 'error', code: denied })
+                    return
+                }
+
+                this.game = null
+                this.seq++
+                await this.ctx.storage.delete('game')
+                const roster = (await this.ctx.storage.get<Record<string, RosterEntry>>('roster')) ?? {}
+                for (const entry of Object.values(roster)) entry.ready = false
+                await this.ctx.storage.put('roster', roster)
+                const timers = await this.getTimers()
+                delete timers.graceAt
+                delete timers.graceSeat
+                delete timers.catchAt
+                delete timers.catchFor
+                await this.putTimers(timers)
+                await this.broadcastPresence(roster)
+                const list = await this.rosterList()
+                for (const player of this.roomSockets()) {
+                    this.send(player.ws, { t: 'snapshot', seq: this.seq, game: this.viewFor(player.userId, list, roomRec!) })
+                }
+                for (const display of this.displaySockets()) {
+                    this.send(display.ws, { t: 'snapshot', seq: this.seq, game: this.publicViewFor(list, roomRec!) })
+                }
+                await this.touchGc()
+                return
+            }
+
+            case 'close-room': {
+                const roomRec = await this.ctx.storage.get<RoomRecord>('room')
+                const denied = roomRec ? couchHostActionError('close-room', {
+                    couch: !!roomRec.couch,
+                    hostUserId: roomRec.hostUserId,
+                    socketUserId: tag.userId,
+                    role: tag.role,
+                    phase: this.roomStatus(),
+                }) : 'not-host'
+                if (denied) {
+                    this.send(ws, { t: 'error', code: denied })
+                    return
+                }
+                const sockets = [...this.roomSockets(), ...this.displaySockets()]
+                for (const connection of sockets) this.send(connection.ws, { t: 'error', code: 'room-closed' })
+                if (roomRec?.voiceMeetingId) await deactivateMeeting(this.env, roomRec.voiceMeetingId)
+                await this.ctx.storage.deleteAll()
+                this.game = undefined
+                this.roomIsPublic = undefined
+                for (const connection of sockets) connection.ws.close(1000, 'room-closed')
+                return
+            }
+
             case 'kick': {
                 const roomRec = await this.ctx.storage.get<RoomRecord>('room')
-                if (roomRec?.hostUserId !== tag.userId || msg.userId === tag.userId) {
+                if (roomRec?.couch) {
+                    await this.loadGame()
+                    const denied = couchHostActionError('kick', {
+                        couch: true,
+                        hostUserId: roomRec.hostUserId,
+                        socketUserId: tag.userId,
+                        role: tag.role,
+                        phase: this.roomStatus(),
+                    })
+                    if (denied) {
+                        this.send(ws, { t: 'error', code: denied })
+                        return
+                    }
+                } else if (roomRec?.hostUserId !== tag.userId || msg.userId === tag.userId) {
                     this.send(ws, { t: 'error', code: 'not-host' })
                     return
                 }
@@ -768,7 +843,8 @@ export class GameRoomDO {
                     if (s.userId === msg.userId) s.ws.close(1008, 'kicked')
                 }
                 await this.broadcastPresence(roster)
-                // Mid-game, a kick is a forced elimination — the seat can't return.
+                // Classic rooms retain their existing mid-game behavior.
+                // Couch-room kicks are rejected above outside the lobby.
                 await this.loadGame()
                 if (this.game && this.roomStatus() === 'playing') {
                     const events = forceEliminate(this.game, msg.userId)

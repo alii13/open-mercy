@@ -313,6 +313,22 @@ describe('presence skins', () => {
     })
 })
 
+describe('couch room closure', () => {
+    it('does not reconnect after the authorized TV host closes the room', async () => {
+        const mp = useMultiplayerStore()
+        const ws = await joinRoom(mp)
+        ws.receive({ t: 'snapshot', seq: 2, game: playingView() })
+
+        ws.receive({ t: 'error', code: 'room-closed' })
+        ws.onclose?.({ code: 1000, reason: 'room-closed' })
+
+        expect(mp.roomCode).toBe('')
+        expect(mp.currentGame).toBeNull()
+        expect(mp.error).toBe('Der TV-Host hat den Raum geschlossen.')
+        expect(FakeWebSocket.instances).toHaveLength(1)
+    })
+})
+
 describe('join failure reasons and retry', () => {
     async function startJoin(mp: ReturnType<typeof useMultiplayerStore>) {
         const joining = mp.joinGame('DEADCD')

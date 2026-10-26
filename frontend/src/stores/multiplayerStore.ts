@@ -443,13 +443,14 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
                 if (msg.code === 'name-invalid') error.value = 'Name must contain 2 to 16 characters'
                 if (msg.code === 'name-taken') error.value = 'That name is already taken in this room'
                 if (msg.code === 'invalid-intent') error.value = 'That move is not allowed'
+                if (msg.code === 'room-closed') error.value = 'Der TV-Host hat den Raum geschlossen.'
                 if (msg.intentId && pendingIntent?.id === msg.intentId) {
                     // Server refused the intent — roll the optimistic render back.
                     view.value = pendingIntent.prevView
                     pendingIntent = null
                     actionInProgress.value = false
                 }
-                if (msg.code === 'room-not-found') {
+                if (msg.code === 'room-not-found' || msg.code === 'room-closed') {
                     try { localStorage.removeItem(STORED_ROOM_KEY) } catch { /* noop */ }
                 }
                 break
@@ -547,6 +548,14 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
                     try { localStorage.removeItem(STORED_ROOM_KEY) } catch { /* noop */ }
                     resetState()
                     error.value = 'You were removed from the room'
+                    return
+                }
+                if (e?.reason === 'room-closed') {
+                    closedByUs = true
+                    void useVoiceStore().leaveVoice()
+                    try { localStorage.removeItem(STORED_ROOM_KEY) } catch { /* noop */ }
+                    resetState()
+                    error.value = 'Der TV-Host hat den Raum geschlossen.'
                     return
                 }
                 if (!closedByUs && roomCodeRef.value) scheduleReconnect()
