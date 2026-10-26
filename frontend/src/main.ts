@@ -3,9 +3,9 @@ import { createPinia } from 'pinia'
 import gsap from 'gsap'
 import { CSSPlugin } from 'gsap/CSSPlugin'
 import './style.css'
-import App from './App.vue'
 import { vFocusRing } from './directives/focusRing'
-import { registerMcpTools } from './mcp/registerTools'
+import ConfigurationError from './components/ConfigurationError.vue'
+import { validateRuntimeConfig } from './config/runtimeConfig'
 
 // CSSPlugin must be explicitly registered under Vite tree-shaking — without it
 // every x/y/opacity/scale tween logs "Missing plugin?" warnings and no-ops.
@@ -28,12 +28,36 @@ window.addEventListener('uno:motion-override', ((e: CustomEvent<{ reduced: boole
     applyMotionPreference(e.detail.reduced)
 }) as EventListener)
 
-const app = createApp(App)
-const pinia = createPinia()
+async function bootstrap() {
+    const runtimeConfig = validateRuntimeConfig(import.meta.env)
+    if (!runtimeConfig.ok) {
+        console.error('RUNE RIOT local configuration is invalid:', runtimeConfig.issues.join(' '))
+        createApp(ConfigurationError, { issues: runtimeConfig.issues }).mount('#app')
+        return
+    }
 
-app.use(pinia)
-app.directive('focus-ring', vFocusRing)
-app.mount('#app')
+    try {
+        // App and WebMCP both import the Supabase client. Keeping them dynamic
+        // lets the friendly setup screen mount before those modules evaluate.
+        const [{ default: App }, { registerMcpTools }] = await Promise.all([
+            import('./App.vue'),
+            import('./mcp/registerTools'),
+        ])
+        const app = createApp(App)
+        const pinia = createPinia()
 
-// Expose the game as WebMCP tools so a visiting agent can play a real seat.
-registerMcpTools(pinia)
+        app.use(pinia)
+        app.directive('focus-ring', vFocusRing)
+        app.mount('#app')
+
+        // Expose the game as WebMCP tools so a visiting agent can play a real seat.
+        registerMcpTools(pinia)
+    } catch (error) {
+        console.error('RUNE RIOT failed to initialize:', error)
+        createApp(ConfigurationError, {
+            issues: ['The configured services could not be initialized. Check the terminal and browser console, then restart the local launcher.'],
+        }).mount('#app')
+    }
+}
+
+void bootstrap()
