@@ -74,7 +74,7 @@ The ruleset popularized by Mattel's UNO Show 'Em No Mercy® never got a proper d
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 22 LTS (the version used by CI; Vite 7 no longer supports Node 18)
 - A [Supabase](https://supabase.com) project (free tier works)
 
 ### 1. Clone and install
@@ -110,7 +110,22 @@ VITE_SUPABASE_ANON_KEY=your-anon-key-here
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173). That's it.
+Open [http://localhost:5173](http://localhost:5173).
+
+For a fully local multiplayer server, start the Worker in a second terminal:
+
+```bash
+cd ../game-server
+npm ci
+npm run dev -- --ip 127.0.0.1 --port 8787
+```
+
+Then set `VITE_GAME_SERVER_URL=http://127.0.0.1:8787` in `frontend/.env`.
+Cloudflare credentials are not needed for this local Worker; Wrangler emulates
+the Durable Object locally. See
+[`docs/alpha-0.1-technical-report.md`](docs/alpha-0.1-technical-report.md) for
+the complete local setup, external-service requirements, and the RUNE RIOT
+rebranding/integration plan.
 
 ### 4. Build for production
 
