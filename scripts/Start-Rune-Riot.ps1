@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [switch]$NoBrowser,
-    [switch]$FrontendOnly
+    [switch]$FrontendOnly,
+    [string]$LanHost
 )
 
 Set-StrictMode -Version Latest
@@ -14,8 +15,9 @@ $frontendEnv = Join-Path $frontendDir '.env.local'
 $workerToml = Join-Path $gameServerDir 'wrangler.toml'
 $runtimeDir = Join-Path $repoRoot '.local\runtime'
 $logDir = Join-Path $runtimeDir 'logs'
-$frontendUrl = 'http://127.0.0.1:5173/'
-$workerHealthUrl = 'http://127.0.0.1:8787/health'
+$bindHost = '127.0.0.1'
+$frontendUrl = ''
+$workerHealthUrl = ''
 
 function Write-Step([string]$Message) {
     Write-Host "[RUNE RIOT] $Message" -ForegroundColor Cyan
@@ -52,22 +54,40 @@ function Read-TomlString([string]$Path, [string]$Name) {
     return $match.Groups[1].Value.Trim()
 }
 
-function Ensure-LocalConfig {
+function Resolve-LanHost([string]$Requested) {
+    if (-not [string]::IsNullOrWhiteSpace($Requested)) {
+        $parsed = $null
+        if (-not [Net.IPAddress]::TryParse($Requested, [ref]$parsed) -or $parsed.AddressFamily -ne [Net.Sockets.AddressFamily]::InterNetwork) {
+            throw "-LanHost must be one IPv4 address, for example 192.168.1.25. Received: $Requested"
+        }
+        return $Requested
+    }
+    if (-not [string]::IsNullOrWhiteSpace($env:RUNE_RIOT_LAN_HOST)) {
+        return Resolve-LanHost $env:RUNE_RIOT_LAN_HOST
+    }
+    try {
+        $candidate = Get-NetIPConfiguration -ErrorAction Stop |
+            Where-Object { $_.IPv4DefaultGateway -and $_.NetAdapter.Status -eq 'Up' } |
+            ForEach-Object { $_.IPv4Address.IPAddress } |
+            Where-Object { $_ -and $_ -notmatch '^127\.' -and $_ -notmatch '^169\.254\.' } |
+            Select-Object -First 1
+        if ($candidate) { return [string]$candidate }
+    } catch { }
+    return '127.0.0.1'
+}
+
+function Ensure-LocalConfig([string]$HostAddress) {
     $existing = Read-EnvFile $frontendEnv
     $url = if ($existing.ContainsKey('VITE_SUPABASE_URL')) { [string]$existing['VITE_SUPABASE_URL'] } else { '' }
     $key = if ($existing.ContainsKey('VITE_SUPABASE_ANON_KEY')) { [string]$existing['VITE_SUPABASE_ANON_KEY'] } else { '' }
 
-    if (Test-PublicSupabaseConfig $url $key) {
-        Write-Step 'Using the existing valid frontend/.env.local configuration.'
-        return
+    if (-not (Test-PublicSupabaseConfig $url $key)) {
+        if (-not (Test-Path -LiteralPath $workerToml)) {
+            throw 'No valid frontend configuration exists and game-server/wrangler.toml is missing. Create frontend/.env.local with a real Supabase URL and publishable/anon key.'
+        }
+        $url = Read-TomlString $workerToml 'SUPABASE_URL'
+        $key = Read-TomlString $workerToml 'SUPABASE_ANON_KEY'
     }
-
-    if (-not (Test-Path -LiteralPath $workerToml)) {
-        throw 'No valid frontend configuration exists and game-server/wrangler.toml is missing. Create frontend/.env.local with a real Supabase URL and publishable/anon key.'
-    }
-
-    $url = Read-TomlString $workerToml 'SUPABASE_URL'
-    $key = Read-TomlString $workerToml 'SUPABASE_ANON_KEY'
     if (-not (Test-PublicSupabaseConfig $url $key)) {
         throw 'No valid public Supabase client values were found. Create frontend/.env.local with VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY from a Supabase project with anonymous sign-ins enabled.'
     }
@@ -76,10 +96,11 @@ function Ensure-LocalConfig {
         '# Generated locally by Start-Rune-Riot.bat. This file is git-ignored.',
         "VITE_SUPABASE_URL=$url",
         "VITE_SUPABASE_ANON_KEY=$key",
-        'VITE_GAME_SERVER_URL=http://127.0.0.1:8787'
+        "VITE_GAME_SERVER_URL=http://${HostAddress}:8787",
+        "VITE_COUCH_PUBLIC_URL=http://${HostAddress}:5173"
     )
     [IO.File]::WriteAllLines($frontendEnv, $lines, [Text.UTF8Encoding]::new($false))
-    Write-Step 'Created frontend/.env.local from the repository''s existing public client configuration.'
+    Write-Step "Prepared local browser configuration for $HostAddress."
 }
 
 function Ensure-Dependencies([string]$Directory, [string]$Label) {
@@ -97,7 +118,7 @@ function Ensure-Dependencies([string]$Directory, [string]$Label) {
 function Test-TcpPort([int]$Port) {
     $client = [Net.Sockets.TcpClient]::new()
     try {
-        $task = $client.ConnectAsync('127.0.0.1', $Port)
+        $task = $client.ConnectAsync($script:bindHost, $Port)
         if (-not $task.Wait(400)) { return $false }
         return $client.Connected
     } catch {
@@ -181,8 +202,13 @@ try {
     }
     Write-Step "Node.js $nodeVersion detected."
 
+    $bindHost = Resolve-LanHost $LanHost
+    $frontendUrl = "http://${bindHost}:5173/couch"
+    $workerHealthUrl = "http://${bindHost}:8787/health"
+    Write-Step "Using exact LAN bind address $bindHost (override with -LanHost or RUNE_RIOT_LAN_HOST)."
+
     New-Item -ItemType Directory -Force -Path $logDir | Out-Null
-    Ensure-LocalConfig
+    Ensure-LocalConfig $bindHost
     Ensure-Dependencies $frontendDir 'Frontend'
     if (-not $FrontendOnly) { Ensure-Dependencies $gameServerDir 'Game server' }
 
@@ -190,7 +216,7 @@ try {
     if (-not $FrontendOnly) {
         $worker = Start-HiddenNpmService `
             -Directory $gameServerDir `
-            -Arguments @('run', 'dev', '--', '--ip', '127.0.0.1', '--port', '8787') `
+            -Arguments @('run', 'dev', '--', '--ip', $bindHost, '--port', '8787', '--var', "COUCH_ALLOWED_ORIGIN:http://${bindHost}:5173") `
             -Name 'game-server' `
             -ReadyUrl $workerHealthUrl `
             -Port 8787
@@ -199,7 +225,7 @@ try {
 
     $frontend = Start-HiddenNpmService `
         -Directory $frontendDir `
-        -Arguments @('run', 'dev', '--', '--host', '127.0.0.1', '--port', '5173', '--strictPort') `
+        -Arguments @('run', 'dev', '--', '--host', $bindHost, '--port', '5173', '--strictPort') `
         -Name 'frontend' `
         -ReadyUrl $frontendUrl `
         -Port 5173
@@ -222,7 +248,9 @@ try {
     }
 
     Write-Host ''
-    Write-Host "RUNE RIOT is ready: $frontendUrl" -ForegroundColor Green
+    Write-Host "RUNE RIOT Couch TV is ready: $frontendUrl" -ForegroundColor Green
+    Write-Host "Phones on this Wi-Fi can scan the TV QR code or open the shown /join link." -ForegroundColor Green
+    if ($bindHost -eq '127.0.0.1') { Write-Host 'No LAN address was detected. Restart with: Start-Rune-Riot.bat -LanHost 192.168.x.x' -ForegroundColor Yellow }
     if (-not $FrontendOnly) { Write-Host "Local multiplayer worker: $workerHealthUrl" -ForegroundColor Green }
     Write-Host "Logs: $logDir" -ForegroundColor DarkGray
     Write-Host 'Run Stop-Rune-Riot.bat to stop launcher-owned local services.' -ForegroundColor DarkGray

@@ -1,7 +1,7 @@
 <template>
   <div class="app-container">
     <!-- Loading state -->
-    <div v-if="authStore.loading" class="loading-screen" role="status" aria-label="Loading">
+    <div v-if="authStore.loading && currentRoute.name !== 'couch' && currentRoute.name !== 'couch-join'" class="loading-screen" role="status" aria-label="Loading">
       <h1 class="loading-brand">
         <span class="loading-uno">RUNE</span>
         <span class="loading-nomercy">RIOT</span>
@@ -65,6 +65,13 @@
         </div>
       </div>
     </template>
+
+    <!-- Couch Mode uses a neutral public TV and private phone controllers. -->
+    <CouchHost v-else-if="currentRoute.name === 'couch'" />
+    <CouchController
+      v-else-if="currentRoute.name === 'couch-join'"
+      :room-code="currentRoute.roomCode"
+    />
 
     <!-- Playing local game vs bot (works without auth for guest play) -->
     <GameView v-else-if="localGameStore.gameState !== 'LOBBY'" @claim-account="handleShowAuth('claim')" @play-daily="startDailyGame('game_over')" />
@@ -195,6 +202,8 @@ const ProfilePage = defineAsyncComponent(() => import('./components/ProfilePage.
 const ChangelogPage = defineAsyncComponent(() => import('./components/ChangelogPage.vue'))
 const GameView = defineAsyncComponent(() => import('./components/game/GameView.vue'))
 const MultiplayerGameView = defineAsyncComponent(() => import('./components/game/MultiplayerGameView.vue'))
+const CouchHost = defineAsyncComponent(() => import('./components/couch/CouchHost.vue'))
+const CouchController = defineAsyncComponent(() => import('./components/couch/CouchController.vue'))
 import { vFocusRing } from './directives/focusRing'
 import { useAuthStore } from './stores/authStore'
 import { supabase } from './lib/supabase'
@@ -247,6 +256,8 @@ const inMpMatch = computed(() => {
 const currentScreen = computed(() => {
   if (authStore.loading) return null
   if (showPasswordReset.value) return 'password_reset'
+  if (currentRoute.value.name === 'couch') return 'couch_host'
+  if (currentRoute.value.name === 'couch-join') return 'couch_controller'
   if (localGameStore.gameState !== 'LOBBY') return 'sp_game'
   if (currentRoute.value.name === 'leaderboard' && !inMpMatch.value) return 'leaderboard'
   if (currentRoute.value.name === 'profile' && !inMpMatch.value) return 'profile'
@@ -296,7 +307,7 @@ onMounted(async () => {
 
   // Reconnect: if we were in an in-progress game when the tab reloaded/dropped,
   // re-enter it instead of stranding the player in the lobby.
-  if (authStore.isAuthenticated) {
+  if (authStore.isAuthenticated && currentRoute.value.name !== 'couch' && currentRoute.value.name !== 'couch-join') {
     await mpStore.restoreActiveGame()
   } else {
     // An invite link shouldn't demand a PLAY NOW click: sign the guest in on

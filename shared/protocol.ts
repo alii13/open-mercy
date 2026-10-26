@@ -6,6 +6,8 @@ export interface PresencePlayer {
     connected: boolean
     /** Equipped card-back skin id — cosmetic, client-reported. */
     skin?: string
+    /** Couch-room lobby gate. Omitted for classic online rooms. */
+    ready?: boolean
 }
 
 // --- Intents: what a client may ask the authoritative room to do ---
@@ -23,9 +25,11 @@ export type IntentAction =
 
 export type ClientMsg =
     | { t: 'auth'; token: string; name: string; skin?: string }
+    | { t: 'couch-auth'; token: string }
     | { t: 'ping'; now: number }
     | { t: 'leave' }
     | { t: 'rename'; name: string }
+    | { t: 'ready'; ready: boolean }
     | { t: 'kick'; userId: string }
     | { t: 'start'; stackingMode?: StackingMode }
     // Hold the public lobby open a minute longer. Anyone at the table may
@@ -97,15 +101,26 @@ export interface PersonalView {
     winnerId: string | null
 }
 
+/**
+ * The neutral TV receives this shape. Keeping the private fields explicitly
+ * null makes accidental hand rendering impossible while preserving the
+ * existing board renderer contract.
+ */
+export type PublicView = Omit<PersonalView, 'you' | 'pendingDiscardAllCards' | 'pendingDrawnWildCard'> & {
+    you: null
+    pendingDiscardAllCards: null
+    pendingDrawnWildCard: null
+}
+
 export type ServerMsg =
-    | { t: 'hello'; roomCode: string; userId: string; hostUserId: string | null }
+    | { t: 'hello'; roomCode: string; userId: string; hostUserId: string | null; role?: 'player' | 'display'; couch?: boolean }
     // autoStartInMs: countdown remaining for a public lobby, sent as a
     // duration so client clock skew cannot bend it; absent = no countdown.
     // autoStartPaused: the room dipped below the minimum and the clock froze.
     // autoStartBumpsLeft: extensions the room can still buy; 0 hides the button.
     | { t: 'presence'; players: PresencePlayer[]; autoStartInMs?: number; autoStartPaused?: boolean; autoStartBumpsLeft?: number }
     | { t: 'pong'; now: number }
-    | { t: 'snapshot'; seq: number; game: PersonalView }
+    | { t: 'snapshot'; seq: number; game: PersonalView | PublicView }
     | { t: 'event'; seq: number; ev: GameEvent; intentId?: string }
     | { t: 'voice-token'; token: string; meetingId: string }
     | { t: 'badge-up'; userId: string; tier: number }
@@ -113,4 +128,4 @@ export type ServerMsg =
     // The outcome of one invite, back to whoever asked. Every value is a
     // normal answer, including the refusals.
     | { t: 'invite-result'; userId: string; result: string }
-    | { t: 'error'; code: 'unauthorized' | 'bad-message' | 'room-not-found' | 'room-full' | 'not-host' | 'not-started' | 'already-started' | 'need-players' | 'not-in-lobby' | 'invalid-intent' | 'voice-unavailable'; intentId?: string }
+    | { t: 'error'; code: 'unauthorized' | 'bad-message' | 'room-not-found' | 'room-full' | 'not-host' | 'not-started' | 'already-started' | 'need-players' | 'not-ready' | 'name-invalid' | 'name-taken' | 'not-in-lobby' | 'invalid-intent' | 'voice-unavailable'; intentId?: string }

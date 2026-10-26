@@ -83,8 +83,36 @@ Start-Rune-Riot.bat
 The launcher checks Node.js, installs missing npm dependencies, creates the
 git-ignored `frontend/.env.local` from the valid public client configuration
 already present in `game-server/wrangler.toml`, starts the local multiplayer
-Worker and Vite, waits for both health checks, and opens the game. It never
+Worker and Vite, waits for both health checks, and opens the Couch TV at
+`/couch`. It never
 copies or requests a service-role key.
+
+The launcher selects one active private IPv4 address and binds both local
+services to that exact address. Phones on the same Wi-Fi can scan the QR code
+shown on the TV. To choose the interface explicitly (recommended on machines
+with VPNs or several network adapters), run:
+
+```text
+Start-Rune-Riot.bat -LanHost 192.168.x.x
+```
+
+You can also set `RUNE_RIOT_LAN_HOST` before launching. The worker accepts the
+matching frontend origin only; the launcher never opens a blanket wildcard
+host/origin. If Windows Firewall blocks another device, allow Node.js for the
+current **private** network when Windows asks. No firewall setting is changed
+automatically.
+
+### Couch Mode
+
+- TV / shared display: `http://<LAN-IP>:5173/couch`
+- Phones: scan the TV QR code or open its `/join/<ROOMCODE>` link
+- Capacity: 2–8 human players
+- Every player chooses a unique 2–16 character name and marks themselves ready
+- The TV starts the match and never receives a player's private hand
+- Refreshing a phone reconnects with its existing anonymous Supabase identity
+
+The TV is a neutral host, not a player. All moves still pass through the same
+authoritative Worker and unchanged shared rule engine used by online play.
 
 Run `Stop-Rune-Riot.bat` when you want to stop the background services started
 by the launcher. Re-running the start script is safe; it reuses healthy local

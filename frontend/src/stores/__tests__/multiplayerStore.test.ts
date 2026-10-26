@@ -117,6 +117,21 @@ beforeEach(() => {
 })
 
 describe('joining and the lobby adapter', () => {
+    it('uses the chosen Couch name and sends readiness over the authoritative socket', async () => {
+        const mp = useMultiplayerStore()
+        const joining = mp.joinCouchGame('AB12CD', 'Rúna 🐉')
+        for (let i = 0; i < 20 && FakeWebSocket.instances.length === 0; i++) await Promise.resolve()
+        const ws = FakeWebSocket.instances[FakeWebSocket.instances.length - 1]!
+        ws.open()
+        expect(ws.lastSent()).toMatchObject({ t: 'auth', name: 'Rúna 🐉', token: 'test-token' })
+        ws.receive({ t: 'hello', roomCode: 'AB12CD', userId: 'me', hostUserId: 'tv', role: 'player', couch: true })
+        ws.receive({ t: 'presence', players: [{ userId: 'me', name: 'Rúna 🐉', connected: true, ready: false }] })
+        ws.receive({ t: 'snapshot', seq: 0, game: playingView({ status: 'lobby', you: null, currentPlayerId: null, players: [] }) })
+        await joining
+        mp.setReady(true)
+        expect(ws.lastSent()).toEqual({ t: 'ready', ready: true })
+    })
+
     it('authenticates, exposes the waiting room from presence, and knows the host', async () => {
         const mp = useMultiplayerStore()
         const ws = await joinRoom(mp)

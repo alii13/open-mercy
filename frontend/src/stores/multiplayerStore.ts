@@ -87,6 +87,7 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
     let ws: WebSocket | null = null
     let closedByUs = false
     let reconnectAttempts = 0
+    let couchConnectionName: string | null = null
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null
     // Why the last connect() failed when the server never said (for mp_join_failed).
     let connectFailReason: string | null = null
@@ -438,6 +439,9 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
                 if (msg.code === 'need-players') {
                     error.value = 'Need at least 2 connected players to start'
                 }
+                if (msg.code === 'not-ready') error.value = 'Every connected player must be ready'
+                if (msg.code === 'name-invalid') error.value = 'Name must contain 2 to 16 characters'
+                if (msg.code === 'name-taken') error.value = 'That name is already taken in this room'
                 if (msg.intentId && pendingIntent?.id === msg.intentId) {
                     // Server refused the intent — roll the optimistic render back.
                     view.value = pendingIntent.prevView
@@ -500,7 +504,7 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
             const settle = (result: boolean | 'superseded') => { if (!settled) { settled = true; clearTimeout(timer); resolve(result) } }
 
             socket.onopen = () => {
-                socket.send(JSON.stringify({ t: 'auth', token, name: myNickname(), skin: getEquippedId() } satisfies ClientMsg))
+                socket.send(JSON.stringify({ t: 'auth', token, name: couchConnectionName ?? myNickname(), skin: getEquippedId() } satisfies ClientMsg))
             }
             socket.onmessage = (e) => {
                 // Only the current socket may drive the store.
@@ -765,6 +769,20 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
         }
     }
 
+    /** Join the private phone-controller route with the name chosen there. */
+    async function joinCouchGame(code: string, name: string) {
+        loading.value = true
+        error.value = null
+        resetState()
+        couchConnectionName = name.trim()
+        try {
+            const ok = await connectWithRetry(code.trim().toUpperCase(), 'code')
+            return ok === true ? currentGame.value : null
+        } finally {
+            loading.value = false
+        }
+    }
+
     async function quickMatch(mode: StackingMode = DEFAULT_STACKING_MODE) {
         loading.value = true
         error.value = null
@@ -885,7 +903,12 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
     }
 
     async function updateMyName(name: string) {
+        couchConnectionName = name.trim()
         sendMsg({ t: 'rename', name })
+    }
+
+    function setReady(ready: boolean) {
+        sendMsg({ t: 'ready', ready })
     }
 
     // --- Game intents ---
@@ -949,6 +972,7 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
         currentGame,
         gamePlayers,
         myPlayer,
+        myUserId,
         opponent,
         opponents,
         eliminatedIds,
@@ -992,6 +1016,7 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
         mpStats,
         createGame,
         joinGame,
+        joinCouchGame,
         quickMatch,
         restoreActiveGame,
         startGame,
@@ -1005,6 +1030,7 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
         callUno,
         kickPlayer,
         updateMyName,
+        setReady,
         requestVoiceJoin,
         leaveGame,
     }
