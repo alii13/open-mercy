@@ -3,8 +3,8 @@
     <!-- Top bar — all three CTAs visible from the first pixel, no scroll needed -->
     <header class="top-bar">
       <a class="brand-mark" href="#" @click.prevent>
-        <span class="brand-mark-uno">OPEN</span>
-        <span class="brand-mark-nomercy">MERCY</span>
+        <span class="brand-mark-uno">RUNE</span>
+        <span class="brand-mark-nomercy">RIOT</span>
       </a>
 
       <div class="top-bar-cta">
@@ -33,7 +33,7 @@
           class="hero-card"
           :ref="(el) => { if (el) cardRefs[idx] = el as HTMLElement }"
         >
-          <Card :card="card" :size="cardSize" :srcset="heroSrcsets[idx]" />
+          <Card :card="card" :size="cardSize" />
         </div>
 
         <!-- The counter — typographic centerpiece during the stack beats -->
@@ -46,10 +46,10 @@
            boot-screen h1 in index.html is destroyed when Vue mounts, so the
            rendered landing page had no top-level heading at all. -->
       <h1 class="hero-wordmark" ref="wordmarkRef">
-        <span class="wm-uno">OPEN</span>
+        <span class="wm-uno">RUNE</span>
         <span class="wm-row">
           <span class="wm-mercy-wrap">
-            <span class="wm-mercy">MERCY</span>
+            <span class="wm-mercy">RIOT</span>
             <svg
               class="wm-strike"
               ref="strikeRef"
@@ -63,7 +63,7 @@
         </span>
       </h1>
 
-      <p class="hero-tagline" ref="taglineRef">THE RUTHLESS CARD BATTLE</p>
+      <p class="hero-tagline" ref="taglineRef">FORGE YOUR FATE · COMMAND THE RUNES</p>
 
       <div class="hero-cta" ref="heroCtaRef">
         <p v-if="inviteCode" class="invite-banner">
@@ -73,7 +73,7 @@
           {{ loading ? 'ENTERING…' : (inviteCode ? 'JOIN THE GAME' : 'PLAY NOW') }}
         </Button>
         <button type="button" class="rules-peek" @click="showRules = true">
-          New to Open Mercy? See how it works
+          New to RUNE RIOT? Learn the runes
         </button>
         <button type="button" class="rules-peek" @click="navigate({ name: 'leaderboard' })">
           Today's leaderboard <ArrowRight :size="14" :stroke-width="2" aria-hidden="true" />
@@ -189,12 +189,6 @@ const heroCards = [
   { id: 'h4', color: 'wild', type: 'draw10' },
   { id: 'h5', color: 'red', type: 'skipEveryone' },
 ] as const
-
-// The source art is 500 px wide; the hero shows these cards at 84 to 124 px.
-const heroImages = import.meta.glob('../assets/cards-hero/*.webp', { eager: true, query: '?url', import: 'default' }) as Record<string, string>
-const heroSrcsets = ['two-draw-red', 'four-draw-green', 'wild-draw-six', 'wild-ten-draw', 'skip-everyone-red'].map((n) =>
-  [130, 260].map((w) => `${heroImages[`../assets/cards-hero/${n}-${w}.webp`]} ${w}w`).join(', '),
-)
 
 const COUNTER_BEATS = [2, 6, 12, 22, 22] // index-matched to heroCards (5th doesn't add)
 
@@ -447,7 +441,7 @@ function runHeroChoreography() {
   // LCP element; hiding it until here cost ~2 s of mobile LCP). The cards
   // slam in front of it and clear it on the explosion.
 
-  // BEAT 9: strike-through draws across MERCY
+  // BEAT 9: the gold rune line seals the wordmark.
   tl.to(
     strikeLine,
     { strokeDashoffset: 0, duration: 0.42, ease: 'power2.inOut' },
@@ -481,7 +475,10 @@ function runHeroChoreography() {
 }
 
 .landing-container {
-  background: var(--bg-concrete);
+  background:
+    radial-gradient(circle at 50% 14%, rgba(105, 65, 148, 0.22), transparent 34%),
+    radial-gradient(circle at 18% 64%, rgba(49, 142, 93, 0.09), transparent 28%),
+    var(--bg-concrete);
   color: var(--text-primary);
   position: relative;
   display: flex;
@@ -498,8 +495,8 @@ function runHeroChoreography() {
   justify-content: space-between;
   gap: var(--spacing-3);
   padding: var(--spacing-3) var(--spacing-4);
-  border-bottom: 1px solid rgba(255, 204, 0, 0.08);
-  background: linear-gradient(180deg, rgba(10, 10, 11, 0.95), rgba(10, 10, 11, 0.7));
+  border-bottom: 1px solid rgba(216, 181, 101, 0.16);
+  background: linear-gradient(180deg, rgba(10, 7, 14, 0.97), rgba(14, 10, 20, 0.74));
   backdrop-filter: blur(8px);
   flex-wrap: wrap;
 }
@@ -515,15 +512,16 @@ function runHeroChoreography() {
 .brand-mark-uno {
   font-family: var(--font-display);
   font-size: var(--text-xl);
-  letter-spacing: 0.05em;
+  letter-spacing: 0.12em;
+  color: var(--color-hazard);
 }
 
 .brand-mark-nomercy {
   font-family: var(--font-display);
   font-size: var(--text-sm);
   letter-spacing: 0.2em;
-  color: var(--color-alert);
-  text-shadow: 0 0 12px rgba(255, 42, 42, 0.5);
+  color: var(--color-neon-magenta);
+  text-shadow: 0 0 12px rgba(167, 122, 228, 0.5);
 }
 
 .top-bar-cta {
@@ -642,7 +640,7 @@ function runHeroChoreography() {
   text-align: center;
   font-family: var(--font-display);
   line-height: 0.95;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.1em;
   /* It's an h1 now — drop the UA margin so the hero layout is unchanged. */
   margin: 0;
   font-weight: inherit;
@@ -651,7 +649,8 @@ function runHeroChoreography() {
 .wm-uno {
   display: block;
   font-size: clamp(3.5rem, 13vw, 7rem);
-  text-shadow: 0 0 32px rgba(255, 42, 42, 0.35);
+  color: var(--color-hazard);
+  text-shadow: 0 0 38px rgba(216, 181, 101, 0.34), 0 3px 0 #493619;
 }
 
 .wm-row {
@@ -666,19 +665,19 @@ function runHeroChoreography() {
 }
 
 .wm-mercy {
-  color: var(--color-alert);
-  text-shadow: 0 0 24px rgba(255, 42, 42, 0.55);
+  color: var(--color-neon-magenta);
+  text-shadow: 0 0 28px rgba(167, 122, 228, 0.58);
 }
 
 .wm-strike {
   position: absolute;
-  top: 50%;
+  top: 102%;
   left: -4%;
   width: 108%;
-  height: 18%;
+  height: 12%;
   transform: translateY(-50%);
-  color: var(--color-alert);
-  filter: drop-shadow(0 0 12px rgba(255, 42, 42, 0.85));
+  color: var(--color-hazard);
+  filter: drop-shadow(0 0 10px rgba(216, 181, 101, 0.72));
   pointer-events: none;
 }
 
@@ -709,7 +708,7 @@ function runHeroChoreography() {
   background: none;
   border: none;
   color: var(--text-muted);
-  font-family: 'Chakra Petch', sans-serif;
+  font-family: var(--font-body);
   font-size: 0.78rem;
   letter-spacing: 0.08em;
   cursor: pointer;
@@ -721,19 +720,19 @@ function runHeroChoreography() {
 .rules-peek:hover { color: var(--text-primary); }
 
 .invite-banner {
-  font-family: 'Chakra Petch', sans-serif;
+  font-family: var(--font-body);
   font-size: 0.85rem;
   letter-spacing: 0.03em;
   color: var(--text-secondary);
-  background: rgba(0, 255, 102, 0.1);
-  border: 1px solid rgba(0, 255, 102, 0.3);
+  background: rgba(81, 200, 137, 0.1);
+  border: 1px solid rgba(81, 200, 137, 0.3);
   border-radius: 6px;
   padding: 0.5rem 1rem;
   max-width: min(360px, 86vw);
   text-align: center;
   margin-bottom: var(--spacing-2);
 }
-.invite-banner strong { color: #00ff66; letter-spacing: 0.1em; }
+.invite-banner strong { color: var(--color-neon-green); letter-spacing: 0.1em; }
 
 .hero-pulse {
   display: inline-flex;

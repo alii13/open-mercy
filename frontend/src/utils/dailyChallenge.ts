@@ -53,7 +53,7 @@ export function dailyGridCells(log: string | undefined): DailyCell[] {
 
 function outcomeLine(rec: DailyRecord): string {
     if (rec.result === 'won') return `Cleared in ${rec.turns}`
-    if (rec.result === 'eliminated') return 'Mercy got me'
+    if (rec.result === 'eliminated') return 'Ruin claimed me'
     return 'Lost'
 }
 
@@ -63,7 +63,7 @@ export interface DailyRank {
 }
 
 export function buildDailyShareText(rec: DailyRecord, rank?: DailyRank): string {
-    const parts = [`Open Mercy Daily ${rec.date}`, outcomeLine(rec)]
+    const parts = [`RUNE RIOT Daily ${rec.date}`, outcomeLine(rec)]
     if (rank && rank.total > 0) {
         // Ceil so the fastest solver of the day reads "top 1%", not "top 0%".
         parts.push(`top ${Math.max(1, Math.ceil((rank.rank / rank.total) * 100))}%`)

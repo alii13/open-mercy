@@ -269,7 +269,7 @@ const myLink = computed(() => {
 })
 const myLinkLabel = computed(() => myLink.value.replace(/^https?:\/\//, ''))
 const whatsappHref = computed(() =>
-  `https://wa.me/?text=${encodeURIComponent(`Add me on Open Mercy and let's play: ${myLink.value}`)}`)
+  `https://wa.me/?text=${encodeURIComponent(`Add me on RUNE RIOT and let's play: ${myLink.value}`)}`)
 
 // Same split as the lobby's room link: the share sheet on phones, the
 // clipboard elsewhere. A refused clipboard leaves the row unconfirmed rather
@@ -280,7 +280,7 @@ let copiedTimer: ReturnType<typeof setTimeout> | null = null
 async function copyLink(): Promise<void> {
   try {
     if (canNativeShare) {
-      await navigator.share({ title: 'Open Mercy', text: 'Add me on Open Mercy', url: myLink.value })
+      await navigator.share({ title: 'RUNE RIOT', text: 'Add me on RUNE RIOT', url: myLink.value })
       return
     }
     await navigator.clipboard.writeText(myLink.value)

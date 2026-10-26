@@ -101,7 +101,7 @@
           class="catch-btn"
           @click="store.catchNoUno(caughtTarget.id)"
         >
-          CAUGHT! {{ caughtTarget.name }} forgot MERCY
+          CAUGHT! {{ caughtTarget.name }} forgot RIOT
         </button>
       </Transition>
     </PlayerConsoleBar>

@@ -3,8 +3,8 @@
     <!-- Loading state -->
     <div v-if="authStore.loading" class="loading-screen" role="status" aria-label="Loading">
       <h1 class="loading-brand">
-        <span class="loading-uno">OPEN</span>
-        <span class="loading-nomercy">MERCY</span>
+        <span class="loading-uno">RUNE</span>
+        <span class="loading-nomercy">RIOT</span>
       </h1>
       <div class="loading-dot" aria-hidden="true"></div>
       <p class="loading-text">INITIALIZING</p>
@@ -15,8 +15,8 @@
       <div class="reset-container">
         <div class="reset-card">
           <h1 class="reset-brand">
-            <span class="reset-uno">OPEN</span>
-            <span class="reset-nomercy">MERCY</span>
+            <span class="reset-uno">RUNE</span>
+            <span class="reset-nomercy">RIOT</span>
           </h1>
           <p class="reset-tagline">SET A NEW PASSWORD</p>
 
@@ -444,7 +444,7 @@ function startDailyGame(entry_point: 'lobby' | 'game_over') {
 }
 
 .signin-toast__title {
-  font-family: 'Black Ops One', 'Impact', sans-serif;
+  font-family: var(--font-display);
   font-size: 1.1rem;
   letter-spacing: 0.14em;
   color: #ff2a2a;
@@ -453,7 +453,7 @@ function startDailyGame(entry_point: 'lobby' | 'game_over') {
 }
 
 .signin-toast__sub {
-  font-family: 'Chakra Petch', sans-serif;
+  font-family: var(--font-body);
   font-size: 0.7rem;
   letter-spacing: 0.1em;
   color: rgba(255, 255, 255, 0.72);
@@ -461,7 +461,7 @@ function startDailyGame(entry_point: 'lobby' | 'game_over') {
 }
 
 .signin-toast__retry {
-  font-family: 'Chakra Petch', sans-serif;
+  font-family: var(--font-body);
   font-size: 0.8rem;
   letter-spacing: 0.18em;
   color: #fff;
@@ -541,7 +541,9 @@ function startDailyGame(entry_point: 'lobby' | 'game_over') {
   align-items: center;
   gap: var(--spacing-6);
   z-index: var(--z-toast);
-  background: var(--bg-concrete);
+  background:
+    radial-gradient(circle at 50% 38%, rgba(122, 77, 168, 0.22), transparent 34%),
+    var(--bg-concrete);
 }
 
 .loading-brand {
@@ -555,24 +557,24 @@ function startDailyGame(entry_point: 'lobby' | 'game_over') {
 .loading-uno {
   font-family: var(--font-display);
   font-size: clamp(2.5rem, 8vw, 3.5rem);
-  letter-spacing: 0.05em;
-  color: var(--text-primary);
+  letter-spacing: 0.12em;
+  color: var(--color-hazard);
 }
 
 .loading-nomercy {
   font-family: var(--font-display);
   font-size: clamp(0.875rem, 3vw, 1.25rem);
   letter-spacing: 0.3em;
-  color: var(--color-alert);
-  text-shadow: 0 0 12px rgba(255, 42, 42, 0.5);
+  color: var(--color-neon-magenta);
+  text-shadow: 0 0 12px rgba(167, 122, 228, 0.5);
 }
 
 .loading-dot {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: var(--color-alert);
-  box-shadow: 0 0 16px var(--color-alert);
+  background: var(--color-neon-green);
+  box-shadow: 0 0 16px var(--color-neon-green);
   animation: loading-pulse 1.4s ease-in-out infinite;
 }
 
@@ -611,14 +613,14 @@ function startDailyGame(entry_point: 'lobby' | 'game_over') {
   align-items: center;
   z-index: var(--z-modal);
   padding: var(--spacing-4);
-  background: var(--bg-concrete);
+  background: radial-gradient(circle at center, rgba(76, 46, 104, 0.2), transparent 52%), var(--bg-concrete);
 }
 
 .reset-card {
   width: 100%;
   max-width: 440px;
-  background: linear-gradient(180deg, #18191b 0%, #0a0a0b 100%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, #21172d 0%, #0b0810 100%);
+  border: 1px solid rgba(216, 181, 101, 0.24);
   border-radius: var(--radius-md);
   padding: var(--spacing-8) var(--spacing-6);
   display: flex;
@@ -637,16 +639,16 @@ function startDailyGame(entry_point: 'lobby' | 'game_over') {
 .reset-uno {
   font-family: var(--font-display);
   font-size: clamp(2.5rem, 8vw, 3.5rem);
-  letter-spacing: 0.05em;
-  color: var(--text-primary);
+  letter-spacing: 0.12em;
+  color: var(--color-hazard);
 }
 
 .reset-nomercy {
   font-family: var(--font-display);
   font-size: clamp(0.875rem, 3vw, 1.25rem);
   letter-spacing: 0.3em;
-  color: var(--color-alert);
-  text-shadow: 0 0 12px rgba(255, 42, 42, 0.5);
+  color: var(--color-neon-magenta);
+  text-shadow: 0 0 12px rgba(167, 122, 228, 0.5);
 }
 
 .reset-tagline {

@@ -920,7 +920,7 @@ describe('quick chat', () => {
 
         ws.receive({ t: 'chat', userId: 'opp', phraseId: 'mercy' })
 
-        expect(mp.lastChat).toMatchObject({ userId: 'opp', name: 'RIVAL', text: 'Mercy!' })
+        expect(mp.lastChat).toMatchObject({ userId: 'opp', name: 'RIVAL', text: 'Riot!' })
         expect(mp.chatLog).toHaveLength(1)
     })
 

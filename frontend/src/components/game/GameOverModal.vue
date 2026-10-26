@@ -14,7 +14,7 @@
         </div>
 
         <p class="tagline">
-          <template v-if="isWinner">You showed no mercy.</template>
+          <template v-if="isWinner">The runes answer to you.</template>
           <template v-else-if="isSpectator">{{ winnerName }} took the table.</template>
           <template v-else>{{ villainQuote }}</template>
         </p>
@@ -31,7 +31,7 @@
           </div>
           <div class="stat-cell">
             <div class="stat-value">{{ animated.unosCalled }}</div>
-            <div class="stat-label">MERCY CALLS</div>
+            <div class="stat-label">RIOT CALLS</div>
           </div>
           <div class="stat-cell">
             <div class="stat-value">{{ animated.peakHand }}</div>
@@ -244,7 +244,7 @@ const sharingX = ref(false)
 // every session. Picked once per mount so refreshing the loss screen doesn't
 // shuffle the line mid-read.
 const LOSS_QUOTES = [
-  'Mercy is for cowards.',
+  'Fate favors the bold.',
   'You played. You lost. That’s the entire story.',
   'The bot does not forgive.',
   'Run it back. Or don’t. The deck doesn’t care.',
@@ -264,11 +264,11 @@ function ordinal(n: number): string {
 }
 
 const stampSub = computed(() => {
-  if (props.isWinner) return 'NO MERCY DEALT'
+  if (props.isWinner) return 'THE RUNES ARE YOURS'
   if (props.isSpectator && props.placement && props.totalPlayers) {
     return `OUT ${ordinal(props.placement)} OF ${props.totalPlayers}`
   }
-  return 'NO MERCY SHOWN'
+  return 'THE RITUAL IS COMPLETE'
 })
 
 function sharePayload() {
@@ -325,7 +325,7 @@ async function shareWithImage(opts: { text: string; url: string; fallbackUrl: st
         try {
           await navAny.share({
             files: [file],
-            title: 'Open Mercy',
+            title: 'RUNE RIOT',
             text: `${opts.text}\n\n${opts.url}`,
           })
           return
@@ -343,8 +343,8 @@ async function shareWithImage(opts: { text: string; url: string; fallbackUrl: st
 
 const SITE_URL = 'https://open-mercy.com'
 const shareText = () => props.mode === 'mp'
-  ? 'Just destroyed my friends in Open Mercy. No mercy given. Play me if you dare.'
-  : 'Just destroyed the bot in Open Mercy. No mercy given. Play me if you dare.'
+  ? 'I mastered the runes in RUNE RIOT. Enter the circle if you dare.'
+  : 'I defeated the arcane rival in RUNE RIOT. Enter the circle if you dare.'
 
 async function onShareWhatsApp() {
   if (sharingWhatsapp.value) return
@@ -427,15 +427,15 @@ function confettiStyle(i: number) {
   align-items: center;
   justify-content: center;
   padding: var(--spacing-4);
-  background: rgba(0, 0, 0, 0.75);
+  background: rgba(4, 2, 7, 0.82);
   animation: overlay-in 0.25s ease-out;
 }
 
 .game-over-overlay.is-win {
-  background: radial-gradient(ellipse at center, rgba(255, 204, 0, 0.18) 0%, rgba(0, 0, 0, 0.85) 60%);
+  background: radial-gradient(ellipse at center, rgba(212, 175, 55, 0.2) 0%, rgba(4, 2, 7, 0.9) 62%);
 }
 .game-over-overlay.is-loss {
-  background: radial-gradient(ellipse at center, rgba(255, 42, 42, 0.18) 0%, rgba(0, 0, 0, 0.88) 60%);
+  background: radial-gradient(ellipse at center, rgba(123, 74, 226, 0.2) 0%, rgba(4, 2, 7, 0.92) 62%);
 }
 
 @keyframes overlay-in { from { opacity: 0 } to { opacity: 1 } }
@@ -443,13 +443,15 @@ function confettiStyle(i: number) {
 .modal-card {
   width: 100%;
   max-width: 440px;
-  background: linear-gradient(180deg, #18191b 0%, #0a0a0b 100%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 4px;
+  background:
+    radial-gradient(circle at 50% 0, rgba(123, 74, 226, 0.12), transparent 42%),
+    linear-gradient(180deg, #1a1125 0%, #09070d 100%);
+  border: 1px solid rgba(212, 175, 55, 0.28);
+  border-radius: var(--radius-md);
   padding: 2rem 1.75rem 1.5rem;
   text-align: center;
   position: relative;
-  font-family: 'Chakra Petch', sans-serif;
+  font-family: var(--font-body);
 }
 
 .is-win .modal-card {
@@ -474,19 +476,19 @@ function confettiStyle(i: number) {
 }
 
 .stamp h1 {
-  font-family: 'Black Ops One', 'Impact', sans-serif;
+  font-family: var(--font-display);
   font-size: clamp(2.4rem, 8vw, 3.6rem);
   letter-spacing: 0.06em;
   line-height: 0.95;
   margin: 0;
 }
 .stamp-win h1 {
-  color: #ffcc00;
-  text-shadow: 0 0 25px rgba(255, 204, 0, 0.6), 0 0 4px rgba(255, 204, 0, 0.9);
+  color: #d4af37;
+  text-shadow: 0 0 25px rgba(212, 175, 55, 0.55), 0 0 4px rgba(212, 175, 55, 0.8);
 }
 .stamp-loss h1 {
-  color: #ff2a2a;
-  text-shadow: 0 0 25px rgba(255, 42, 42, 0.6), 0 0 4px rgba(255, 42, 42, 0.9);
+  color: #9b7be8;
+  text-shadow: 0 0 25px rgba(123, 74, 226, 0.6), 0 0 4px rgba(155, 123, 232, 0.85);
 }
 
 .stamp-sub {
@@ -518,12 +520,12 @@ function confettiStyle(i: number) {
   padding: 0.25rem 0.4rem;
 }
 .stat-value {
-  font-family: 'Black Ops One', 'Impact', sans-serif;
+  font-family: var(--font-display);
   font-size: 1.6rem;
   color: #e6e6e6;
   line-height: 1;
 }
-.is-win .stat-value { color: #ffcc00; }
+.is-win .stat-value { color: #d4af37; }
 .stat-label {
   font-size: 0.6rem;
   letter-spacing: 0.18em;
@@ -535,7 +537,7 @@ function confettiStyle(i: number) {
 /* Primary CTA — the obvious next action, dominant and glowing */
 .cta-primary {
   width: 100%;
-  font-family: 'Black Ops One', 'Impact', sans-serif;
+  font-family: var(--font-display);
   font-size: 1.1rem;
   letter-spacing: 0.15em;
   padding: 1rem 1rem;
@@ -575,7 +577,7 @@ function confettiStyle(i: number) {
 }
 .share-btn {
   flex: 1;
-  font-family: 'Chakra Petch', sans-serif;
+  font-family: var(--font-body);
   font-size: 0.8rem;
   font-weight: 500;
   letter-spacing: 0.12em;
@@ -634,7 +636,7 @@ function confettiStyle(i: number) {
   gap: 0.35rem;
 }
 .daily-nudge-streak {
-  font-family: 'Chakra Petch', sans-serif;
+  font-family: var(--font-body);
   font-size: 0.65rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -648,7 +650,7 @@ function confettiStyle(i: number) {
   color: rgba(255, 255, 255, 0.55);
 }
 .daily-nudge-btn {
-  font-family: 'Chakra Petch', sans-serif;
+  font-family: var(--font-body);
   font-size: 0.8rem;
   font-weight: 600;
   letter-spacing: 0.12em;
@@ -698,7 +700,7 @@ function confettiStyle(i: number) {
   color: rgba(255, 255, 255, 0.55);
 }
 .claim-nudge-btn {
-  font-family: 'Chakra Petch', sans-serif;
+  font-family: var(--font-body);
   font-size: 0.8rem;
   font-weight: 600;
   letter-spacing: 0.12em;
@@ -726,7 +728,7 @@ function confettiStyle(i: number) {
 }
 .rematch-hint {
   margin: 0.6rem 0 0;
-  font-family: 'Chakra Petch', sans-serif;
+  font-family: var(--font-body);
   font-size: 0.72rem;
   letter-spacing: 0.06em;
   color: rgba(255, 255, 255, 0.45);
@@ -743,7 +745,7 @@ function confettiStyle(i: number) {
 }
 
 .add-label {
-  font-family: 'Chakra Petch', sans-serif;
+  font-family: var(--font-body);
   font-size: 0.58rem;
   letter-spacing: 0.22em;
   color: rgba(255, 255, 255, 0.35);
@@ -759,7 +761,7 @@ function confettiStyle(i: number) {
   border: 1px solid rgba(0, 243, 255, 0.3);
   border-radius: 999px;
   color: rgba(0, 243, 255, 0.9);
-  font-family: 'Chakra Petch', sans-serif;
+  font-family: var(--font-body);
   font-size: 0.68rem;
   letter-spacing: 0.04em;
   white-space: nowrap;
@@ -790,7 +792,7 @@ function confettiStyle(i: number) {
   background: none;
   border: none;
   cursor: pointer;
-  font-family: 'Chakra Petch', sans-serif;
+  font-family: var(--font-body);
   font-size: 0.78rem;
   letter-spacing: 0.08em;
   color: #52525b;

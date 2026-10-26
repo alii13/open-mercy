@@ -48,7 +48,7 @@ const retention = useRetentionStore()
   border: 1px solid rgba(255, 204, 0, 0.22);
   /* Tactical cut corner — a clipped notch top-right reads as "field-issued". */
   clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%);
-  font-family: 'Chakra Petch', sans-serif;
+  font-family: var(--font-body);
 }
 
 /* Thin hazard accent along the top edge for issued-equipment feel. */
@@ -93,7 +93,7 @@ const retention = useRetentionStore()
 }
 
 .cr-streak-num {
-  font-family: 'Black Ops One', 'Impact', sans-serif;
+  font-family: var(--font-display);
   font-size: 0.95rem;
   line-height: 1;
   text-shadow: 0 0 10px rgba(255, 204, 0, 0.4);
@@ -125,7 +125,7 @@ const retention = useRetentionStore()
 }
 
 .cr-value {
-  font-family: 'Black Ops One', 'Impact', sans-serif;
+  font-family: var(--font-display);
   font-size: 1.45rem;
   line-height: 1;
   color: #f2f2f2;

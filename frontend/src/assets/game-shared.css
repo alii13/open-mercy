@@ -33,7 +33,9 @@
   height: 100dvh; /* dynamic viewport accounts for mobile browser chrome */
   width: 100vw;
   position: relative;
-  background: var(--bg-concrete);
+  background:
+    radial-gradient(ellipse at 50% 36%, rgba(68, 42, 92, 0.16), transparent 58%),
+    var(--bg-concrete);
   color: var(--text-primary);
   overflow: hidden;
 }
@@ -70,10 +72,13 @@
   inset: 0;
   pointer-events: none;
   z-index: 0;
-  opacity: 0.1;
-  background: 
-    repeating-linear-gradient(90deg, transparent 0, transparent 50px, #000 50px, #000 51px),
-    repeating-linear-gradient(0deg, transparent 0, transparent 50px, #000 50px, #000 51px);
+  opacity: 1;
+  background:
+    radial-gradient(circle at 18% 34%, rgba(255,255,255,.035) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 72% 64%, rgba(0,0,0,.24) 0 1px, transparent 1.5px),
+    repeating-linear-gradient(117deg, transparent 0 32px, rgba(255,255,255,.012) 33px, transparent 34px 76px),
+    linear-gradient(115deg, #0d0b12 0%, #181321 48%, #0b0910 100%);
+  background-size: 23px 19px, 29px 31px, auto, auto;
 }
 
 /* The -45deg hatching used to live only inside the pit, which is a single grid
@@ -85,19 +90,63 @@
   inset: 0;
   pointer-events: none;
   z-index: 0;
-  background-image: repeating-linear-gradient(
-    -45deg,
-    rgba(255, 255, 255, 0.018) 0 2px,
-    transparent 2px 22px
-  );
+  opacity: .52;
+  background-image:
+    linear-gradient(30deg, transparent 49.4%, rgba(218, 185, 105, .035) 50%, transparent 50.6%),
+    linear-gradient(-30deg, transparent 49.4%, rgba(218, 185, 105, .025) 50%, transparent 50.6%);
+  background-size: 58px 100px;
 }
 
 .vignette {
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle, transparent 40%, rgba(0,0,0,0.8));
+  background:
+    linear-gradient(180deg, rgba(0,0,0,.28), transparent 18% 76%, rgba(0,0,0,.48)),
+    radial-gradient(ellipse at center, transparent 34%, rgba(2,1,4,0.84) 100%);
   pointer-events: none;
   z-index: var(--z-base);
+}
+
+.rune-compass {
+  position: absolute;
+  left: 50%;
+  top: 48%;
+  width: min(66vw, 680px);
+  aspect-ratio: 1;
+  z-index: 0;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  opacity: .2;
+  background:
+    radial-gradient(circle, transparent 0 29%, rgba(167,122,228,.22) 29.4% 30%, transparent 30.5% 44%, rgba(216,181,101,.28) 44.4% 45%, transparent 45.5%),
+    repeating-conic-gradient(from 0deg, rgba(216,181,101,.34) 0 1deg, transparent 1deg 14deg, rgba(81,200,137,.2) 14deg 15deg, transparent 15deg 30deg);
+  mask: radial-gradient(circle, transparent 0 16%, #000 16.5% 48%, transparent 49%);
+  transition: transform var(--duration-strut) var(--ease-strut);
+}
+
+.rune-compass--reversed { transform: translate(-50%, -50%) scaleX(-1); }
+.rune-compass-core {
+  position: absolute;
+  inset: 38%;
+  border: 1px solid rgba(81,200,137,.45);
+  transform: rotate(45deg);
+  box-shadow: 0 0 28px rgba(81,200,137,.2);
+}
+
+.arcane-embers {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: .48;
+  background:
+    radial-gradient(circle at 9% 24%, rgba(81,200,137,.7) 0 1px, transparent 2px),
+    radial-gradient(circle at 88% 30%, rgba(167,122,228,.65) 0 1px, transparent 2px),
+    radial-gradient(circle at 23% 81%, rgba(216,181,101,.55) 0 1px, transparent 2px),
+    radial-gradient(circle at 76% 73%, rgba(81,200,137,.5) 0 1px, transparent 2px);
+  filter: drop-shadow(0 0 5px currentColor);
+  animation: ember-breathe 5s ease-in-out infinite;
 }
 
 .mechanical-cog {
@@ -120,9 +169,9 @@
    ========================================================================== */
 .surveillance-bar {
   flex: 0 0 auto;
-  background: linear-gradient(180deg, rgba(10, 10, 11, 0.95), rgba(10, 10, 11, 0.6));
+  background: linear-gradient(180deg, rgba(16, 11, 22, 0.98), rgba(12, 9, 17, 0.72));
   backdrop-filter: blur(8px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgba(216, 181, 101, 0.18);
   /* Respect notch / dynamic island so the opponent row + controls aren't
      hidden under the status bar on modern phones. */
   padding: max(var(--spacing-2), env(safe-area-inset-top)) max(var(--spacing-3), env(safe-area-inset-right)) var(--spacing-2) max(var(--spacing-3), env(safe-area-inset-left));
@@ -309,9 +358,9 @@
 }
 
 .opponent-card.active {
-  border-color: var(--color-neon-blue);
-  background: rgba(0, 243, 255, 0.06);
-  box-shadow: 0 0 16px rgba(0, 243, 255, 0.25);
+  border-color: var(--color-neon-green);
+  background: rgba(81, 200, 137, 0.08);
+  box-shadow: 0 0 18px rgba(81, 200, 137, 0.3), inset 0 0 16px rgba(81, 200, 137, 0.05);
   color: var(--text-primary);
 }
 
@@ -492,7 +541,7 @@ body.fx-ko-desat .game-view {
 }
 
 .opponent-card.active .card-count {
-  color: var(--color-neon-blue);
+  color: var(--color-neon-green);
 }
 
 .opponent-card .eliminated-text {
@@ -551,18 +600,9 @@ body.fx-ko-desat .game-view {
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(
-      ellipse 65% 55% at 55% 40%,
-      rgba(255, 196, 122, 0.06) 0%,
-      rgba(255, 196, 122, 0.02) 35%,
-      transparent 70%
-    ),
-    radial-gradient(
-      ellipse 90% 80% at 55% 60%,
-      rgba(0, 0, 0, 0.5) 50%,
-      rgba(0, 0, 0, 0.2) 80%,
-      transparent 100%
-    );
+    radial-gradient(ellipse 46% 42% at 52% 44%, rgba(81, 200, 137, 0.075), transparent 66%),
+    radial-gradient(ellipse 70% 58% at 52% 44%, rgba(167, 122, 228, 0.065), transparent 74%),
+    radial-gradient(ellipse 92% 86% at 52% 58%, rgba(0, 0, 0, 0.58) 54%, transparent 100%);
   z-index: 1;
 }
 
@@ -598,9 +638,10 @@ body.fx-ko-desat .game-view {
   align-items: stretch;
   gap: var(--spacing-3);
   padding: var(--spacing-3) var(--spacing-2);
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.25));
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: var(--radius-md);
+  background:
+    linear-gradient(180deg, rgba(35, 24, 46, 0.88), rgba(11, 8, 15, 0.78));
+  border: 1px solid rgba(216, 181, 101, 0.25);
+  border-radius: 18px 4px 18px 4px;
   z-index: calc(var(--z-cards) + 1);
   backdrop-filter: blur(8px);
 }
@@ -794,28 +835,28 @@ body.fx-ko-desat .game-view {
   inset: 0;
   pointer-events: none;
   background:
-    linear-gradient(to right, rgba(255, 204, 0, 0.22) 0 14px, transparent 14px) top left / 14px 1px no-repeat,
-    linear-gradient(to bottom, rgba(255, 204, 0, 0.22) 0 14px, transparent 14px) top left / 1px 14px no-repeat,
-    linear-gradient(to left, rgba(255, 204, 0, 0.22) 0 14px, transparent 14px) top right / 14px 1px no-repeat,
-    linear-gradient(to bottom, rgba(255, 204, 0, 0.22) 0 14px, transparent 14px) top right / 1px 14px no-repeat,
-    linear-gradient(to right, rgba(255, 204, 0, 0.22) 0 14px, transparent 14px) bottom left / 14px 1px no-repeat,
-    linear-gradient(to top, rgba(255, 204, 0, 0.22) 0 14px, transparent 14px) bottom left / 1px 14px no-repeat,
-    linear-gradient(to left, rgba(255, 204, 0, 0.22) 0 14px, transparent 14px) bottom right / 14px 1px no-repeat,
-    linear-gradient(to top, rgba(255, 204, 0, 0.22) 0 14px, transparent 14px) bottom right / 1px 14px no-repeat;
+    linear-gradient(to right, rgba(216, 181, 101, 0.5) 0 18px, transparent 18px) top left / 18px 1px no-repeat,
+    linear-gradient(to bottom, rgba(216, 181, 101, 0.5) 0 18px, transparent 18px) top left / 1px 18px no-repeat,
+    linear-gradient(to left, rgba(216, 181, 101, 0.5) 0 18px, transparent 18px) top right / 18px 1px no-repeat,
+    linear-gradient(to bottom, rgba(216, 181, 101, 0.5) 0 18px, transparent 18px) top right / 1px 18px no-repeat,
+    linear-gradient(to right, rgba(216, 181, 101, 0.5) 0 18px, transparent 18px) bottom left / 18px 1px no-repeat,
+    linear-gradient(to top, rgba(216, 181, 101, 0.5) 0 18px, transparent 18px) bottom left / 1px 18px no-repeat,
+    linear-gradient(to left, rgba(216, 181, 101, 0.5) 0 18px, transparent 18px) bottom right / 18px 1px no-repeat,
+    linear-gradient(to top, rgba(216, 181, 101, 0.5) 0 18px, transparent 18px) bottom right / 1px 18px no-repeat;
 }
 
 /* Draw station gets a periodic holographic shine sweep — like the cards
    are emitting a faint light. Subtle, plays once every 8s. */
 .draw-station::after {
   background-image:
-    linear-gradient(to right, rgba(0, 243, 255, 0.3) 0 14px, transparent 14px),
-    linear-gradient(to bottom, rgba(0, 243, 255, 0.3) 0 14px, transparent 14px),
-    linear-gradient(to left, rgba(0, 243, 255, 0.3) 0 14px, transparent 14px),
-    linear-gradient(to bottom, rgba(0, 243, 255, 0.3) 0 14px, transparent 14px),
-    linear-gradient(to right, rgba(0, 243, 255, 0.3) 0 14px, transparent 14px),
-    linear-gradient(to top, rgba(0, 243, 255, 0.3) 0 14px, transparent 14px),
-    linear-gradient(to left, rgba(0, 243, 255, 0.3) 0 14px, transparent 14px),
-    linear-gradient(to top, rgba(0, 243, 255, 0.3) 0 14px, transparent 14px);
+    linear-gradient(to right, rgba(81, 200, 137, 0.5) 0 14px, transparent 14px),
+    linear-gradient(to bottom, rgba(81, 200, 137, 0.5) 0 14px, transparent 14px),
+    linear-gradient(to left, rgba(81, 200, 137, 0.5) 0 14px, transparent 14px),
+    linear-gradient(to bottom, rgba(81, 200, 137, 0.5) 0 14px, transparent 14px),
+    linear-gradient(to right, rgba(81, 200, 137, 0.5) 0 14px, transparent 14px),
+    linear-gradient(to top, rgba(81, 200, 137, 0.5) 0 14px, transparent 14px),
+    linear-gradient(to left, rgba(81, 200, 137, 0.5) 0 14px, transparent 14px),
+    linear-gradient(to top, rgba(81, 200, 137, 0.5) 0 14px, transparent 14px);
   background-position: top left, top left, top right, top right, bottom left, bottom left, bottom right, bottom right;
   background-size: 14px 1px, 1px 14px, 14px 1px, 1px 14px, 14px 1px, 1px 14px, 14px 1px, 1px 14px;
   background-repeat: no-repeat;
@@ -824,10 +865,19 @@ body.fx-ko-desat .game-view {
 .draw-station::before {
   background: radial-gradient(
     ellipse 80% 50% at 50% 100%,
-    rgba(0, 243, 255, 0.12) 0%,
+    rgba(81, 200, 137, 0.18) 0%,
     rgba(0, 0, 0, 0.55) 40%,
     transparent 80%
   );
+}
+
+@keyframes ember-breathe {
+  0%, 100% { opacity: .34; filter: brightness(.8); }
+  50% { opacity: .62; filter: brightness(1.25); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arcane-embers { animation: none; }
 }
 
 /* --- MOBILE HUD (replaces the desktop left rail under ≤768px) --- */
