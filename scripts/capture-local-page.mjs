@@ -56,17 +56,41 @@ try {
   const { sessionId } = await command('Target.attachToTarget', { targetId, flatten: true })
   await command('Page.enable', {}, sessionId)
   await command('Runtime.enable', {}, sessionId)
+  await command('Emulation.setDeviceMetricsOverride', {
+    width: Number(widthArg),
+    height: Number(heightArg),
+    deviceScaleFactor: 1,
+    mobile: true,
+  }, sessionId)
   await command('Page.navigate', { url }, sessionId)
   await new Promise(resolveWait => setTimeout(resolveWait, Number(waitArg)))
+  let actionResult = null
   if (actionExpression) {
-    await command('Runtime.evaluate', { expression: actionExpression, awaitPromise: true, returnByValue: true }, sessionId)
+    actionResult = await command('Runtime.evaluate', { expression: actionExpression, awaitPromise: true, returnByValue: true }, sessionId)
+    if (actionResult.exceptionDetails) {
+      throw new Error(actionResult.exceptionDetails.exception?.description || actionResult.exceptionDetails.text || 'Browser action failed')
+    }
     await new Promise(resolveWait => setTimeout(resolveWait, Number(afterWaitArg)))
   }
-  const page = await command('Runtime.evaluate', { expression: '({ url: location.href, text: document.body.innerText.slice(0, 600) })', returnByValue: true }, sessionId)
+  const page = await command('Runtime.evaluate', {
+    expression: `({
+      url: location.href,
+      text: document.body.innerText.slice(0, 600),
+      viewport: { width: innerWidth, height: innerHeight },
+      overflow: {
+        bodyWidth: document.body.scrollWidth,
+        clientWidth: document.documentElement.clientWidth,
+        bodyHeight: document.body.scrollHeight,
+        clientHeight: document.documentElement.clientHeight,
+      },
+    })`,
+    returnByValue: true,
+  }, sessionId)
   const shot = await command('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false }, sessionId)
   const path = resolve(output)
   mkdirSync(dirname(path), { recursive: true })
   writeFileSync(path, Buffer.from(shot.data, 'base64'))
+  if (actionResult) console.log(`Action result: ${JSON.stringify(actionResult.result.value)}`)
   console.log(JSON.stringify(page.result.value))
   console.log(`Browser errors: ${browserErrors.length ? browserErrors.join(' | ') : 'none'}`)
   console.log(`Screenshot: ${path}`)

@@ -214,6 +214,7 @@ describe('optimistic play', () => {
 
         expect(mp.myPlayer?.hand.map(c => c.id)).toEqual(['c-r5', 'c-b3'])
         expect(mp.actionInProgress).toBe(false)
+        expect(mp.error).toBe('That move is not allowed')
     })
 })
 

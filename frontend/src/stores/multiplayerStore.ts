@@ -442,6 +442,7 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
                 if (msg.code === 'not-ready') error.value = 'Every connected player must be ready'
                 if (msg.code === 'name-invalid') error.value = 'Name must contain 2 to 16 characters'
                 if (msg.code === 'name-taken') error.value = 'That name is already taken in this room'
+                if (msg.code === 'invalid-intent') error.value = 'That move is not allowed'
                 if (msg.intentId && pendingIntent?.id === msg.intentId) {
                     // Server refused the intent — roll the optimistic render back.
                     view.value = pendingIntent.prevView
@@ -633,6 +634,7 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
     }
 
     function sendIntent(action: IntentAction, opts: { optimistic?: (v: PersonalView) => void } = {}) {
+        error.value = null
         const id = `i${++intentN}`
         if (opts.optimistic && view.value) {
             pendingIntent = { id, prevView: JSON.parse(JSON.stringify(view.value)) }
