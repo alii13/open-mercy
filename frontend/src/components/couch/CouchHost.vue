@@ -3,7 +3,7 @@
     <div class="couch-ambient" aria-hidden="true"></div>
     <header class="couch-header">
       <div>
-        <p class="eyebrow">RUNE RIOT · COUCH MODE</p>
+        <p class="eyebrow">RUNE RIOT · COUCH MODE · {{ store.selectedMode === 'chaos' ? 'CHAOS' : 'KLASSISCH' }}</p>
         <h1>{{ phase === 'lobby' ? 'Versammelt eure Gilde' : phase === 'finished' ? 'Runde beendet' : 'Der Runentisch' }}</h1>
       </div>
       <div v-if="store.roomCode" class="host-tools">
@@ -69,6 +69,11 @@
       </section>
 
       <section class="roster-panel">
+        <div class="mode-picker" aria-label="Spielmodus wählen">
+          <button :class="{ active: store.selectedMode === 'classic' }" @click="store.setMode('classic')">CLASSIC</button>
+          <button :class="{ active: store.selectedMode === 'chaos' }" @click="store.setMode('chaos')">CHAOS</button>
+          <span>{{ store.selectedMode === 'chaos' ? '5 Chaos-Karten · Ereignisse alle 3 Minuten · 25-Minuten-Limit' : 'Klassische Karten und Regeln ohne Chaos-Erweiterungen' }}</span>
+        </div>
         <div class="section-title">
           <h2>Spieler {{ store.connectedCount }}/8</h2>
           <span>{{ store.readyCount }} bereit</span>
@@ -96,6 +101,10 @@
     </template>
 
     <section v-else class="public-table">
+      <div v-if="store.view?.chaos" class="chaos-clock">
+        <strong>{{ formatRemaining }}</strong>
+        <span>{{ store.view.chaos.finalPhase ? 'FINALPHASE' : 'NÄCHSTES EREIGNIS ' + formatEventCountdown }}</span>
+      </div>
       <div class="direction" :class="{ reverse: store.view?.direction === -1 }">
         <RotateCw :size="34" /><span>SPIELRICHTUNG</span>
       </div>
@@ -111,13 +120,25 @@
       <div class="table-center">
         <div class="deck-stack"><CardBack :size="{ width: 142, height: 204 }" /><span>{{ store.view?.deckCount }}</span></div>
         <div class="discard-glow" :class="`glow-${store.view?.currentColor}`">
-          <Card v-if="store.view?.discardTop" :card="store.view.discardTop" :size="{ width: 160, height: 230 }" />
+          <Card v-if="store.view?.discardTop" :card="store.view.discardTop" :ruleset="store.view.ruleset" :size="{ width: 160, height: 230 }" />
         </div>
         <div v-if="store.view?.drawStack" class="draw-stack">+{{ store.view.drawStack }}</div>
       </div>
+      <div v-if="store.view?.chaos?.event" class="event-overlay">
+        <p>CHAOS-EREIGNIS · NORMALES SPIEL PAUSIERT</p>
+        <h2>{{ eventName }}</h2>
+        <ul>
+          <li v-for="participant in store.view.chaos.event.participants" :key="participant.userId">
+            <span>{{ store.view.players.find(player => player.userId === participant.userId)?.name }}</span>
+            <b v-if="participant.roll">W6: {{ participant.roll }}</b>
+            <b v-else>{{ participant.status === 'waiting' || participant.status === 'eligible' ? 'HANDELT …' : 'FERTIG' }}</b>
+          </li>
+        </ul>
+        <strong v-if="store.view.chaos.event.message">{{ store.view.chaos.event.message }}</strong>
+      </div>
       <div v-if="phase === 'finished'" class="victory-overlay">
         <Crown :size="54" />
-        <p>RUNDE BEENDET</p>
+        <p>{{ store.view?.chaos?.winReason === 'time' ? 'ZEITENTSCHEIDUNG' : 'NORMAL ABGELEGT' }}</p>
         <h2>{{ winnerName }}</h2>
         <ul class="finish-roster">
           <li v-for="player in store.view?.players" :key="player.userId">
@@ -148,6 +169,12 @@ const qrDataUrl = ref('')
 const menuOpen = ref(false)
 const confirming = ref<'lobby' | 'close' | null>(null)
 const phase = computed(() => store.view?.status ?? 'lobby')
+const now = ref(Date.now())
+const clock = setInterval(() => { now.value = Date.now() }, 1000)
+const formatRemaining = computed(() => formatMs(Math.max(0, (store.view?.chaos?.matchEndsAt ?? now.value) - now.value)))
+const formatEventCountdown = computed(() => formatMs(Math.max(0, (store.view?.chaos?.nextEventAt ?? now.value) - now.value)))
+const eventNames = { treasure: 'Schatztruhe', 'goblin-trade': 'Goblin-Handel', 'rune-trial': 'Runenprüfung', oracle: 'Orakelblick', 'color-storm': 'Sturm der Farben', 'dragon-curse': 'Drachenfluch' } as const
+const eventName = computed(() => store.view?.chaos?.event ? eventNames[store.view.chaos.event.kind] : '')
 const winnerName = computed(() => store.view?.players.find(p => p.userId === store.view?.winnerId)?.name ?? 'Unbekannt')
 const startHint = computed(() => {
   if (store.connectedCount < 2) return 'Mindestens zwei Spieler müssen verbunden sein.'
@@ -164,6 +191,11 @@ function confirmHostAction(action: 'lobby' | 'close') {
   menuOpen.value = false
   if (action === 'lobby') store.returnToLobby()
   else store.closeRoom()
+}
+
+function formatMs(ms: number) {
+  const seconds = Math.ceil(ms / 1000)
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
 }
 
 watch(phase, () => { confirming.value = null })
@@ -183,7 +215,7 @@ onMounted(async () => {
   if (!auth.isAuthenticated) await auth.signInAnonymously('Runentisch')
   await store.initialize()
 })
-onBeforeUnmount(() => store.dispose())
+onBeforeUnmount(() => { clearInterval(clock); store.dispose() })
 </script>
 
 <style scoped>
@@ -193,4 +225,5 @@ onBeforeUnmount(() => store.dispose())
 .phase-lobby{padding-block:24px}.phase-lobby .join-panel{margin:2vh auto 16px;padding:22px 28px}.phase-lobby .qr-frame{width:clamp(180px,18vw,250px)}.phase-lobby .roster-panel{padding:18px 28px}.phase-lobby .host-roster{margin-block:8px}.phase-lobby .host-roster li{padding-block:9px}.phase-lobby .start-button{margin-top:14px}.phase-lobby .start-hint{margin-bottom:0}
 @media(max-width:720px){.host-tools{grid-template-columns:1fr}.host-connection{grid-column:1}.host-menu-toggle{font-size:0}.host-menu{position:fixed;top:90px;right:12px;left:12px;width:auto}.finish-roster{grid-template-columns:1fr}.finish-actions{flex-direction:column}}
 @media(prefers-reduced-motion:reduce){.spin{animation:none}}
+.mode-picker{display:grid;grid-template-columns:auto auto 1fr;gap:8px;align-items:center;margin-bottom:14px}.mode-picker button{min-height:42px;padding:0 18px;border:1px solid #66506f;background:#17101f;color:#d8cadc;font-weight:900}.mode-picker button.active{border-color:#e3bb5d;background:#493514;color:#ffe49b}.mode-picker span{color:#a99bad;font-size:12px}.chaos-clock{position:absolute;z-index:4;left:50%;top:10px;translate:-50%;display:flex;gap:14px;align-items:center;padding:8px 14px;background:#0c0911;border:1px solid #b181df}.chaos-clock strong{font-size:22px;color:#ffe078}.chaos-clock span{font-size:11px;letter-spacing:.12em;color:#d9b7fa}.event-overlay{position:absolute;z-index:8;inset:12% 20%;display:flex;flex-direction:column;justify-content:center;padding:28px;background:rgba(10,6,15,.96);border:2px solid #b887ec;text-align:center;box-shadow:0 0 70px #000}.event-overlay p{color:#e0bd65;letter-spacing:.15em}.event-overlay h2{font-family:var(--font-display);font-size:clamp(32px,5vw,62px);margin:8px}.event-overlay ul{list-style:none;padding:0;display:grid;grid-template-columns:repeat(2,1fr);gap:6px}.event-overlay li{display:flex;justify-content:space-between;padding:9px;background:#1b1224;border:1px solid #50385f}.event-overlay li b{color:#82efc7}@media(max-width:720px){.mode-picker{grid-template-columns:1fr 1fr}.mode-picker span{grid-column:1/-1}.event-overlay{inset:10% 4%}.event-overlay ul{grid-template-columns:1fr}}
 </style>

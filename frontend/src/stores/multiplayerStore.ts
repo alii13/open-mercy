@@ -205,6 +205,7 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
             roulette_target_color: v.rouletteTargetColor,
             eliminated_user_ids: v.players.filter(p => p.isEliminated).map(p => p.userId),
             stacking_mode: v.stackingMode,
+            ruleset: v.ruleset ?? 'mercy',
             is_public: false,
             version: lastSeq,
             created_at: '',
@@ -257,6 +258,10 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
         return (view.value?.players ?? []).map(p => p.userId).filter(id => !connected.has(id))
     })
     const pendingDrawnWildCard = computed(() => view.value?.pendingDrawnWildCard ?? null)
+    const pendingDrawnCard = computed(() => view.value?.pendingDrawnCard ?? null)
+    const canChallengeDraw4 = computed(() => !!view.value?.canChallengeDraw4)
+    const ruleset = computed(() => view.value?.ruleset ?? 'mercy')
+    const chaos = computed(() => view.value?.chaos ?? null)
     const pendingDiscardAllCards = computed(() => view.value?.pendingDiscardAllCards ?? [])
 
     // --- Wire handling ---
@@ -941,6 +946,30 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
         })
     }
 
+    async function playChaosCard(card: Card, selectedColor: CardColor, targetUserId?: string) {
+        if (!isMyTurn.value || actionInProgress.value) return
+        actionInProgress.value = true
+        sendIntent({ kind: 'PLAY_CHAOS_CARD', cardId: card.id, chosenColor: selectedColor, targetUserId })
+    }
+
+    function chaosReact(cardId?: string, targetUserId?: string, treasure = false) {
+        if (actionInProgress.value) return
+        actionInProgress.value = true
+        sendIntent({ kind: 'CHAOS_REACT', cardId, targetUserId, treasure })
+    }
+
+    function declineChaosReaction() {
+        if (actionInProgress.value) return
+        actionInProgress.value = true
+        sendIntent({ kind: 'CHAOS_DECLINE_REACTION' })
+    }
+
+    function chaosEventRoll() { actionInProgress.value = true; sendIntent({ kind: 'CHAOS_EVENT_ROLL' }) }
+    function chaosEventSelectCard(cardId: string) { actionInProgress.value = true; sendIntent({ kind: 'CHAOS_EVENT_SELECT_CARD', cardId }) }
+    function chaosEventSelectPlayer(targetUserId: string) { actionInProgress.value = true; sendIntent({ kind: 'CHAOS_EVENT_SELECT_PLAYER', targetUserId }) }
+    function chaosEventChooseColor(color: CardColor) { actionInProgress.value = true; sendIntent({ kind: 'CHAOS_EVENT_CHOOSE_COLOR', color }) }
+    function useTreasure(targetUserId?: string, cardId?: string) { actionInProgress.value = true; sendIntent({ kind: 'USE_TREASURE', targetUserId, cardId }) }
+
     async function drawCard() {
         if (!isMyTurn.value || actionInProgress.value) return
         actionInProgress.value = true
@@ -964,6 +993,22 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
 
     async function playDrawnWildCard(color: CardColor) {
         sendIntent({ kind: 'CHOOSE_DRAWN_WILD_COLOR', color })
+    }
+
+    async function playDrawnCard(color?: CardColor) {
+        sendIntent({ kind: 'PLAY_DRAWN_CARD', chosenColor: color })
+    }
+
+    async function passDrawnCard() {
+        sendIntent({ kind: 'PASS_DRAWN_CARD' })
+    }
+
+    async function acceptDraw4() {
+        sendIntent({ kind: 'ACCEPT_DRAW4' })
+    }
+
+    async function challengeDraw4() {
+        sendIntent({ kind: 'CHALLENGE_DRAW4' })
     }
 
     async function selectDiscardAllTop(cardId: string) {
@@ -997,11 +1042,15 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
         gameStatus,
         roomCode,
         stackingMode,
+        ruleset,
+        chaos,
         opponentLeft,
         realtimeStatus,
         actionInProgress,
         suppressDiscardSlam,
         pendingDrawnWildCard,
+        pendingDrawnCard,
+        canChallengeDraw4,
         pendingDiscardAllCards,
         presentUserIds,
         presence,
@@ -1032,11 +1081,23 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
         restoreActiveGame,
         startGame,
         playCard,
+        playChaosCard,
+        chaosReact,
+        declineChaosReaction,
+        chaosEventRoll,
+        chaosEventSelectCard,
+        chaosEventSelectPlayer,
+        chaosEventChooseColor,
+        useTreasure,
         drawCard,
         swapHands,
         skipSwap,
         setRouletteColor,
         playDrawnWildCard,
+        playDrawnCard,
+        passDrawnCard,
+        acceptDraw4,
+        challengeDraw4,
         selectDiscardAllTop,
         callUno,
         kickPlayer,

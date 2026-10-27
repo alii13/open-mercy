@@ -26,6 +26,7 @@
         >
           <Card
             :card="card"
+            :ruleset="ruleset"
             :size="cardSize"
             :is-playable="canPlay(card)"
             :is-selected="selectedCardId === card.id"
@@ -45,6 +46,7 @@
 import { computed, nextTick, type ComponentPublicInstance } from 'vue'
 import { CircleCheckBig, LockKeyhole, MoveHorizontal } from 'lucide-vue-next'
 import type { Card as CardType } from '../../types/card'
+import type { GameRuleset } from '@engine'
 import { cardFamily, cardPresentation } from '../../utils/cardPresentation'
 import { showHandScrollHint } from '../../utils/couchController'
 import Card from '../game/Card.vue'
@@ -54,6 +56,7 @@ const props = defineProps<{
   selectedCardId: string | null
   canPlay: (card: CardType) => boolean
   disabled?: boolean
+  ruleset?: GameRuleset
 }>()
 
 const emit = defineEmits<{
@@ -74,7 +77,7 @@ function setCardElement(id: string, element: Element | ComponentPublicInstance |
 function cardAria(card: CardType): string {
   const state = props.canPlay(card) ? 'spielbar' : 'nicht spielbar'
   const selected = props.selectedCardId === card.id ? ', ausgewählt' : ''
-  return `${cardPresentation(card).name}, ${cardFamily(card)}, ${state}${selected}`
+  return `${cardPresentation(card, props.ruleset).name}, ${cardFamily(card)}, ${state}${selected}`
 }
 
 function choose(card: CardType) {

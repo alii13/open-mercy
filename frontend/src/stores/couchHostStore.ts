@@ -15,6 +15,7 @@ export const useCouchHostStore = defineStore('couchHost', () => {
   const error = ref<string | null>(null)
   const lastEvent = ref<GameEvent | null>(null)
   const hostActionPending = ref(false)
+  const selectedMode = ref<'classic' | 'chaos'>('classic')
   let socket: WebSocket | null = null
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
   let intentionalClose = false
@@ -55,6 +56,7 @@ export const useCouchHostStore = defineStore('couchHost', () => {
       if (msg.seq < lastSeq) return
       lastSeq = msg.seq
       view.value = msg.game
+      if (msg.game.ruleset === 'classic' || msg.game.ruleset === 'chaos') selectedMode.value = msg.game.ruleset
       hostActionPending.value = false
       return
     }
@@ -129,7 +131,7 @@ export const useCouchHostStore = defineStore('couchHost', () => {
     })
   }
 
-  async function createRoom(): Promise<boolean> {
+  async function createRoom(ruleset: 'classic' | 'chaos' = selectedMode.value): Promise<boolean> {
     const accessToken = await token()
     if (!accessToken) {
       error.value = 'Die anonyme TV-Sitzung konnte nicht erstellt werden.'
@@ -141,7 +143,7 @@ export const useCouchHostStore = defineStore('couchHost', () => {
       const response = await fetch(`${GAME_SERVER}/rooms`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${accessToken}`, 'content-type': 'application/json' },
-        body: JSON.stringify({ couch: true, public: false, stackingMode: 'official' }),
+        body: JSON.stringify({ couch: true, public: false, stackingMode: 'official', ruleset }),
       })
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
       const created = await response.json() as { code: string }
@@ -174,6 +176,11 @@ export const useCouchHostStore = defineStore('couchHost', () => {
   function startGame() {
     if (hostActionPending.value || view.value?.status === 'playing') return
     hostActionPending.value = send({ t: 'start', stackingMode: view.value?.stackingMode ?? 'official' })
+  }
+  function setMode(ruleset: 'classic' | 'chaos') {
+    if (view.value?.status !== 'lobby' || hostActionPending.value) return
+    selectedMode.value = ruleset
+    hostActionPending.value = send({ t: 'set-couch-mode', ruleset })
   }
   function returnToLobby() {
     if (hostActionPending.value || view.value?.status === 'lobby') return
@@ -212,8 +219,8 @@ export const useCouchHostStore = defineStore('couchHost', () => {
   }
 
   return {
-    roomCode, view, presence, status, error, lastEvent, hostActionPending, joinUrl,
+    roomCode, view, presence, status, error, lastEvent, hostActionPending, joinUrl, selectedMode,
     readyCount, connectedCount, canStart,
-    initialize, createRoom, retry, startGame, returnToLobby, closeRoom, kickPlayer, dispose,
+    initialize, createRoom, retry, startGame, setMode, returnToLobby, closeRoom, kickPlayer, dispose,
   }
 })

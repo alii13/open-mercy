@@ -5,6 +5,7 @@ import { CARD_TYPE_PRESENTATIONS, cardPresentation, playabilityExplanation } fro
 const TYPES: CardType[] = [
   'number', 'skip', 'reverse', 'draw2', 'skipEveryone', 'discardAll',
   'wild', 'draw4', 'draw6', 'draw10', 'wildReverseDraw4', 'wildColorRoulette',
+  'fateSwap', 'curseMirror', 'diceCurse', 'runeShield', 'runeWhirl',
 ]
 
 const EXPECTED: Record<CardType, { name: string, effect: string }> = {
@@ -20,13 +21,18 @@ const EXPECTED: Record<CardType, { name: string, effect: string }> = {
   draw10: { name: 'Arkaner Zug +10', effect: '10 Karten' },
   wildReverseDraw4: { name: 'Schicksalsbruch +4', effect: 'Spielrichtung um' },
   wildColorRoulette: { name: 'Chaos-Roulette', effect: 'zieht, bis eine Karte dieser Familie erscheint' },
+  fateSwap: { name: 'Schicksalstausch', effect: 'gesamte Hand' },
+  curseMirror: { name: 'Fluchspiegel', effect: 'weiter' },
+  diceCurse: { name: 'Würfelfluch', effect: '1 bis 6' },
+  runeShield: { name: 'Runenschild', effect: 'vollständig auf' },
+  runeWhirl: { name: 'Runenwirbel', effect: 'Alle Hände' },
 }
 
 const card = (type: CardType, value?: number): Card => ({
   id: `${type}-${value ?? 'x'}`,
   type,
   value,
-  color: type.startsWith('wild') || ['wild', 'draw6', 'draw10'].includes(type) ? 'wild' : 'red',
+  color: type.startsWith('wild') || ['wild', 'draw6', 'draw10', 'fateSwap', 'curseMirror', 'diceCurse', 'runeShield', 'runeWhirl'].includes(type) ? 'wild' : 'red',
 })
 
 describe('German card presentation', () => {

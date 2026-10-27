@@ -2,7 +2,7 @@
 
 import { verifySupabaseToken, type AuthEnv } from './auth'
 import type { ClientMsg, GameEvent, PresencePlayer, PublicView, ServerMsg } from './protocol'
-import { applyIntent, applyUnoCatch, autoResolveAbsentTurn, forceEliminate, persistResults, personalView, startGame, updateStats, viewEventFor, type GameRecord } from './game'
+import { applyIntent, applyUnoCatch, autoResolveAbsentTurn, forceEliminate, maybeStartChaosEvent, nextChaosDeadline, persistResults, personalView, processChaosDeadline, startGame, updateStats, viewEventFor, type GameRecord } from './game'
 import { dirCodes, dirRegister, liveTables, normalizeDir } from './directory'
 import { cleanCouchName, cleanName, cleanSkin, couchNameTaken, isStackingMode } from './validate'
 import { newBucket, socketVerdict, type Bucket } from './socketLimit'
@@ -15,7 +15,7 @@ import { autoStartTick, autoStartBump, autoStartBumpsLeft, AUTO_START_MIN_PLAYER
 import { chatAllowed } from './chatLimit'
 import { sendRoomInvite } from './invites'
 import { quickChatPhrase } from '../../shared/quickChat'
-import type { StackingMode } from '../../shared/engine'
+import type { GameRuleset, StackingMode } from '../../shared/engine'
 import { couchHostActionError } from './couchHostActions'
 
 interface Env extends AuthEnv, VoiceEnv {
@@ -145,7 +145,7 @@ export default {
                 method: 'POST', body: JSON.stringify({ userId: creator.userId }),
             })
             if (!(await allowed.json<boolean>())) return withCors(new Response('too many rooms', { status: 429 }), req, env)
-            const opts = await req.json<{ public?: boolean; stackingMode?: string; couch?: boolean }>().catch(() => ({} as { public?: boolean; stackingMode?: string; couch?: boolean }))
+            const opts = await req.json<{ public?: boolean; stackingMode?: string; couch?: boolean; ruleset?: GameRuleset }>().catch(() => ({} as { public?: boolean; stackingMode?: string; couch?: boolean; ruleset?: GameRuleset }))
             const stackingMode: StackingMode = isStackingMode(opts.stackingMode) ? opts.stackingMode : 'official'
             const code = generateRoomCode()
             const timings = await Promise.all(
@@ -163,7 +163,14 @@ export default {
             const winner = timings[0]!
             await candidateStub(env, code, winner.i).fetch('https://do/activate', {
                 method: 'POST',
-                body: JSON.stringify({ code, hostUserId: creator.userId, stackingMode, isPublic: !!opts.public, couch: !!opts.couch }),
+                body: JSON.stringify({
+                    code,
+                    hostUserId: creator.userId,
+                    stackingMode,
+                    ruleset: opts.couch ? (opts.ruleset === 'chaos' ? 'chaos' : 'classic') : 'mercy',
+                    isPublic: !!opts.public,
+                    couch: !!opts.couch,
+                }),
             })
             if (opts.public) {
                 await directoryStub(env).fetch('https://do/dir-register', { method: 'POST', body: JSON.stringify({ code }) })
@@ -224,6 +231,7 @@ interface RoomRecord {
     createdAt: number
     hostUserId: string
     stackingMode: string
+    ruleset?: GameRuleset
     isPublic: boolean
     couch?: boolean
     /** RealtimeKit meeting backing this room's voice channel; created lazily. */
@@ -305,7 +313,7 @@ export class GameRoomDO {
 
     private async putTimers(t: RoomTimers): Promise<void> {
         await this.ctx.storage.put('timers', t)
-        const due = [t.gcAt, t.graceAt, t.catchAt, t.startAt].filter((x): x is number => !!x)
+        const due = [t.gcAt, t.graceAt, t.catchAt, t.startAt, nextChaosDeadline(this.game ?? null)].filter((x): x is number => !!x)
         if (due.length) await this.ctx.storage.setAlarm(Math.min(...due))
     }
 
@@ -382,7 +390,10 @@ export class GameRoomDO {
         // Same id scheme as game_results rows — distinct per dealt game.
         const gameId = this.game && roomRec ? `do-${roomRec.code}-${this.game.startedAt}` : null
         const view = personalView(this.game ?? null, this.roomStatus(), userId, roster, connected, roomRec?.hostUserId ?? null, gameId)
-        if (!this.game && roomRec) view.stackingMode = roomRec.stackingMode as StackingMode
+        if (!this.game && roomRec) {
+            view.stackingMode = roomRec.stackingMode as StackingMode
+            view.ruleset = roomRec.ruleset ?? (roomRec.couch ? 'classic' : 'mercy')
+        }
         return view
     }
 
@@ -395,6 +406,7 @@ export class GameRoomDO {
             you: null,
             pendingDiscardAllCards: null,
             pendingDrawnWildCard: null,
+            pendingDrawnCard: null,
         }
     }
 
@@ -448,11 +460,12 @@ export class GameRoomDO {
                 return Response.json(!!(await this.ctx.storage.get('room')))
 
             case '/activate': {
-                const body = await req.json<{ code: string; hostUserId: string; stackingMode?: string; isPublic?: boolean; couch?: boolean }>()
+                const body = await req.json<{ code: string; hostUserId: string; stackingMode?: string; ruleset?: GameRuleset; isPublic?: boolean; couch?: boolean }>()
                 const room: RoomRecord = {
                     code: body.code, createdAt: Date.now(), hostUserId: body.hostUserId,
                     stackingMode: isStackingMode(body.stackingMode) ? body.stackingMode : 'official', isPublic: !!body.isPublic,
                     couch: !!body.couch,
+                    ruleset: body.couch ? (body.ruleset === 'chaos' ? 'chaos' : 'classic') : 'mercy',
                 }
                 await this.ctx.storage.put('room', room)
                 this.roomIsPublic = !!body.isPublic
@@ -882,7 +895,8 @@ export class GameRoomDO {
                 }
                 const mode = isStackingMode(msg.stackingMode) ? msg.stackingMode
                     : isStackingMode(roomRec.stackingMode) ? roomRec.stackingMode : 'official'
-                const { game, events } = startGame(seated, mode)
+                const ruleset: GameRuleset = roomRec.couch ? (roomRec.ruleset === 'chaos' ? 'chaos' : 'classic') : 'mercy'
+                const { game, events } = startGame(seated, mode, ruleset)
                 this.game = game
                 {
                     // A manual start beats the countdown to the punch —
@@ -903,6 +917,25 @@ export class GameRoomDO {
                     await this.refreshDirectory(await this.ctx.storage.get<Record<string, RosterEntry>>('roster') ?? {})
                 }
                 await this.broadcastGame(events)
+                return
+            }
+
+            case 'set-couch-mode': {
+                const roomRec = await this.ctx.storage.get<RoomRecord>('room')
+                const denied = roomRec ? couchHostActionError('return-lobby', {
+                    couch: !!roomRec.couch,
+                    role: tag.role,
+                    socketUserId: tag.userId,
+                    hostUserId: roomRec.hostUserId,
+                    phase: this.roomStatus(),
+                }) : 'not-host'
+                if (denied || this.roomStatus() !== 'lobby' || (msg.ruleset !== 'classic' && msg.ruleset !== 'chaos')) {
+                    this.send(ws, { t: 'error', code: denied === 'not-host' ? 'not-host' : 'not-in-lobby' })
+                    return
+                }
+                roomRec!.ruleset = msg.ruleset
+                await this.ctx.storage.put('room', roomRec)
+                await this.broadcastGame([])
                 return
             }
 
@@ -986,7 +1019,8 @@ export class GameRoomDO {
                     this.send(ws, { t: 'error', code: 'invalid-intent', intentId: msg.id })
                     return
                 }
-                await this.broadcastGame(res.events, msg.id)
+                const chaosEvents = msg.action.kind === 'CALL_UNO' ? [] : maybeStartChaosEvent(game)
+                await this.broadcastGame([...res.events, ...chaosEvents], msg.id)
                 return
             }
 
@@ -1028,6 +1062,14 @@ export class GameRoomDO {
         if (gcDue) t.gcAt = now + gcWindowMs(await this.isRoomPublic())
         await this.putTimers(t)
 
+        await this.loadGame()
+        if (this.game?.chaos) {
+            const before = `${this.game.engine.gameState}:${this.game.engine.turnState}:${this.game.chaos.event?.phase ?? 'none'}:${this.game.chaos.eventDue}`
+            const chaosEvents = processChaosDeadline(this.game, now)
+            const after = `${this.game.engine.gameState}:${this.game.engine.turnState}:${this.game.chaos.event?.phase ?? 'none'}:${this.game.chaos.eventDue}`
+            if (chaosEvents.length || before !== after) await this.broadcastGame(chaosEvents)
+        }
+
         if (catchDue && catchWho) {
             await this.loadGame()
             if (this.game && this.roomStatus() === 'playing') {
@@ -1043,6 +1085,7 @@ export class GameRoomDO {
                 && s.players[s.currentPlayerIndex]?.id === graceSeat
                 && !connected.has(graceSeat)) {
                 const events = autoResolveAbsentTurn(this.game, graceSeat)
+                events.push(...maybeStartChaosEvent(this.game, now))
                 await this.broadcastGame(events)
             }
         }
@@ -1056,7 +1099,7 @@ export class GameRoomDO {
             const connected = new Set(this.roomSockets().map(x => x.userId))
             const seated = (await this.rosterList()).filter(r => connected.has(r.userId))
             if (roomRec?.isPublic && this.roomStatus() === 'lobby' && seated.length >= AUTO_START_MIN_PLAYERS) {
-                const { game, events } = startGame(seated, roomRec.stackingMode as StackingMode)
+                const { game, events } = startGame(seated, roomRec.stackingMode as StackingMode, roomRec.ruleset ?? 'mercy')
                 this.game = game
                 await this.refreshDirectory(await this.ctx.storage.get<Record<string, RosterEntry>>('roster') ?? {})
                 await this.broadcastGame(events)

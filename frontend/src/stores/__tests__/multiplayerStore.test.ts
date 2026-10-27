@@ -87,6 +87,8 @@ function playingView(overrides: Partial<PersonalView> = {}): PersonalView {
         rouletteTargetColor: null,
         pendingDiscardAllCards: null,
         pendingDrawnWildCard: null,
+        pendingDrawnCard: null,
+        canChallengeDraw4: false,
         stackingMode: 'official',
         winnerId: null,
         ...overrides,

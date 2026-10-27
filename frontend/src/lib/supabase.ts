@@ -40,6 +40,7 @@ export interface GameRow {
     // ran won't have it — treated as [].
     eliminated_user_ids?: string[]
     stacking_mode: 'official' | 'house' | 'casual'
+    ruleset?: 'mercy' | 'classic' | 'chaos'
     is_public?: boolean
     // Optimistic-concurrency counter — see commitGameUpdate in multiplayerStore.
     // Optional so rows read before the migration ran don't break; treated as 0.

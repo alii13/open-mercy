@@ -1,4 +1,5 @@
 import type { TurnState } from '../types/card'
+import type { GameRuleset } from '@engine'
 
 export type RealtimeStatus = 'CONNECTING' | 'SUBSCRIBED' | 'CLOSED'
 
@@ -10,6 +11,7 @@ export interface CouchStatusInput {
   isMyTurn: boolean
   activePlayerName?: string
   drawStack: number
+  ruleset?: GameRuleset
 }
 
 export function couchStatusText(input: CouchStatusInput): string {
@@ -19,7 +21,9 @@ export function couchStatusText(input: CouchStatusInput): string {
     if (input.turnState === 'CHOOSING_DRAWN_WILD_COLOR' || input.turnState === 'CHOOSING_ROULETTE_COLOR') return 'Wähle eine Farbe'
     if (input.turnState === 'CHOOSING_PLAYER_TO_SWAP') return 'Wähle einen Spieler'
     if (input.turnState === 'CHOOSING_DISCARD_ALL_TOP') return 'Wähle die oberste Karte'
-    if (input.drawStack > 0) return `Ziehe ${input.drawStack} Karten oder staple`
+    if (input.turnState === 'CHOOSING_DRAWN_CARD') return 'Gezogene Karte ausspielen oder behalten'
+    if (input.turnState === 'AWAITING_DRAW4_CHALLENGE') return '+4 annehmen oder anfechten'
+    if (input.drawStack > 0) return input.ruleset === 'classic' || input.ruleset === 'chaos' ? `Ziehe ${input.drawStack} Karten` : `Ziehe ${input.drawStack} Karten oder staple`
     return 'Du bist dran!'
   }
   return input.activePlayerName ? `${input.activePlayerName} ist dran` : 'Warte auf andere Spieler'

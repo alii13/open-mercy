@@ -57,6 +57,7 @@
 import { computed, type Component } from 'vue'
 import {
   Ban,
+  ArrowLeftRight,
   CircleDotDashed,
   Flame,
   Leaf,
@@ -67,10 +68,13 @@ import {
   RotateCw,
   Snowflake,
   Sparkles,
+  Shield,
+  Dices,
   Users,
   Zap,
 } from 'lucide-vue-next'
 import type { Card, CardColor, CardType } from '@/types/card'
+import type { GameRuleset } from '@engine'
 import { cardFamily, cardPresentation } from '@/utils/cardPresentation'
 
 interface Props {
@@ -81,6 +85,7 @@ interface Props {
   size?: { width: number; height: number }
   /** Kept for call-site compatibility; RUNE RIOT cards are rendered as vectors/CSS. */
   srcset?: string
+  ruleset?: GameRuleset
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -89,6 +94,7 @@ const props = withDefaults(defineProps<Props>(), {
   isFlipped: false,
   size: () => ({ width: 250, height: 350 }),
   srcset: undefined,
+  ruleset: 'mercy',
 })
 
 const emit = defineEmits<{
@@ -117,11 +123,16 @@ const ACTION_ICONS: Record<CardType, Component> = {
   draw10: Layers3,
   wildReverseDraw4: Repeat2,
   wildColorRoulette: CircleDotDashed,
+  fateSwap: ArrowLeftRight,
+  curseMirror: Repeat2,
+  diceCurse: Dices,
+  runeShield: Shield,
+  runeWhirl: Sparkles,
 }
 
 const familyIcon = computed(() => FAMILY_ICONS[props.card.color])
 const actionIcon = computed(() => ACTION_ICONS[props.card.type])
-const presentation = computed(() => cardPresentation(props.card))
+const presentation = computed(() => cardPresentation(props.card, props.ruleset))
 const cardTitle = computed(() => presentation.value.shortName)
 const drawValue = computed(() => {
   if (props.card.type === 'draw2') return 2
@@ -140,6 +151,11 @@ const cornerMark = computed(() => {
     discardAll: 'FLUT',
     wild: 'WAHL',
     wildColorRoulette: 'CHAOS',
+    fateSwap: 'TAUSCH',
+    curseMirror: 'SPIEGEL',
+    diceCurse: 'W6',
+    runeShield: 'SCHILD',
+    runeWhirl: 'WIRBEL',
   }
   return marks[props.card.type] ?? 'RUNE'
 })

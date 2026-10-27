@@ -1,4 +1,5 @@
 import type { Card, CardColor, CardType } from '../types/card'
+import type { GameRuleset } from '@engine'
 import { getDrawValue } from './gameRules'
 
 export interface CardPresentation {
@@ -76,18 +77,42 @@ export const CARD_TYPE_PRESENTATIONS: Record<CardType, CardPresentation> = {
     shortName: 'Chaos',
     effect: 'Der nächste Spieler wählt eine Familie und zieht, bis eine Karte dieser Familie erscheint.',
   },
+  fateSwap: {
+    name: 'Schicksalstausch', shortName: 'Tausch',
+    effect: 'Tauscht deine gesamte Hand gleichzeitig mit der Hand eines gewählten Gegners.',
+  },
+  curseMirror: {
+    name: 'Fluchspiegel', shortName: 'Spiegel',
+    effect: 'Reaktion: Leitet eine gegen dich gerichtete Ziehstrafe einmalig an einen anderen Spieler weiter.',
+  },
+  diceCurse: {
+    name: 'Würfelfluch', shortName: 'W6-Fluch',
+    effect: 'Wähle einen Gegner. Der Server würfelt; der Gegner zieht 1 bis 6 Karten.',
+  },
+  runeShield: {
+    name: 'Runenschild', shortName: 'Schild',
+    effect: 'Reaktion: Hebt eine gegen dich gerichtete Ziehstrafe vollständig auf und wird verbraucht.',
+  },
+  runeWhirl: {
+    name: 'Runenwirbel', shortName: 'Wirbel',
+    effect: 'Alle Hände wandern gleichzeitig zum nächsten Spieler in aktueller Spielrichtung.',
+  },
 }
 
-export function cardPresentation(card: Card): CardPresentation {
+export function cardPresentation(card: Card, ruleset: GameRuleset = 'mercy'): CardPresentation {
+  if (ruleset !== 'mercy') {
+    if (card.type === 'draw2') return { ...CARD_TYPE_PRESENTATIONS.draw2, effect: 'Der nächste Spieler zieht 2 Karten und setzt aus. Ziehstrafen werden nicht gestapelt.' }
+    if (card.type === 'draw4') return { ...CARD_TYPE_PRESENTATIONS.draw4, effect: 'Wählt eine neue Familie; der nächste Spieler zieht 4 Karten und setzt aus. Nur legal, wenn keine Karte der aktiven Familie vorhanden ist.' }
+  }
   if (card.type !== 'number') return CARD_TYPE_PRESENTATIONS[card.type]
-  if (card.value === 0) {
+  if (ruleset === 'mercy' && card.value === 0) {
     return {
       name: 'Runenzahl 0',
       shortName: CARD_FAMILIES[card.color],
       effect: 'Rotiert alle aktiven Kartenhände in Spielrichtung, sofern die Karte nicht die eigene Hand leert.',
     }
   }
-  if (card.value === 7) {
+  if (ruleset === 'mercy' && card.value === 7) {
     return {
       name: 'Runenzahl 7',
       shortName: CARD_FAMILIES[card.color],
@@ -112,12 +137,19 @@ export interface PlayabilityExplanationInput {
   drawStack: number
   currentColor: CardColor
   topCard: Card | null
+  ruleset?: GameRuleset
+  wildDraw4Legal?: boolean
 }
 
 /** Explains an already-authoritative playability result; it never decides a move. */
 export function playabilityExplanation(input: PlayabilityExplanationInput): string {
   if (!input.isMyTurn) return 'Nicht spielbar: Du bist gerade nicht am Zug.'
   if (input.playable) {
+    if ((input.ruleset === 'classic' || input.ruleset === 'chaos') && input.card.type === 'draw4') {
+      return input.wildDraw4Legal === false
+        ? 'Als Bluff spielbar: Du hast eine Karte der aktiven Familie. Die +4 darf erfolgreich angefochten werden.'
+        : 'Spielbar: Du hast keine Karte der aktiven Familie; die +4 ist regelgerecht.'
+    }
     if (input.drawStack > 0) return `Spielbar: Diese Ziehkarte darf den aktiven Ziehstapel von ${input.drawStack} Karten erhöhen.`
     if (input.card.color === 'wild') return 'Spielbar: Arkane Karten dürfen unabhängig von der aktiven Familie gelegt werden.'
     if (input.card.color === input.currentColor) return 'Spielbar: Die Karte gehört zur aktiven Familie.'
@@ -127,6 +159,7 @@ export function playabilityExplanation(input: PlayabilityExplanationInput): stri
     return 'Spielbar: Das Kartensymbol stimmt mit der Tischkarte überein.'
   }
   if (input.drawStack > 0) {
+    if (input.ruleset === 'classic' || input.ruleset === 'chaos') return `Nicht spielbar: Die Ziehstrafe von ${input.drawStack} Karten darf nicht gestapelt werden.`
     if (getDrawValue(input.card) === 0) return `Nicht spielbar: Auf den Ziehstapel von ${input.drawStack} darf nur eine erlaubte Ziehkarte folgen.`
     return 'Nicht spielbar: Diese Ziehkarte erfüllt die aktuelle Stapelregel nicht.'
   }

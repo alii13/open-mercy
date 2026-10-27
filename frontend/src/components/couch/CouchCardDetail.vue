@@ -25,15 +25,17 @@
 import { computed } from 'vue'
 import { CircleCheckBig, Info, LockKeyhole } from 'lucide-vue-next'
 import type { Card } from '../../types/card'
+import type { GameRuleset } from '@engine'
 import { cardFamily, cardPresentation } from '../../utils/cardPresentation'
 
 const props = defineProps<{
   card: Card | null
   playable: boolean
   explanation: string
+  ruleset?: GameRuleset
 }>()
 
-const presentation = computed(() => props.card ? cardPresentation(props.card) : cardPresentation({ id: 'empty', color: 'wild', type: 'wild' }))
+const presentation = computed(() => props.card ? cardPresentation(props.card, props.ruleset) : cardPresentation({ id: 'empty', color: 'wild', type: 'wild' }, props.ruleset))
 const family = computed(() => props.card ? cardFamily(props.card) : '')
 </script>
 

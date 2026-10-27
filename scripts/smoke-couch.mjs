@@ -9,6 +9,7 @@ const setting = name => toml.match(new RegExp(`^${name}\\s*=\\s*"([^"]+)"`, 'm')
 const supabaseUrl = setting('SUPABASE_URL')
 const supabaseKey = setting('SUPABASE_ANON_KEY')
 const serverUrl = process.argv[2] || 'http://127.0.0.1:8787'
+const ruleset = process.argv[3] === 'chaos' ? 'chaos' : 'classic'
 if (!supabaseUrl || !supabaseKey) throw new Error('Missing public Supabase settings in game-server/wrangler.toml')
 
 async function anonymous(name) {
@@ -41,7 +42,7 @@ const hostToken = await anonymous(`TV-${crypto.randomUUID().slice(0, 8)}`)
 const created = await fetch(`${serverUrl}/rooms`, {
   method: 'POST',
   headers: { Authorization: `Bearer ${hostToken}`, 'content-type': 'application/json', Origin: 'http://127.0.0.1:5173' },
-  body: JSON.stringify({ couch: true, public: false, stackingMode: 'official' }),
+  body: JSON.stringify({ couch: true, public: false, stackingMode: 'official', ruleset }),
 })
 if (!created.ok) throw new Error(`Room create failed: ${created.status}`)
 const { code } = await created.json()
@@ -68,9 +69,15 @@ const started = new Promise((resolve, reject) => {
 })
 display.ws.send(JSON.stringify({ t: 'start', stackingMode: 'official' }))
 const publicGame = await started
+if (publicGame.ruleset !== ruleset) {
+  throw new Error(`Expected ${ruleset} ruleset, received ${publicGame.ruleset}`)
+}
+if (ruleset === 'chaos' && (!publicGame.chaos || publicGame.deckCount + publicGame.discardCount + publicGame.players.reduce((sum, player) => sum + player.handCount, 0) !== 113)) {
+  throw new Error('Chaos snapshot is missing its timer state or complete 113-card deck')
+}
 if (publicGame.you !== null || JSON.stringify(publicGame).includes('"hand":')) {
   throw new Error('TV game snapshot leaked a hand')
 }
 
 for (const connection of [display, ...players]) connection.ws.close()
-console.log(`Couch smoke passed: room ${code}, 2 players, TV snapshot contains no private hand.`)
+console.log(`Couch ${ruleset} smoke passed: room ${code}, 2 players, TV snapshot contains no private hand.`)

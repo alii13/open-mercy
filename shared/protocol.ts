@@ -1,4 +1,4 @@
-import type { Card, CardColor, StackingMode, TurnState } from './engine'
+import type { Card, CardColor, GameRuleset, StackingMode, TurnState } from './engine'
 
 export interface PresencePlayer {
     userId: string
@@ -10,6 +10,32 @@ export interface PresencePlayer {
     ready?: boolean
 }
 
+export type ChaosEventKind = 'treasure' | 'goblin-trade' | 'rune-trial' | 'oracle' | 'color-storm' | 'dragon-curse'
+export type TreasureAbility = 'draw-three' | 'discard-one' | 'block-penalty'
+
+export interface ChaosEventView {
+    kind: ChaosEventKind
+    phase: 'rolling' | 'select-card' | 'select-player' | 'select-color' | 'resolved'
+    deadlineAt: number
+    participants: { userId: string; status: 'waiting' | 'done' | 'eligible' | 'not-eligible'; roll?: number }[]
+    winnerId?: string
+    loserId?: string
+    chosenColor?: CardColor
+    message?: string
+}
+
+export interface ChaosView {
+    nextEventAt: number
+    matchEndsAt: number
+    finalPhase: boolean
+    event: ChaosEventView | null
+    myTreasure: TreasureAbility | null
+    treasureHolders: string[]
+    reaction: { targetUserId: string; amount: number; reflected: boolean } | null
+    oracleReveal: { targetUserId: string; card: Card } | null
+    winReason: 'cards' | 'time' | null
+}
+
 // --- Intents: what a client may ask the authoritative room to do ---
 
 export type IntentAction =
@@ -17,11 +43,23 @@ export type IntentAction =
     | { kind: 'DRAW' }
     | { kind: 'PICK_DISCARD_ALL_TOP'; cardId: string }
     | { kind: 'CHOOSE_DRAWN_WILD_COLOR'; color: CardColor }
+    | { kind: 'PLAY_DRAWN_CARD'; chosenColor?: CardColor }
+    | { kind: 'PASS_DRAWN_CARD' }
+    | { kind: 'ACCEPT_DRAW4' }
+    | { kind: 'CHALLENGE_DRAW4' }
     | { kind: 'SET_ROULETTE_COLOR'; color: CardColor }
     | { kind: 'SWAP_HANDS'; targetUserId: string }
     | { kind: 'SKIP_SWAP' }
     | { kind: 'CALL_UNO' }
     | { kind: 'CATCH_UNO'; targetUserId: string }
+    | { kind: 'PLAY_CHAOS_CARD'; cardId: string; chosenColor: CardColor; targetUserId?: string }
+    | { kind: 'CHAOS_REACT'; cardId?: string; targetUserId?: string; treasure?: boolean }
+    | { kind: 'CHAOS_DECLINE_REACTION' }
+    | { kind: 'CHAOS_EVENT_ROLL' }
+    | { kind: 'CHAOS_EVENT_SELECT_CARD'; cardId: string }
+    | { kind: 'CHAOS_EVENT_SELECT_PLAYER'; targetUserId: string }
+    | { kind: 'CHAOS_EVENT_CHOOSE_COLOR'; color: CardColor }
+    | { kind: 'USE_TREASURE'; targetUserId?: string; cardId?: string }
 
 export type ClientMsg =
     | { t: 'auth'; token: string; name: string; skin?: string }
@@ -32,6 +70,7 @@ export type ClientMsg =
     | { t: 'ready'; ready: boolean }
     | { t: 'kick'; userId: string }
     | { t: 'start'; stackingMode?: StackingMode }
+    | { t: 'set-couch-mode'; ruleset: 'classic' | 'chaos' }
     | { t: 'return-lobby' }
     | { t: 'close-room' }
     // Hold the public lobby open a minute longer. Anyone at the table may
@@ -65,7 +104,14 @@ export type GameEvent =
     | { t: 'UNO_WINDOW_CLOSED'; playerId: string }
     | { t: 'TURN_AUTO_RESOLVED'; playerId: string }
     | { t: 'ROULETTE_ENDED'; playerId: string; outcome: 'match' | 'eliminated' | 'exhausted'; matchCard?: Card }
+    | { t: 'DRAW4_RESOLVED'; challengerId: string; offenderId: string; outcome: 'accepted' | 'challenge-succeeded' | 'challenge-failed'; amount: 4 | 6 }
     | { t: 'GAME_OVER'; winnerId: string }
+    | { t: 'CHAOS_CARD'; by: string; card: Card; targetUserId?: string; roll?: number }
+    | { t: 'CHAOS_REACTION'; by: string; reaction: 'shield' | 'mirror' | 'decline'; targetUserId?: string }
+    | { t: 'CHAOS_EVENT_STARTED'; kind: ChaosEventKind }
+    | { t: 'CHAOS_EVENT_RESOLVED'; kind: ChaosEventKind; message: string }
+    | { t: 'TREASURE_USED'; by: string; ability: TreasureAbility; targetUserId?: string }
+    | { t: 'TIME_LIMIT_REACHED'; winnerId: string }
 
 // --- Personalized snapshot: everything a client may know ---
 
@@ -99,8 +145,14 @@ export interface PersonalView {
     pendingDiscardAllCards: Card[] | null
     /** Only present for the player who drew a playable wild. */
     pendingDrawnWildCard: Card | null
+    /** Classic only: the one freshly drawn playable card. Visible to its owner. */
+    pendingDrawnCard: Card | null
+    /** Classic only: true exclusively for the +4 victim while a response is due. */
+    canChallengeDraw4: boolean
     stackingMode: StackingMode
+    ruleset?: GameRuleset
     winnerId: string | null
+    chaos?: ChaosView
 }
 
 /**
@@ -108,10 +160,11 @@ export interface PersonalView {
  * null makes accidental hand rendering impossible while preserving the
  * existing board renderer contract.
  */
-export type PublicView = Omit<PersonalView, 'you' | 'pendingDiscardAllCards' | 'pendingDrawnWildCard'> & {
+export type PublicView = Omit<PersonalView, 'you' | 'pendingDiscardAllCards' | 'pendingDrawnWildCard' | 'pendingDrawnCard'> & {
     you: null
     pendingDiscardAllCards: null
     pendingDrawnWildCard: null
+    pendingDrawnCard: null
 }
 
 export type ServerMsg =

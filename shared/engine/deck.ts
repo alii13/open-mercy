@@ -52,6 +52,47 @@ export function generateFullDeck(): Card[] {
     return deck
 }
 
+/**
+ * The deliberately small living-room deck: 108 cards, no Mercy additions.
+ * Four blank/custom cards found in some retail packs are intentionally absent
+ * because RUNE RIOT does not define a rule for them.
+ */
+export function generateClassicDeck(): Card[] {
+    idCounter = 0
+    const deck: Card[] = []
+    const colors: CardColor[] = ['red', 'blue', 'green', 'yellow']
+
+    for (const color of colors) {
+        deck.push(createCard(color, 'number', 0))
+        for (let value = 1; value <= 9; value++) {
+            deck.push(createCard(color, 'number', value))
+            deck.push(createCard(color, 'number', value))
+        }
+        for (let copy = 0; copy < 2; copy++) {
+            deck.push(createCard(color, 'skip'))
+            deck.push(createCard(color, 'reverse'))
+            deck.push(createCard(color, 'draw2'))
+        }
+    }
+
+    for (let copy = 0; copy < 4; copy++) {
+        deck.push(createCard('wild', 'wild'))
+        deck.push(createCard('wild', 'draw4'))
+    }
+    return deck
+}
+
+/** Classic 108-card deck plus exactly one copy of every Chaos card. */
+export function generateChaosDeck(): Card[] {
+    const deck = generateClassicDeck()
+    deck.push(createCard('wild', 'fateSwap'))
+    deck.push(createCard('wild', 'curseMirror'))
+    deck.push(createCard('wild', 'diceCurse'))
+    deck.push(createCard('wild', 'runeShield'))
+    deck.push(createCard('wild', 'runeWhirl'))
+    return deck
+}
+
 export function shuffleDeck(deck: Card[], rng: Rng = Math.random): Card[] {
     const newDeck = [...deck]
     for (let i = newDeck.length - 1; i > 0; i--) {
