@@ -28,7 +28,7 @@
         <h2 class="bp-h2">How it works</h2>
         <p>
           Every game you play earns points. Points add up over time and lift you
-          through twenty badges, from Recruit to God of No Mercy. Your badge shows on
+          through twenty badges, from Recruit to Worldforged. Your badge shows on
           every table you sit at, so everyone sees how far you've climbed.
         </p>
         <p>
@@ -139,7 +139,7 @@ const EARN = [
   { label: "Finish a game you're losing", points: POINT_WEIGHTS.completedLoss },
   { label: 'Each draw card you play', points: POINT_WEIGHTS.drawCard },
   { label: 'Per card in the biggest stack you survive', points: POINT_WEIGHTS.stackSurvived },
-  { label: 'Call "Mercy!"', points: POINT_WEIGHTS.unoCall },
+  { label: 'Call "Riot!"', points: POINT_WEIGHTS.unoCall },
   { label: 'Show up and play (per day)', points: POINT_WEIGHTS.dayPlayed },
 ]
 </script>

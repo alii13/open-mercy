@@ -82,35 +82,36 @@ withDefaults(
   min-height: 56px;
 }
 
-/* primary — red glow, gradient fill */
+/* primary — antique-gold forged plate */
 .btn--primary {
   background: linear-gradient(
     145deg,
-    var(--color-alert) 0%,
-    var(--color-alert-dim) 100%
+    #ead28d 0%,
+    #9a7130 100%
   );
-  border-color: var(--color-alert);
-  color: white;
+  border-color: #f1d58b;
+  color: #160f08;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35);
 }
 .btn--primary:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: var(--shadow-glow-red);
+  box-shadow: var(--shadow-glow-yellow);
 }
 .btn--primary:active:not(:disabled) {
   transform: translateY(0);
 }
 
-/* secondary — cyan outline */
+/* secondary — emerald magic outline */
 .btn--secondary {
   background: transparent;
-  border-color: var(--color-neon-blue);
-  color: var(--color-neon-blue);
+  border-color: var(--color-neon-green);
+  color: var(--color-neon-green);
 }
 .btn--secondary:hover:not(:disabled) {
-  background: var(--color-neon-blue);
+  background: var(--color-neon-green);
   color: var(--bg-concrete);
   transform: translateY(-2px);
-  box-shadow: var(--shadow-glow-cyan);
+  box-shadow: var(--shadow-glow-lime);
 }
 
 /* ghost — muted, low-attention */

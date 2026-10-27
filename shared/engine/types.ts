@@ -13,6 +13,11 @@ export type CardType =
     | 'draw10'
     | 'wildReverseDraw4'
     | 'wildColorRoulette'
+    | 'fateSwap'
+    | 'curseMirror'
+    | 'diceCurse'
+    | 'runeShield'
+    | 'runeWhirl'
 
 export interface Card {
     id: string
@@ -33,6 +38,8 @@ export interface Player {
 
 export type GameState = 'LOBBY' | 'PLAYING' | 'GAME_OVER'
 
+export type GameRuleset = 'mercy' | 'classic' | 'chaos'
+
 export type TurnState =
     | 'WAITING_FOR_ACTION'
     | 'CHOOSING_COLOR'
@@ -41,6 +48,10 @@ export type TurnState =
     | 'ROULETTE_DRAWING'
     | 'CHOOSING_ROULETTE_COLOR'
     | 'CHOOSING_DRAWN_WILD_COLOR'
+    | 'CHOOSING_DRAWN_CARD'
+    | 'AWAITING_DRAW4_CHALLENGE'
+    | 'AWAITING_CHAOS_REACTION'
+    | 'CHAOS_EVENT'
     | 'CHOOSING_DISCARD_ALL_TOP'
     | 'DEALING'
 
@@ -69,6 +80,8 @@ export interface EngineState {
     swapInitiatorId: string | null
     hasCalledUno: Record<string, boolean>
     stackingMode: StackingMode
+    /** Undefined on legacy state means the original Mercy ruleset. */
+    ruleset?: GameRuleset
 }
 
 /**

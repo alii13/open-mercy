@@ -123,6 +123,7 @@ function lobbyView(): PersonalView {
         currentPlayerId: null, turnState: 'WAITING_FOR_ACTION', direction: 1, drawStack: 0,
         currentColor: 'red', discardTop: null, deckCount: 0, discardCount: 0,
         rouletteTargetColor: null, pendingDiscardAllCards: null, pendingDrawnWildCard: null,
+        pendingDrawnCard: null, canChallengeDraw4: false,
         stackingMode: 'official', winnerId: null,
     }
 }

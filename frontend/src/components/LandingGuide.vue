@@ -4,13 +4,13 @@
   <section class="guide-section" aria-labelledby="guide-heading">
     <div class="guide-inner">
       <h2 id="guide-heading" class="guide-heading">
-        WHAT IS <span class="accent-yellow">OPEN MERCY?</span>
+        WHAT IS <span class="accent-yellow">RUNE RIOT?</span>
       </h2>
       <p class="guide-intro">
-        Open Mercy is a free card game you play in your browser, built on the No Mercy rules:
+        RUNE RIOT is a fast fantasy card game you play in your browser:
         bigger draw cards, stacking, and a hard limit on how many cards you can hold.
-        The ruleset was popularized by Mattel's UNO Show 'Em No Mercy&reg; card game;
-        Open Mercy is independent and not affiliated with Mattel.
+        Match a family or value, stack powerful draw runes, and survive until your hand is empty.
+        RUNE RIOT uses original visual art and is not affiliated with another card-game brand.
       </p>
       <p class="guide-intro">
         It is made for friend groups who want a quick game over a call, but you can also
@@ -36,7 +36,7 @@
             <li>Hold 25 cards and you are out.</li>
             <li>A 7 swaps hands, a 0 passes every hand along.</li>
             <li>Color Roulette makes the next player pick a color, then draw until they hit it.</li>
-            <li>Forget to call MERCY! and it can cost you 10 cards.</li>
+            <li>Forget to call RIOT! and it can cost you 10 cards.</li>
           </ul>
         </div>
 

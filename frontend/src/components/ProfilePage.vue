@@ -6,8 +6,8 @@
         BACK
       </button>
       <a class="brand-mark" href="#" @click.prevent>
-        <span class="brand-mark-uno">OPEN</span>
-        <span class="brand-mark-nomercy">MERCY</span>
+        <span class="brand-mark-uno">RUNE</span>
+        <span class="brand-mark-nomercy">RIOT</span>
       </a>
       <button v-if="p" class="share-btn" @click="onShare">
         <Check v-if="shareState === 'copied'" :size="14" :stroke-width="2" aria-hidden="true" />
@@ -578,8 +578,8 @@ watch(() => props.code, (code) => {
   text-decoration: none;
   font-size: 1rem;
 }
-.brand-mark-uno { color: var(--text-primary); }
-.brand-mark-nomercy { color: var(--color-alert); margin-left: 0.4ch; }
+.brand-mark-uno { color: var(--color-hazard); }
+.brand-mark-nomercy { color: var(--color-neon-magenta); margin-left: 0.4ch; }
 
 .pp-topbar-spacer { width: 72px; }
 

@@ -1,0 +1,9 @@
+# Copy this file to .dev.vars for local overrides. .dev.vars is git-ignored.
+# Use the same Supabase project as the frontend.
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_ANON_KEY=your-publishable-or-anon-key
+
+# Optional server-only features. Never commit real values.
+# SUPABASE_SERVICE_KEY=your-service-role-key
+# REALTIMEKIT_APP_ID=your-app-id
+# REALTIMEKIT_API_TOKEN=your-api-token

@@ -26,7 +26,7 @@ export interface Badge {
     color: string
 }
 
-/** Escalating heat to the King's gold, then ten prestige ranks above it.
+/** Escalating heat to the Sovereign's gold, then ten prestige ranks above it.
  *  Steepening thresholds toward the top so the apex is genuinely more than a
  *  year of sustained play (decay makes it harder). */
 export const BADGES: Badge[] = [
@@ -39,7 +39,7 @@ export const BADGES: Badge[] = [
     { tier: 7, threshold: 11_000, title: 'Overlord', color: '#ec4899' },
     { tier: 8, threshold: 22_000, title: 'Executioner', color: '#a855f7' },
     { tier: 9, threshold: 45_000, title: 'Merciless', color: '#7c3aed' },
-    { tier: 10, threshold: 100_000, title: 'No Mercy King', color: '#ffd700' },
+    { tier: 10, threshold: 100_000, title: 'Rune Sovereign', color: '#ffd700' },
     // Prestige ranks: x1.4 per rank, rounded. At the fastest player's pace
     // when these shipped (~140k points a month) the top is well over a year
     // away - reachable, so it still pulls, but nobody walks into it.
@@ -52,7 +52,7 @@ export const BADGES: Badge[] = [
     { tier: 17, threshold: 1_050_000, title: 'Reaper', color: '#c9d0d6' },
     { tier: 18, threshold: 1_480_000, title: 'Doombringer', color: '#d0453a' },
     { tier: 19, threshold: 2_070_000, title: 'Apocalypse', color: '#9b6bd6' },
-    { tier: 20, threshold: 2_890_000, title: 'God of No Mercy', color: '#ffcc33' },
+    { tier: 20, threshold: 2_890_000, title: 'Worldforged', color: '#ffcc33' },
 ]
 
 export function badgeFor(points: number): Badge {

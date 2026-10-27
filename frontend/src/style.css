@@ -11,28 +11,29 @@
    consumers. (Default @theme only emits variables referenced inside this
    file, which strips ~80% of our scale.) */
 @theme static {
-  /* Industrial chaos palette */
-  --bg-concrete: #0a0a0b;
-  --bg-concrete-light: #18191b;
-  --surface-metal: #1f2226;
-  --surface-metal-dark: #121416;
+  /* RUNE RIOT — obsidian, antique gold and arcane light. Legacy token names
+     remain as compatibility aliases so component structure and logic stay put. */
+  --bg-concrete: #08060c;
+  --bg-concrete-light: #15101e;
+  --surface-metal: #241c2d;
+  --surface-metal-dark: #100c16;
 
-  --color-hazard: #ffcc00;
-  --color-hazard-dim: #997a00;
-  --color-alert: #ff2a2a;
-  --color-alert-dim: #801515;
-  --color-neon-blue: #00f3ff;
-  --color-neon-green: #00ff66;
-  --color-neon-magenta: #ff66dd;
+  --color-hazard: #d8b565;
+  --color-hazard-dim: #80652e;
+  --color-alert: #d95545;
+  --color-alert-dim: #6f2925;
+  --color-neon-blue: #78bde4;
+  --color-neon-green: #51c889;
+  --color-neon-magenta: #a77ae4;
 
-  --text-primary: #e6e6e6;
-  --text-secondary: #a1a1aa;
-  --text-muted: #808089;
+  --text-primary: #f3ead5;
+  --text-secondary: #c1b6c7;
+  --text-muted: #85798c;
 
   /* Typography */
-  --font-display: 'Black Ops One', cursive;
-  --font-body: 'Chakra Petch', sans-serif;
-  --font-mono: 'Helvetica Neue', 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Palatino Linotype', 'Book Antiqua', Georgia, serif;
+  --font-body: Inter, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'Segoe UI', Roboto, sans-serif;
 
   /* Type scale */
   --text-xs: 0.75rem;
@@ -68,11 +69,11 @@
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
   --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.6);
-  --shadow-glow-red: 0 0 24px rgba(255, 42, 42, 0.4);
-  --shadow-glow-yellow: 0 0 24px rgba(255, 204, 0, 0.35);
-  --shadow-glow-cyan: 0 0 24px rgba(0, 243, 255, 0.4);
-  --shadow-glow-lime: 0 0 24px rgba(0, 255, 102, 0.4);
-  --shadow-glow-magenta: 0 0 24px rgba(255, 102, 221, 0.4);
+  --shadow-glow-red: 0 0 24px rgba(217, 85, 69, 0.38);
+  --shadow-glow-yellow: 0 0 24px rgba(216, 181, 101, 0.32);
+  --shadow-glow-cyan: 0 0 24px rgba(120, 189, 228, 0.34);
+  --shadow-glow-lime: 0 0 24px rgba(81, 200, 137, 0.34);
+  --shadow-glow-magenta: 0 0 24px rgba(167, 122, 228, 0.36);
 
   /* Motion duration + easing — these mirror useMotion.ts presets */
   --duration-snap: 180ms;
@@ -118,16 +119,10 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
-  /* Scratched metal / grain texture overlay would be great here */
-  background-image: 
-    repeating-linear-gradient(
-      45deg,
-      rgba(0,0,0,0.05) 0px,
-      rgba(0,0,0,0.05) 2px,
-      transparent 2px,
-      transparent 8px
-    ),
-    radial-gradient(circle at center, var(--bg-concrete-light), var(--bg-concrete));
+  background-image:
+    radial-gradient(circle at 50% -10%, rgba(100, 60, 145, 0.2), transparent 38%),
+    repeating-radial-gradient(circle at 15% 30%, rgba(255,255,255,0.018) 0 1px, transparent 1px 5px),
+    radial-gradient(circle at center, var(--bg-concrete-light), var(--bg-concrete) 72%);
 }
 
 button {
@@ -155,6 +150,11 @@ button {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-hazard); 
+}
+
+::selection {
+  color: #100b15;
+  background: var(--color-hazard);
 }
 
 /* Utility / Animations */

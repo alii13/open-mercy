@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cleanName, cleanSkin, isStackingMode, isWildColor, NAME_MAX } from './validate'
+import { cleanCouchName, cleanName, cleanSkin, couchNameTaken, isStackingMode, isWildColor, NAME_MAX } from './validate'
 
 describe('isStackingMode', () => {
     it('accepts the three modes', () => {
@@ -53,5 +53,24 @@ describe('cleanName', () => {
         expect(cleanName('   \t')).toBe('PLAYER')
         expect(cleanName({ name: 'x' })).toBe('PLAYER')
         expect(cleanName(undefined)).toBe('PLAYER')
+    })
+})
+
+describe('couch names', () => {
+    it('accepts 2-16 Unicode code points and normalizes whitespace', () => {
+        expect(cleanCouchName('  Rúna   🐉 ')).toBe('Rúna 🐉')
+        expect(cleanCouchName('🐉🐉')).toBe('🐉🐉')
+    })
+
+    it('rejects short, long and control-only input', () => {
+        expect(cleanCouchName('A')).toBeNull()
+        expect(cleanCouchName('x'.repeat(17))).toBeNull()
+        expect(cleanCouchName('\n\t')).toBeNull()
+    })
+
+    it('detects duplicate names case-insensitively and permits the same reconnecting player', () => {
+        const roster = { u1: { name: 'Rúna' } }
+        expect(couchNameTaken(roster, 'RÚNA')).toBe(true)
+        expect(couchNameTaken(roster, 'Rúna', 'u1')).toBe(false)
     })
 })

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { startGame, applyIntent, forceEliminate, persistResults } from './game'
+import { startGame, applyIntent, forceEliminate, persistResults, personalView, viewEventFor } from './game'
 import type { CardColor } from '../../shared/engine'
 
 const twoPlayers = () => startGame(
@@ -9,6 +9,50 @@ const twoPlayers = () => startGame(
   ],
   'official',
 )
+
+describe('same-room rematch deal', () => {
+  it('keeps player identities and creates a fresh valid seven-card round', () => {
+    const seats = [
+      { userId: 'u1', name: 'Alice' },
+      { userId: 'u2', name: 'Bob' },
+    ]
+    const first = startGame(seats, 'official').game
+    const rematch = startGame(seats, first.engine.stackingMode).game
+
+    expect(rematch).not.toBe(first)
+    expect(rematch.engine.players.map(player => player.id)).toEqual(['u1', 'u2'])
+    expect(rematch.engine.players.every(player => player.hand.length === 7)).toBe(true)
+    expect(rematch.engine.gameState).toBe('PLAYING')
+    expect([0, 2]).toContain(rematch.engine.drawStack)
+    expect(rematch.engine.stackingMode).toBe('official')
+  })
+})
+
+describe('couch display privacy', () => {
+  it('cannot receive a private hand or a pending private choice', () => {
+    const { game } = twoPlayers()
+    const current = game.engine.players[game.engine.currentPlayerIndex]!
+    game.pendingDrawnWildCardId = current.hand[0]!.id
+    const view = personalView(
+      game,
+      'playing',
+      '!couch-display',
+      game.engine.players.map(p => ({ userId: p.id, name: p.name })),
+      new Set(game.engine.players.map(p => p.id)),
+      'tv-host',
+    )
+    expect(view.you).toBeNull()
+    expect(view.pendingDrawnWildCard).toBeNull()
+    expect(view.pendingDiscardAllCards).toBeNull()
+    expect(JSON.stringify(view)).not.toContain(current.hand[0]!.id)
+  })
+
+  it('turns private draw events into public counts for the display', () => {
+    const hidden = viewEventFor({ t: 'YOU_DREW', cards: [{ id: 'secret', color: 'red', type: 'number', value: 1 }], _owner: 'u1' } as any, '!couch-display')
+    expect(hidden).toEqual({ t: 'PLAYER_DREW', playerId: 'u1', count: 1 })
+    expect(JSON.stringify(hidden)).not.toContain('secret')
+  })
+})
 
 describe('wild colour validation', () => {
   it('rejects a PLAY_CARD whose chosenColor is not a suit colour, without touching state', () => {

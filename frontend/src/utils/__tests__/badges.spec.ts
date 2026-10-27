@@ -47,13 +47,13 @@ describe('badgeFor', () => {
         expect(badgeFor(599).title).toBe('Scrapper')
         expect(badgeFor(600).title).toBe('Enforcer')
         expect(badgeFor(99_999).title).toBe('Merciless')
-        expect(badgeFor(100_000).title).toBe('No Mercy King')
-        expect(badgeFor(139_999).title).toBe('No Mercy King')
+        expect(badgeFor(100_000).title).toBe('Rune Sovereign')
+        expect(badgeFor(139_999).title).toBe('Rune Sovereign')
         expect(badgeFor(140_000).title).toBe('Tyrant')
         // The leader on the day ranks 11-20 shipped.
         expect(badgeFor(215_040).title).toBe('Butcher')
         expect(badgeFor(2_889_999).title).toBe('Apocalypse')
-        expect(badgeFor(2_890_000).title).toBe('God of No Mercy')
+        expect(badgeFor(2_890_000).title).toBe('Worldforged')
         expect(badgeFor(50_000_000).tier).toBe(20)
     })
 
@@ -233,7 +233,7 @@ describe('progressToNext', () => {
 
     it('caps out at the apex', () => {
         const p = progressToNext(3_000_000)
-        expect(p.current.title).toBe('God of No Mercy')
+        expect(p.current.title).toBe('Worldforged')
         expect(p.next).toBeNull()
         expect(p.pct).toBe(1)
     })

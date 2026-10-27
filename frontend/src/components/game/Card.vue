@@ -1,36 +1,81 @@
 <template>
   <div
-    :class="['card-wrapper', {
-      playable: card.isPlayable,
-      selected: isSelected,
-      flipped: isFlipped,
-      [`color-${card.color}`]: true,
-      [`type-${card.type}`]: true
-    }]"
+    :class="[
+      'card-wrapper',
+      `color-${card.color}`,
+      `type-${card.type}`,
+      {
+        playable: isPlayable || card.isPlayable,
+        selected: isSelected,
+        flipped: isFlipped,
+      },
+    ]"
+    :style="{
+      width: `${size.width}px`,
+      height: `${size.height}px`,
+      '--card-width': `${size.width}px`,
+    }"
+    role="img"
+    :aria-label="cardAlt"
     @click="handleClick"
     @mouseenter="handleHover"
-    :style="{ width: size.width + 'px', height: size.height + 'px' }"
   >
-    <!-- Eager, not lazy: hand/pile cards are the game's core content, and
-         lazy-loading made faces pop in as ghost outlines mid-deal. -->
-    <img
-      class="card-image"
-      :src="cardUrl"
-      :srcset="srcset"
-      :sizes="srcset ? `${size.width}px` : undefined"
-      :width="size.width"
-      :height="size.height"
-      decoding="async"
-      :alt="cardAlt"
-      draggable="false"
-    />
+    <div class="card-face">
+      <div class="card-inlay" aria-hidden="true"></div>
+      <div class="card-corner card-corner--top" aria-hidden="true">
+        <span>{{ cornerMark }}</span>
+        <component :is="familyIcon" :stroke-width="1.7" />
+      </div>
+
+      <div class="card-sigil" aria-hidden="true">
+        <span class="sigil-orbit sigil-orbit--outer"></span>
+        <span class="sigil-orbit sigil-orbit--inner"></span>
+        <component
+          v-if="card.type !== 'number'"
+          :is="actionIcon"
+          class="action-glyph"
+          :stroke-width="1.45"
+        />
+        <span v-else class="number-glyph">{{ card.value }}</span>
+        <span v-if="drawValue" class="draw-value">+{{ drawValue }}</span>
+      </div>
+
+      <div class="family-rune" aria-hidden="true">
+        <component :is="familyIcon" :stroke-width="1.35" />
+      </div>
+      <div class="card-title">{{ cardTitle }}</div>
+
+      <div class="card-corner card-corner--bottom" aria-hidden="true">
+        <span>{{ cornerMark }}</span>
+        <component :is="familyIcon" :stroke-width="1.7" />
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import { getCardImageUrl } from '@/utils/cardGenerator'
-import type { Card } from '@/types/card'
+import { computed, type Component } from 'vue'
+import {
+  Ban,
+  ArrowLeftRight,
+  CircleDotDashed,
+  Flame,
+  Leaf,
+  Layers3,
+  ListX,
+  Palette,
+  Repeat2,
+  RotateCw,
+  Snowflake,
+  Sparkles,
+  Shield,
+  Dices,
+  Users,
+  Zap,
+} from 'lucide-vue-next'
+import type { Card, CardColor, CardType } from '@/types/card'
+import type { GameRuleset } from '@engine'
+import { cardFamily, cardPresentation } from '@/utils/cardPresentation'
 
 interface Props {
   card: Card
@@ -38,8 +83,9 @@ interface Props {
   isSelected?: boolean
   isFlipped?: boolean
   size?: { width: number; height: number }
-  /** Smaller encodes for places that show the card small, like the landing hero. */
+  /** Kept for call-site compatibility; RUNE RIOT cards are rendered as vectors/CSS. */
   srcset?: string
+  ruleset?: GameRuleset
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -47,6 +93,8 @@ const props = withDefaults(defineProps<Props>(), {
   isSelected: false,
   isFlipped: false,
   size: () => ({ width: 250, height: 350 }),
+  srcset: undefined,
+  ruleset: 'mercy',
 })
 
 const emit = defineEmits<{
@@ -54,219 +102,248 @@ const emit = defineEmits<{
   hover: [card: Card]
 }>()
 
-const cardUrl = computed(() => getCardImageUrl(props.card))
-const cardAlt = computed(() => {
-  if (props.card.color === 'wild') return `Wild ${props.card.type}`
-  const value = props.card.value !== undefined ? ` ${props.card.value}` : ''
-  return `${props.card.color}${value} ${props.card.type}`.trim()
-})
-
-const handleClick = () => {
-  if (props.isPlayable) {
-    emit('click', props.card)
-  }
+const FAMILY_ICONS: Record<CardColor, Component> = {
+  red: Flame,
+  blue: Snowflake,
+  green: Leaf,
+  yellow: Zap,
+  wild: Sparkles,
 }
 
-const handleHover = () => {
+const ACTION_ICONS: Record<CardType, Component> = {
+  number: CircleDotDashed,
+  skip: Ban,
+  reverse: RotateCw,
+  draw2: Layers3,
+  skipEveryone: Users,
+  discardAll: ListX,
+  wild: Palette,
+  draw4: Layers3,
+  draw6: Layers3,
+  draw10: Layers3,
+  wildReverseDraw4: Repeat2,
+  wildColorRoulette: CircleDotDashed,
+  fateSwap: ArrowLeftRight,
+  curseMirror: Repeat2,
+  diceCurse: Dices,
+  runeShield: Shield,
+  runeWhirl: Sparkles,
+}
+
+const familyIcon = computed(() => FAMILY_ICONS[props.card.color])
+const actionIcon = computed(() => ACTION_ICONS[props.card.type])
+const presentation = computed(() => cardPresentation(props.card, props.ruleset))
+const cardTitle = computed(() => presentation.value.shortName)
+const drawValue = computed(() => {
+  if (props.card.type === 'draw2') return 2
+  if (props.card.type === 'draw4' || props.card.type === 'wildReverseDraw4') return 4
+  if (props.card.type === 'draw6') return 6
+  if (props.card.type === 'draw10') return 10
+  return 0
+})
+const cornerMark = computed(() => {
+  if (props.card.type === 'number') return String(props.card.value ?? '')
+  if (drawValue.value) return `+${drawValue.value}`
+  const marks: Partial<Record<CardType, string>> = {
+    skip: 'SPERRE',
+    reverse: 'WENDE',
+    skipEveryone: 'BANN',
+    discardAll: 'FLUT',
+    wild: 'WAHL',
+    wildColorRoulette: 'CHAOS',
+    fateSwap: 'TAUSCH',
+    curseMirror: 'SPIEGEL',
+    diceCurse: 'W6',
+    runeShield: 'SCHILD',
+    runeWhirl: 'WIRBEL',
+  }
+  return marks[props.card.type] ?? 'RUNE'
+})
+const cardAlt = computed(() => {
+  return `${presentation.value.name}, ${cardFamily(props.card)}. ${presentation.value.effect}`
+})
+
+function handleClick() {
+  if (props.isPlayable) emit('click', props.card)
+}
+
+function handleHover() {
   emit('hover', props.card)
 }
 </script>
 
 <style scoped>
-/* Card wrapper carries two pseudo-element layers:
-   ::before — color-tinted neon outline (gets brighter / pulses when playable)
-   ::after  — holographic conic-gradient shimmer (wild cards + danger pulse on +N)
-   Both are positioned absolute on top of the card image with pointer-events: none
-   so clicks still reach the wrapper. Pure CSS — no extra DOM, no JS. */
 .card-wrapper {
+  --card-accent: #c7a45a;
+  --card-accent-bright: #f1d58b;
+  --card-glow: rgba(199, 164, 90, 0.45);
+  --card-field: #17121e;
   position: relative;
   display: inline-block;
   cursor: pointer;
-  transition: transform 0.2s ease;
-  transform-style: preserve-3d;
   user-select: none;
-  border-radius: 10px;
+  border-radius: calc(var(--card-width) * 0.07);
+  transform-style: preserve-3d;
+  transition: transform 180ms cubic-bezier(0.33, 1, 0.68, 1), filter 180ms ease;
 }
 
-.card-wrapper .card-image {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  border-radius: 8px;
-  pointer-events: none;
-  position: relative;
-  z-index: 1;
+.color-red { --card-accent: #d55a3b; --card-accent-bright: #ffb069; --card-glow: rgba(235, 75, 42, 0.55); --card-field: #2a0d11; }
+.color-blue { --card-accent: #70b6e5; --card-accent-bright: #d7f4ff; --card-glow: rgba(83, 174, 235, 0.52); --card-field: #091b2c; }
+.color-green { --card-accent: #55a56f; --card-accent-bright: #b9f2b5; --card-glow: rgba(65, 192, 111, 0.5); --card-field: #0b2319; }
+.color-yellow { --card-accent: #d7ae42; --card-accent-bright: #fff0a0; --card-glow: rgba(238, 184, 50, 0.55); --card-field: #2b2108; }
+.color-wild { --card-accent: #9b72db; --card-accent-bright: #e8d8ff; --card-glow: rgba(145, 92, 229, 0.58); --card-field: #170b27; }
+
+.card-face {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border: max(2px, calc(var(--card-width) * 0.026)) solid #09070c;
+  border-radius: inherit;
+  color: var(--card-accent-bright);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.08), transparent 18% 82%, rgba(0, 0, 0, 0.42)),
+    radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--card-accent) 18%, transparent), transparent 46%),
+    var(--card-field);
+  box-shadow:
+    inset 0 0 0 max(1px, calc(var(--card-width) * 0.009)) rgba(226, 197, 128, 0.56),
+    inset 0 0 0 calc(var(--card-width) * 0.036) rgba(10, 7, 14, 0.88),
+    inset 0 0 calc(var(--card-width) * 0.16) rgba(0, 0, 0, 0.78),
+    0 calc(var(--card-width) * 0.055) calc(var(--card-width) * 0.1) rgba(0, 0, 0, 0.7);
 }
 
-/* ---------- Color tokens per card color ---------- */
-.card-wrapper.color-red    { --card-glow: #ff2a2a; --card-glow-soft: rgba(255, 42, 42, 0.55); }
-.card-wrapper.color-blue   { --card-glow: #00bfff; --card-glow-soft: rgba(0, 191, 255, 0.55); }
-.card-wrapper.color-green  { --card-glow: #00ff66; --card-glow-soft: rgba(0, 255, 102, 0.55); }
-.card-wrapper.color-yellow { --card-glow: #ffcc00; --card-glow-soft: rgba(255, 204, 0, 0.55); }
-.card-wrapper.color-wild   { --card-glow: #ff66dd; --card-glow-soft: rgba(255, 102, 221, 0.55); }
+.card-inlay {
+  position: absolute;
+  inset: 7.2%;
+  border: max(1px, calc(var(--card-width) * 0.008)) solid color-mix(in srgb, var(--card-accent) 72%, #3c2b18);
+  clip-path: polygon(12% 0, 88% 0, 100% 8%, 100% 92%, 88% 100%, 12% 100%, 0 92%, 0 8%);
+  box-shadow: inset 0 0 calc(var(--card-width) * 0.08) rgba(0, 0, 0, 0.7);
+}
 
-/* ---------- Neon outline (::before, behind the image as a glow halo) ---------- */
+.card-inlay::before,
+.card-inlay::after { content: ''; position: absolute; inset: 4%; opacity: 0.28; }
+.color-red .card-inlay::before { background: repeating-conic-gradient(from 12deg at 50% 78%, transparent 0 8deg, var(--card-accent) 9deg 10deg, transparent 11deg 19deg); }
+.color-blue .card-inlay::before {
+  background:
+    linear-gradient(45deg, transparent 47%, var(--card-accent) 48% 52%, transparent 53%),
+    linear-gradient(-45deg, transparent 47%, var(--card-accent) 48% 52%, transparent 53%);
+  background-size: 24% 16%;
+}
+.color-green .card-inlay::before { background: repeating-radial-gradient(ellipse at 0 50%, transparent 0 13%, var(--card-accent) 14% 15%, transparent 16% 27%); }
+.color-yellow .card-inlay::before { background: repeating-linear-gradient(120deg, transparent 0 15%, var(--card-accent) 16% 18%, transparent 19% 31%); }
+.color-wild .card-inlay::before { background: conic-gradient(from 45deg, #d45a45, #6aaee6, #62b77b, #dfba4f, #a879e5, #d45a45); opacity: 0.18; }
+
+.card-sigil {
+  position: absolute;
+  left: 50%;
+  top: 44%;
+  width: 57%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--card-accent-bright);
+  background: radial-gradient(circle, color-mix(in srgb, var(--card-accent) 26%, transparent), transparent 62%), rgba(5, 4, 8, 0.56);
+  border: max(1px, calc(var(--card-width) * 0.009)) solid color-mix(in srgb, var(--card-accent) 68%, transparent);
+  box-shadow: 0 0 calc(var(--card-width) * 0.12) var(--card-glow), inset 0 0 calc(var(--card-width) * 0.09) rgba(0, 0, 0, 0.84);
+}
+
+.sigil-orbit { position: absolute; inset: 8%; border: max(1px, calc(var(--card-width) * 0.006)) solid color-mix(in srgb, var(--card-accent) 50%, transparent); transform: rotate(45deg); }
+.sigil-orbit--inner { inset: 22%; border-radius: 50%; transform: rotate(0deg); border-style: dashed; }
+.action-glyph { width: 47%; height: 47%; filter: drop-shadow(0 0 calc(var(--card-width) * 0.04) var(--card-glow)); }
+.number-glyph { font-family: var(--font-display); font-size: calc(var(--card-width) * 0.42); line-height: 1; text-shadow: 0 0 calc(var(--card-width) * 0.08) var(--card-glow); }
+.draw-value {
+  position: absolute;
+  right: -5%;
+  bottom: -4%;
+  min-width: 38%;
+  padding: 2% 7%;
+  border-radius: 999px;
+  font-family: var(--font-display);
+  font-size: calc(var(--card-width) * 0.13);
+  color: #150d06;
+  background: var(--card-accent-bright);
+  box-shadow: 0 0 calc(var(--card-width) * 0.06) var(--card-glow);
+}
+
+.family-rune { position: absolute; left: 50%; bottom: 15.5%; transform: translateX(-50%); width: 13%; color: var(--card-accent); opacity: 0.9; }
+.family-rune svg { width: 100%; height: auto; }
+.card-title {
+  position: absolute;
+  left: 13%;
+  right: 13%;
+  bottom: 8.5%;
+  overflow: hidden;
+  color: color-mix(in srgb, var(--card-accent-bright) 82%, white);
+  font-family: var(--font-display);
+  font-size: calc(var(--card-width) * 0.057);
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  line-height: 1;
+  text-align: center;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.card-corner {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--card-width) * 0.012);
+  width: 20%;
+  font-family: var(--font-display);
+  font-size: calc(var(--card-width) * 0.077);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.03em;
+  text-shadow: 0 0 calc(var(--card-width) * 0.03) var(--card-glow);
+}
+.card-corner svg { width: 54%; height: auto; }
+.card-corner--top { top: 5.5%; left: 4.8%; }
+.card-corner--bottom { right: 4.8%; bottom: 5.5%; transform: rotate(180deg); }
+
 .card-wrapper::before {
   content: '';
   position: absolute;
   inset: -2px;
-  border-radius: 10px;
-  pointer-events: none;
-  z-index: 0;
-  box-shadow:
-    0 0 0 1px var(--card-glow-soft, rgba(255, 255, 255, 0.08)) inset,
-    0 0 12px var(--card-glow-soft, transparent);
-  opacity: 0.45;
-  transition: opacity 0.2s, box-shadow 0.2s;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--card-accent);
+  filter: blur(calc(var(--card-width) * 0.055));
+  opacity: 0.2;
+  transition: opacity 180ms ease, filter 180ms ease;
 }
-
-.card-wrapper.playable::before {
-  opacity: 1;
-  box-shadow:
-    0 0 0 1.5px var(--card-glow) inset,
-    0 0 24px var(--card-glow-soft);
-  animation: cardGlowPulse 2.2s ease-in-out infinite;
-}
-
-@keyframes cardGlowPulse {
-  0%, 100% { box-shadow: 0 0 0 1.5px var(--card-glow) inset, 0 0 18px var(--card-glow-soft); }
-  50%      { box-shadow: 0 0 0 2px var(--card-glow) inset, 0 0 34px var(--card-glow); }
-}
-
-/* ---------- Wild holographic shimmer (::after) ----------
-   A conic gradient that rotates slowly across the card with screen blend mode.
-   Only active on wild-color cards; doesn't show on colored cards. */
-.card-wrapper.color-wild::after {
+.card-wrapper.playable::before { opacity: 0.8; animation: rune-card-pulse 2.4s ease-in-out infinite; }
+.card-wrapper.color-wild .card-face::after {
   content: '';
   position: absolute;
-  inset: 4px;
-  border-radius: 6px;
+  inset: 4%;
   pointer-events: none;
-  z-index: 2;
-  background: conic-gradient(
-    from var(--shimmer-angle, 0deg),
-    rgba(255, 0, 200, 0.0),
-    rgba(0, 200, 255, 0.35),
-    rgba(255, 220, 0, 0.0),
-    rgba(255, 100, 200, 0.35),
-    rgba(255, 0, 200, 0.0)
-  );
+  border-radius: inherit;
+  background: conic-gradient(from 0deg, transparent, rgba(137, 86, 220, 0.28), transparent, rgba(67, 194, 126, 0.2), transparent);
   mix-blend-mode: screen;
-  opacity: 0.65;
-  animation: holoShimmer 4.5s linear infinite;
+  animation: arcane-shimmer 7s linear infinite;
 }
 
-@property --shimmer-angle {
-  syntax: '<angle>';
-  initial-value: 0deg;
-  inherits: false;
-}
-
-@keyframes holoShimmer {
-  to { --shimmer-angle: 360deg; }
-}
-
-/* Fallback for browsers without @property (Safari < 16.4): rotate via transform */
-@supports not (background: conic-gradient(from 0deg, red, blue)) {
-  .card-wrapper.color-wild::after {
-    animation: none;
-  }
-}
-
-/* ---------- Danger pulse on +N draw cards ----------
-   Aggressive red ring + shake-ready overlay so the player reads "incoming pain"
-   before they read the number. Only fires on playable +N cards — an unplayable
-   draw card in hand should sit quietly like any other unplayable card. */
-.card-wrapper.playable.type-draw2::after,
-.card-wrapper.playable.type-draw4::after,
-.card-wrapper.playable.type-draw6::after,
-.card-wrapper.playable.type-draw10::after,
-.card-wrapper.playable.type-wildReverseDraw4::after,
-.card-wrapper.playable.type-wildColorRoulette::after {
-  content: '';
-  position: absolute;
-  inset: -1px;
-  border-radius: 10px;
-  pointer-events: none;
-  z-index: 2;
-  box-shadow:
-    0 0 0 1.5px rgba(255, 42, 42, 0.6) inset,
-    0 0 20px rgba(255, 42, 42, 0.4);
-  animation: dangerPulse 1.8s ease-in-out infinite;
-}
-
-@keyframes dangerPulse {
-  0%, 100% {
-    box-shadow:
-      0 0 0 1.5px rgba(255, 42, 42, 0.45) inset,
-      0 0 14px rgba(255, 42, 42, 0.3);
-  }
-  50% {
-    box-shadow:
-      0 0 0 2.5px rgba(255, 42, 42, 0.9) inset,
-      0 0 28px rgba(255, 42, 42, 0.7);
-  }
-}
-
-/* When a +N card is ALSO playable (your turn, valid play), upgrade the pulse
-   to the color glow + the danger ring layered, so playable danger cards
-   visually scream "play me and ruin them". */
-.card-wrapper.playable.type-draw2::before,
-.card-wrapper.playable.type-draw4::before,
-.card-wrapper.playable.type-draw6::before,
-.card-wrapper.playable.type-draw10::before,
-.card-wrapper.playable.type-wildReverseDraw4::before,
-.card-wrapper.playable.type-wildColorRoulette::before {
-  opacity: 1;
-  box-shadow:
-    0 0 0 2px var(--card-glow) inset,
-    0 0 32px var(--card-glow);
-}
-
-/* ---------- Interaction states ---------- */
 @media (hover: hover) {
-  .card-wrapper:hover {
-    transform: translateY(-8px) rotateX(5deg) rotateY(-2deg) scale(1.05);
-  }
-  .card-wrapper:hover::before {
-    opacity: 1;
-    box-shadow:
-      0 0 0 1px var(--card-glow) inset,
-      0 0 30px var(--card-glow-soft);
-  }
+  .card-wrapper:hover { transform: translateY(-8px) rotateX(4deg) scale(1.045); filter: brightness(1.08); }
 }
+.card-wrapper:active { transform: scale(0.97); }
+.card-wrapper.selected { transform: translateY(-12px) scale(1.075); }
+.card-wrapper.selected::before { opacity: 1; filter: blur(calc(var(--card-width) * 0.075)); }
+.card-wrapper.flipped { transform: rotateY(180deg); }
 
-.card-wrapper:active {
-  transform: scale(0.97);
-  transition-duration: 0.1s;
+@keyframes rune-card-pulse {
+  0%, 100% { filter: blur(calc(var(--card-width) * 0.045)); opacity: 0.5; }
+  50% { filter: blur(calc(var(--card-width) * 0.075)); opacity: 0.95; }
 }
-
-.card-wrapper.selected {
-  transform: translateY(-12px) scale(1.08);
-}
-.card-wrapper.selected::before {
-  opacity: 1;
-  box-shadow:
-    0 0 0 2px var(--card-glow) inset,
-    0 0 40px var(--card-glow);
-}
-
-.card-wrapper.flipped {
-  transform: rotateY(180deg);
-}
+@keyframes arcane-shimmer { to { transform: rotate(360deg); } }
 
 @media (prefers-reduced-motion: reduce) {
-  .card-wrapper.playable::before,
-  .card-wrapper.color-wild::after,
-  .card-wrapper.type-draw2::after,
-  .card-wrapper.type-draw4::after,
-  .card-wrapper.type-draw6::after,
-  .card-wrapper.type-draw10::after,
-  .card-wrapper.type-wildReverseDraw4::after,
-  .card-wrapper.type-wildColorRoulette::after {
-    animation: none;
-  }
+  .card-wrapper,
+  .card-wrapper::before,
+  .card-wrapper.color-wild .card-face::after { animation: none; transition-duration: 0.001ms; }
 }
 </style>
-

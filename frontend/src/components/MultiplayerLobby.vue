@@ -3,8 +3,8 @@
     <!-- Top bar — slim, brand left, identity + auth controls right. No scan-line. -->
     <header class="lobby-top-bar">
       <a class="brand-mark" href="#" @click.prevent>
-        <span class="brand-mark-uno">OPEN</span>
-        <span class="brand-mark-nomercy">MERCY</span>
+        <span class="brand-mark-uno">RUNE</span>
+        <span class="brand-mark-nomercy">RIOT</span>
       </a>
 
       <div class="top-bar-cta">
@@ -125,7 +125,7 @@
           </template>
           <template v-else>
             <p class="daily-desc daily-result">
-              {{ dailyRecord.result === 'won' ? `Cleared in ${dailyRecord.turns} turns` : dailyRecord.result === 'eliminated' ? 'Mercy got you today' : 'Lost today' }}
+              {{ dailyRecord.result === 'won' ? `Cleared in ${dailyRecord.turns} turns` : dailyRecord.result === 'eliminated' ? 'Ruin claimed you today' : 'Lost today' }}
               <span v-if="dailyPercentile">- top {{ dailyPercentile }}% today.</span>
               <span v-else>- new deal tomorrow.</span>
             </p>
@@ -1162,8 +1162,8 @@ async function confirmSignOut() {
 
 const WAIT_TIPS = [
   'Stack a draw card on a draw card to pass the pile along - it grows until someone eats the whole thing.',
-  'Down to one card? Call "Mercy!" fast. Get caught silent and you draw 10.',
-  'Hit 25 cards in hand and you are eliminated on the spot. No mercy.',
+  'Down to one card? Call "Riot!" fast. Get caught silent and you draw 10.',
+  'Hit 25 cards in hand and you are eliminated on the spot. Ruin is absolute.',
   'A 7 lets you swap hands with any player. A 0 rotates every hand around the table.',
   'Wild Color Roulette makes someone draw until they hit the called color.',
 ]
@@ -1223,7 +1223,7 @@ async function shareInvite() {
   if (navigator.share) {
     try {
       await navigator.share({
-        title: 'Open Mercy',
+        title: 'RUNE RIOT',
         text: 'Sit down - the game starts the moment you join.',
         url: inviteUrl(),
       })
@@ -1262,7 +1262,10 @@ function copyLink() {
 <style scoped>
 .lobby-container {
   min-height: 100vh;
-  background: var(--bg-concrete);
+  background:
+    radial-gradient(circle at 50% 0, rgba(112, 69, 153, 0.18), transparent 32%),
+    radial-gradient(circle at 12% 78%, rgba(55, 145, 94, 0.07), transparent 28%),
+    var(--bg-concrete);
   color: var(--text-primary);
   position: relative;
   display: flex;
@@ -1278,8 +1281,8 @@ function copyLink() {
   justify-content: space-between;
   gap: var(--spacing-3);
   padding: var(--spacing-3) var(--spacing-4);
-  border-bottom: 1px solid rgba(255, 204, 0, 0.08);
-  background: linear-gradient(180deg, rgba(10, 10, 11, 0.95), rgba(10, 10, 11, 0.7));
+  border-bottom: 1px solid rgba(216, 181, 101, 0.16);
+  background: linear-gradient(180deg, rgba(10, 7, 14, 0.97), rgba(14, 10, 20, 0.74));
   flex-wrap: wrap;
 }
 
@@ -1294,15 +1297,16 @@ function copyLink() {
 .brand-mark-uno {
   font-family: var(--font-display);
   font-size: var(--text-xl);
-  letter-spacing: 0.05em;
+  letter-spacing: 0.12em;
+  color: var(--color-hazard);
 }
 
 .brand-mark-nomercy {
   font-family: var(--font-display);
   font-size: var(--text-sm);
   letter-spacing: 0.2em;
-  color: var(--color-alert);
-  text-shadow: 0 0 12px rgba(255, 42, 42, 0.5);
+  color: var(--color-neon-magenta);
+  text-shadow: 0 0 12px rgba(167, 122, 228, 0.5);
 }
 
 .top-bar-cta {
@@ -1456,7 +1460,7 @@ function copyLink() {
   flex-direction: column;
   justify-content: center;
   padding: var(--spacing-8) var(--spacing-4);
-  max-width: 600px;
+  max-width: 680px;
   width: 100%;
   margin: 0 auto;
   gap: var(--spacing-6);
@@ -1488,8 +1492,11 @@ function copyLink() {
    every dark UI worth copying; a bright border on pure black reads as a
    wireframe. The hazard tint is what keeps this the daily zone. */
 .daily-card {
-  background: linear-gradient(180deg, rgba(255, 204, 0, 0.05), rgba(255, 255, 255, 0.02));
-  border: 1px solid rgba(255, 204, 0, 0.14);
+  background:
+    linear-gradient(135deg, rgba(212, 175, 55, 0.09), transparent 45%),
+    linear-gradient(180deg, rgba(28, 19, 40, 0.96), rgba(11, 8, 16, 0.98));
+  border: 1px solid rgba(212, 175, 55, 0.25);
+  box-shadow: inset 0 1px rgba(255, 239, 184, 0.04), 0 12px 36px rgba(0, 0, 0, 0.24);
   border-radius: var(--radius-md);
   padding: var(--spacing-4);
   display: flex;
@@ -1500,8 +1507,8 @@ function copyLink() {
 /* Today's board — the reason to come back tomorrow, next to the reason to
    play today. */
 .board-card {
-  background: rgba(255, 255, 255, 0.025);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: linear-gradient(180deg, rgba(25, 17, 36, 0.92), rgba(11, 8, 16, 0.96));
+  border: 1px solid rgba(155, 123, 232, 0.18);
   border-radius: var(--radius-md);
   padding: var(--spacing-4);
   display: flex;
@@ -1910,8 +1917,10 @@ function copyLink() {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-3);
-  background: rgba(255, 255, 255, 0.025);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  background:
+    linear-gradient(135deg, rgba(85, 214, 167, 0.055), transparent 55%),
+    linear-gradient(180deg, rgba(25, 17, 36, 0.94), rgba(11, 8, 16, 0.97));
+  border: 1px solid rgba(85, 214, 167, 0.2);
   border-radius: var(--radius-md);
   padding: var(--spacing-4);
 }
@@ -1980,8 +1989,8 @@ function copyLink() {
 .mode-list {
   display: flex;
   flex-direction: column;
-  background: rgba(255, 255, 255, 0.025);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: linear-gradient(180deg, rgba(25, 17, 36, 0.92), rgba(11, 8, 16, 0.96));
+  border: 1px solid rgba(155, 123, 232, 0.18);
   border-radius: var(--radius-md);
   padding: var(--spacing-2);
 }
@@ -2051,7 +2060,7 @@ function copyLink() {
 }
 
 .mode-item:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.045);
+  background: linear-gradient(90deg, rgba(85, 214, 167, 0.09), rgba(155, 123, 232, 0.04));
 }
 
 .mode-item:disabled {
@@ -2110,7 +2119,7 @@ function copyLink() {
   border: none;
   border-radius: var(--radius-sm);
   padding: var(--spacing-2) var(--spacing-3);
-  font-family: 'Chakra Petch', sans-serif;
+  font-family: var(--font-body);
   font-size: 0.82rem;
   color: rgba(255, 255, 255, 0.8);
   text-align: left;
@@ -2306,8 +2315,11 @@ function copyLink() {
   align-items: center;
   gap: var(--spacing-3);
   padding: var(--spacing-6) var(--spacing-4) var(--spacing-4);
-  background: rgba(255, 204, 0, 0.04);
-  border: 1px solid var(--color-hazard-dim);
+  background:
+    radial-gradient(circle at 50% 0, rgba(212, 175, 55, 0.12), transparent 55%),
+    linear-gradient(180deg, rgba(27, 18, 38, 0.97), rgba(10, 7, 15, 0.98));
+  border: 1px solid rgba(212, 175, 55, 0.38);
+  box-shadow: 0 20px 55px rgba(0, 0, 0, 0.34), inset 0 1px rgba(255, 239, 184, 0.06);
   border-radius: var(--radius-md);
   width: 100%;
 }
@@ -2406,8 +2418,10 @@ function copyLink() {
      24px margin), matching the approved wireframe. */
   margin-top: var(--spacing-6);
   padding: var(--spacing-4);
-  background: rgba(0, 243, 255, 0.03);
-  border: 1px solid rgba(0, 243, 255, 0.16);
+  background:
+    radial-gradient(circle at 50% 0, rgba(85, 214, 167, 0.08), transparent 55%),
+    linear-gradient(180deg, rgba(18, 25, 28, 0.96), rgba(9, 10, 13, 0.98));
+  border: 1px solid rgba(85, 214, 167, 0.24);
   border-radius: var(--radius-md);
 }
 
@@ -2689,7 +2703,7 @@ function copyLink() {
   border: 1px solid rgba(0, 243, 255, 0.22);
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
-  font-family: 'Chakra Petch', sans-serif;
+  font-family: var(--font-body);
   font-size: 0.82rem;
   text-align: left;
   cursor: pointer;

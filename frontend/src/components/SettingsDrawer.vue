@@ -176,7 +176,7 @@ function onMusicVolume(e: Event) {
   border-left: 1px solid rgba(255, 204, 0, 0.15);
   display: flex;
   flex-direction: column;
-  font-family: 'Chakra Petch', sans-serif;
+  font-family: var(--font-body);
   color: #e6e6e6;
 }
 
@@ -189,7 +189,7 @@ function onMusicVolume(e: Event) {
 }
 
 .settings-header h2 {
-  font-family: 'Black Ops One', 'Impact', sans-serif;
+  font-family: var(--font-display);
   font-size: 1.5rem;
   letter-spacing: 0.18em;
   margin: 0;
@@ -259,7 +259,7 @@ input[type="range"]:disabled { opacity: 0.4; }
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.18);
   color: #e6e6e6;
-  font-family: 'Chakra Petch', sans-serif;
+  font-family: var(--font-body);
   font-size: 0.7rem;
   letter-spacing: 0.18em;
   padding: 0.4rem 0;
@@ -274,7 +274,7 @@ input[type="range"]:disabled { opacity: 0.4; }
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.18);
   color: #e6e6e6;
-  font-family: 'Chakra Petch', sans-serif;
+  font-family: var(--font-body);
   font-size: 0.75rem;
   letter-spacing: 0.18em;
   padding: 0.65rem 0;
@@ -301,7 +301,7 @@ input[type="range"]:disabled { opacity: 0.4; }
   color: #a1a1aa;
   padding: 0.55rem 0;
   cursor: pointer;
-  font-family: 'Chakra Petch', sans-serif;
+  font-family: var(--font-body);
   font-size: 0.78rem;
   letter-spacing: 0.18em;
   text-transform: uppercase;

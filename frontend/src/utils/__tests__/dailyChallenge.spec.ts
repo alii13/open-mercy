@@ -18,13 +18,13 @@ const base = { date: '2026-08-09', result: 'won' as const, turns: 23, log: '' }
 
 describe('buildDailyShareText', () => {
     it('leads with the game and the date so a pasted line is self-identifying', () => {
-        expect(buildDailyShareText({ ...base, log: 'ppd' })).toContain('Open Mercy Daily 2026-08-09')
+        expect(buildDailyShareText({ ...base, log: 'ppd' })).toContain('RUNE RIOT Daily 2026-08-09')
     })
 
     it('states the outcome in words', () => {
         expect(buildDailyShareText({ ...base })).toContain('Cleared in 23')
         expect(buildDailyShareText({ ...base, result: 'lost' })).toContain('Lost')
-        expect(buildDailyShareText({ ...base, result: 'eliminated' })).toContain('Mercy got me')
+        expect(buildDailyShareText({ ...base, result: 'eliminated' })).toContain('Ruin claimed me')
     })
 
     it('includes the percentile when a rank is known', () => {

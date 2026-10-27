@@ -10,7 +10,7 @@
 
       <div class="rules-body">
         <p class="rules-goal">
-          Be the first to empty your hand. Open Mercy is brutal — penalties stack high
+          Be the first to empty your hand. RUNE RIOT is unforgiving — penalties stack high
           and if you ever hold <strong>25 cards</strong>, you're <strong>eliminated</strong>.
         </p>
 
@@ -19,15 +19,15 @@
           <ul class="rules-list">
             <li>Play a card that matches the <strong>color</strong> or the <strong>number/symbol</strong> on the pile.</li>
             <li>Can't play? <strong>Draw</strong> from the deck. If the drawn card is playable it plays automatically.</li>
-            <li>Down to one card? <strong>Call MERCY!</strong> — forget and you're penalized.</li>
+            <li>Down to one card? <strong>Call RIOT!</strong> — forget and you're penalized.</li>
           </ul>
         </section>
 
         <section class="rules-section">
-          <h3 class="rules-subhead">THE NO MERCY CARDS</h3>
+          <h3 class="rules-subhead">THE GREATER RUNES</h3>
           <ul class="rules-cards">
             <li><span class="chip chip-num">+2 +4</span> <span><strong>Draw cards.</strong> Stack them on the next player — they draw the whole pile or stack their own to pass it on.</span></li>
-            <li><span class="chip chip-danger">+6 +10</span> <span><strong>Wild draws.</strong> Massive penalties that send a hand spiralling toward the 25-card mercy limit.</span></li>
+            <li><span class="chip chip-danger">+6 +10</span> <span><strong>Wild draws.</strong> Massive penalties that send a hand spiralling toward the 25-card ruin limit.</span></li>
             <li><span class="chip">SKIP</span> <span>Skip the next player's turn.</span></li>
             <li><span class="chip">REV</span> <span>Reverse the direction of play.</span></li>
             <li><span class="chip">SKIP ALL</span> <span><strong>Skip everyone</strong> — you immediately play again.</span></li>

@@ -1,4 +1,4 @@
-# Open Mercy
+# RUNE RIOT
 
 A real-time multiplayer card game with a brutal stacking ruleset. Play online with friends or battle a ruthless AI - all from your browser.
 
@@ -72,32 +72,87 @@ The ruleset popularized by Mattel's UNO Show 'Em No Mercy® never got a proper d
 
 ## Getting started
 
+### Windows quick start
+
+From the repository root, double-click:
+
+```text
+Start-Rune-Riot.bat
+```
+
+The launcher checks Node.js, installs missing npm dependencies, creates the
+git-ignored `frontend/.env.local` from the valid public client configuration
+already present in `game-server/wrangler.toml`, starts the local multiplayer
+Worker and Vite, waits for both health checks, and opens the Couch TV at
+`/couch`. It never
+copies or requests a service-role key.
+
+The launcher selects one active private IPv4 address and binds both local
+services to that exact address. Phones on the same Wi-Fi can scan the QR code
+shown on the TV. To choose the interface explicitly (recommended on machines
+with VPNs or several network adapters), run:
+
+```text
+Start-Rune-Riot.bat -LanHost 192.168.x.x
+```
+
+You can also set `RUNE_RIOT_LAN_HOST` before launching. The worker accepts the
+matching frontend origin only; the launcher never opens a blanket wildcard
+host/origin. If Windows Firewall blocks another device, allow Node.js for the
+current **private** network when Windows asks. No firewall setting is changed
+automatically.
+
+### Couch Mode
+
+- TV / shared display: `http://<LAN-IP>:5173/couch`
+- Phones: scan the TV QR code or open its `/join/<ROOMCODE>` link
+- Capacity: 2–8 human players
+- Every player chooses a unique 2–16 character name and marks themselves ready
+- The TV starts the match and never receives a player's private hand
+- Refreshing a phone reconnects with its existing anonymous Supabase identity
+
+The TV is a neutral host, not a player. All moves still pass through the same
+authoritative Worker and unchanged shared rule engine used by online play.
+
+Run `Stop-Rune-Riot.bat` when you want to stop the background services started
+by the launcher. Re-running the start script is safe; it reuses healthy local
+services instead of starting duplicates.
+
+The game still needs an internet connection to the existing Supabase
+development endpoint for anonymous guest authentication. A fully local
+Supabase stack is not currently reproducible from this repository: it requires
+Docker/Supabase CLI and the repository does not yet contain the complete base
+schema for a fresh database.
+
 ### Prerequisites
 
-- Node.js 18+
-- A [Supabase](https://supabase.com) project (free tier works)
+- Node.js 22 LTS (the version used by CI; Vite 7 no longer supports Node 18)
+- Windows quick start: the existing public development configuration and an
+  internet connection
+- Custom backend setup: a [Supabase](https://supabase.com) project (free tier
+  works) with anonymous sign-ins enabled
 
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/alii13/open-mercy.git
-cd open-mercy/frontend
+git clone https://github.com/Craine92/Rune-Riot.git
+cd Rune-Riot/frontend
 npm install
 ```
 
-### 2. Set up Supabase
+### 2. Set up Supabase manually (only for a different project)
 
 1. Create a project at [supabase.com](https://supabase.com)
 2. Copy your project URL and anon key from **Settings > API**
 3. Enable **anonymous sign-ins** under **Authentication > Settings** (required for guest play)
-4. Set the **Site URL** under **Authentication > URL Configuration** to your deploy URL (e.g. `https://open-mercy.com`)
-5. Create your env file:
+4. Add `http://localhost:5173` under **Authentication > URL Configuration** for local development
+5. Create your local env file:
 
 ```bash
-cp .env.example .env
+cp .env.example .env.local
 ```
 
-4. Fill in your credentials:
+6. Replace both placeholders with the real public client values:
 
 ```env
 VITE_SUPABASE_URL=https://your-project-ref.supabase.co
@@ -110,7 +165,22 @@ VITE_SUPABASE_ANON_KEY=your-anon-key-here
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173). That's it.
+Open [http://localhost:5173](http://localhost:5173).
+
+For a fully local multiplayer server, start the Worker in a second terminal:
+
+```bash
+cd ../game-server
+npm ci
+npm run dev -- --ip 127.0.0.1 --port 8787
+```
+
+Then set `VITE_GAME_SERVER_URL=http://127.0.0.1:8787` in `frontend/.env`.
+Cloudflare credentials are not needed for this local Worker; Wrangler emulates
+the Durable Object locally. See
+[`docs/alpha-0.1-technical-report.md`](docs/alpha-0.1-technical-report.md) for
+the complete local setup, external-service requirements, and the RUNE RIOT
+rebranding/integration plan.
 
 ### 4. Build for production
 

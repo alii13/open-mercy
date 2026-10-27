@@ -17,7 +17,8 @@ export const QUICK_CHAT: readonly QuickChatPhrase[] = [
     { id: 'hi', text: 'Hi!', group: 'greet' },
     { id: 'gl', text: 'Good luck!', group: 'greet' },
     { id: 'gg', text: 'gg', group: 'greet' },
-    { id: 'mercy', text: 'Mercy!', group: 'react' },
+    // Keep the stable wire id for protocol compatibility; only the rendered copy changes.
+    { id: 'mercy', text: 'Riot!', group: 'react' },
     { id: 'nooo', text: 'Nooo!', group: 'react' },
     { id: 'wow', text: 'Wow!', group: 'react' },
     { id: 'close', text: 'Close one!', group: 'react' },

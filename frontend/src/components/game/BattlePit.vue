@@ -1,16 +1,15 @@
 <template>
   <div class="battle-pit" :style="{ '--mercy-intensity': mercyIntensity }">
-    <!-- Layer 1: Background pattern (diagonal industrial hatching, very low opacity) -->
+    <!-- Decorative table layers never receive pointer input. -->
     <div class="pit-hatching" aria-hidden="true"></div>
 
-    <!-- Layer 2: Felt table surface with top-down light + dark vignette -->
+    <!-- Ancient stone surface with top-down arcane light. -->
     <div class="pit-surface" aria-hidden="true"></div>
 
     <!-- Layer 3: Danger gradient bleeding from top-right, intensity scales with Mercy % -->
     <div class="pit-danger-gradient" aria-hidden="true"></div>
 
-    <!-- Layer 5: Left vertical rail — industrial control panel. Direction, color,
-         stack, and a TALL Mercy thermometer. Desktop only. -->
+    <!-- Compact grimoire rail: direction, active rune, curse stack and ruin limit. -->
     <aside class="pit-rail" aria-label="Game state">
       <div ref="railDirectionRef" class="rail-cell rail-direction" :class="{ ccw: direction === -1 }" :title="direction === 1 ? 'Clockwise' : 'Counter-clockwise'">
         <RotateCw :size="16" :stroke-width="2" aria-hidden="true" />
@@ -19,17 +18,17 @@
 
       <div v-if="currentColor && currentColor !== 'wild'" class="rail-cell rail-color">
         <span class="color-dot" :class="`dot-${currentColor}`" aria-hidden="true"></span>
-        <span>{{ currentColor.toUpperCase() }}</span>
+        <span>{{ colorLabel }}</span>
       </div>
 
       <div v-if="drawStack && drawStack > 0" class="rail-cell rail-stack" :class="{ critical: drawStack >= 12 }">
-        <span class="rail-cell-label">STACK</span>
+        <span class="rail-cell-label">CURSE</span>
         <span class="rail-cell-value">+<RollingNumber :value="drawStack" /></span>
       </div>
 
-      <!-- Mercy thermometer — tall vertical bar, fills bottom→top toward 25 -->
+      <!-- Ruin meter — fills bottom→top toward the unchanged 25-card limit. -->
       <div v-if="myCardCount !== undefined" class="rail-mercy" :class="mercyClass">
-        <div class="mercy-track" role="progressbar" :aria-valuenow="myCardCount" aria-valuemin="0" aria-valuemax="25" aria-label="Mercy meter">
+        <div class="mercy-track" role="progressbar" :aria-valuenow="myCardCount" aria-valuemin="0" aria-valuemax="25" aria-label="Ruin meter">
           <div class="mercy-fill" :style="{ height: mercyPct + '%' }"></div>
           <span class="mercy-tick mercy-tick-warn"></span>
           <span class="mercy-tick mercy-tick-crit"></span>
@@ -37,7 +36,7 @@
         <div class="mercy-readout">
           <span class="mercy-num"><RollingNumber :value="myCardCount ?? 0" /></span>
           <span class="mercy-of">/25</span>
-          <span class="mercy-label-text">MERCY</span>
+          <span class="mercy-label-text">RUIN</span>
         </div>
       </div>
     </aside>
@@ -99,7 +98,13 @@ const props = defineProps<{
 }>()
 
 const { isMobile } = useScreenSize()
-const drawHintText = computed(() => (isMobile.value ? 'TAP TO DRAW' : 'CLICK TO DRAW'))
+const drawHintText = computed(() => (isMobile.value ? 'TAP TO DRAW' : 'DRAW A RUNE'))
+const colorLabel = computed(() => ({
+  red: 'FLAME',
+  blue: 'FROST',
+  green: 'GROVE',
+  yellow: 'STORM',
+}[props.currentColor ?? ''] ?? props.currentColor?.toUpperCase() ?? ''))
 
 const mercyPct = computed(() => {
   if (props.myCardCount === undefined) return 0

@@ -18,8 +18,8 @@ export function buildShareText(p: ShareInputs): string {
     if (p.max_stack_survived > 0) brags.push(`survived a +${p.max_stack_survived} stack 💀`)
     const brag = brags.length ? `${brags.join(' · ')} — ` : ''
     const challenge = p.isOwn
-        ? 'Think you can beat me at Open Mercy?'
-        : `Think you can beat ${p.username} at Open Mercy?`
+        ? 'Think you can beat me at RUNE RIOT?'
+        : `Think you can beat ${p.username} at RUNE RIOT?`
     return `${brag}${challenge} ${p.url}`
 }
 

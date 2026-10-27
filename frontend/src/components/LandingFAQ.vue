@@ -6,7 +6,7 @@
         YOUR QUESTIONS, <span class="accent-blue">ANSWERED</span>
       </h2>
       <p class="section-desc" ref="faqDesc">
-        Everything about playing Open Mercy online, in one place.
+        Everything about entering RUNE RIOT, in one place.
       </p>
 
       <div class="faq-list">
@@ -47,8 +47,8 @@ import { onFirstScroll } from '../composables/onFirstScroll'
 // structured data must match the visible questions and answers exactly.
 const faqs = [
   {
-    q: 'Can I play Open Mercy online?',
-    a: 'Yes. Open Mercy runs directly in your web browser at open-mercy.com. There is nothing to install - open the page and play.',
+    q: 'Can I play RUNE RIOT online?',
+    a: 'Yes. RUNE RIOT runs directly in a modern web browser. There is nothing to install - open the page and play.',
   },
   {
     q: 'Is the game free?',
@@ -87,12 +87,12 @@ const faqs = [
     a: 'Yes. Draw cards stack onto each other, so a Draw 2 can build into a much larger penalty before someone finally picks up.',
   },
   {
-    q: 'What is the 25-card Mercy Rule?',
-    a: 'If a player\'s hand ever reaches 25 or more cards, that player is eliminated from the game. It is the "no mercy" twist that ends runaway hands.',
+    q: 'What is the 25-card Ruin Rule?',
+    a: 'If a player\'s hand ever reaches 25 or more cards, that player is eliminated from the game. The limit keeps runaway hands and long matches in check.',
   },
   {
-    q: 'Is Open Mercy an official UNO or Mattel game?',
-    a: "No. Open Mercy is an independent game. Its ruleset was popularized by Mattel's UNO Show 'Em No Mercy® card game, but this project is not affiliated with, endorsed by, or associated with Mattel or the official UNO brand.",
+    q: 'Does RUNE RIOT use official card-game artwork?',
+    a: 'No. RUNE RIOT is an independent fantasy card game with original interface, symbols and card artwork.',
   },
 ]
 
