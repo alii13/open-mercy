@@ -579,12 +579,29 @@ describe('username collision resilience', () => {
     it('reports a taken name as taken on rename', async () => {
         const auth = useAuthStore()
         await auth.signInAnonymously('Bob')
+        h.state.getSession = async () => ({ data: { session: { user: { id: 'anon-1' }, access_token: 't' } } })
         h.state.upsertResults = [collision]
 
         const res = await auth.updateUsername('Ali')
 
         expect(res.success).toBe(false)
         expect(res.error).toBe('That name is already taken')
+    })
+
+    // The store can still hold a player after the SDK has lost the session.
+    // The write then goes out as anon and Postgres answers 42501, which the
+    // player used to see verbatim and retried for minutes.
+    it('asks a signed-out player to reload instead of renaming as anon', async () => {
+        const auth = useAuthStore()
+        await auth.signInAnonymously('Bob')
+        const upsertsBefore = h.state.upsertCalls.length
+        h.state.getSession = async () => ({ data: { session: null } })
+
+        const res = await auth.updateUsername('Ali')
+
+        expect(res.success).toBe(false)
+        expect(res.error).toBe('You were signed out. Reload the page and try again.')
+        expect(h.state.upsertCalls).toHaveLength(upsertsBefore)
     })
 
     describe('suggestUsernames', () => {
