@@ -61,6 +61,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: '2026-10-29',
+        level: 'loud',
+        tag: 'FIXED',
+        title: 'Talk while you play again',
+        body: "Voice chat in multiplayer rooms stopped working at the end of September. It's fixed: in any room, tap the mic and talk to everyone at the table.",
+    },
+    {
         id: '2026-10-19',
         level: 'loud',
         tag: 'NEW',
