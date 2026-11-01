@@ -81,9 +81,9 @@ const initial = computed(() => initialOf(props.name))
 }
 
 /* Rank pip: a little under half the avatar, never below 14px, hanging off the
-   bottom-right edge. The thin white edge traces the shield's own outline so
-   it separates from any photo; it sits on the art, not the emblem, so the top
-   tiers keep their glow. */
+   bottom-right edge. A dark cutout traces the shield's own outline so it
+   separates from any photo by negative space, not a new colour; it sits on the
+   art, not the emblem, so the top tiers keep their glow. */
 .av .av-pip {
     position: absolute;
     --emblem-size: max(14px, calc(var(--av-size, 32px) * 0.45));
@@ -91,17 +91,18 @@ const initial = computed(() => initialOf(props.name))
     bottom: calc(var(--emblem-size) * -0.2);
 }
 .av-pip :deep(.badge-art) {
+    --cut: rgba(6, 8, 10, 0.95);
     filter:
-        drop-shadow(1px 0 0 #fff) drop-shadow(-1px 0 0 #fff)
-        drop-shadow(0 1px 0 #fff) drop-shadow(0 -1px 0 #fff);
+        drop-shadow(1.5px 0 0 var(--cut)) drop-shadow(-1.5px 0 0 var(--cut))
+        drop-shadow(0 1.5px 0 var(--cut)) drop-shadow(0 -1.5px 0 var(--cut));
 }
 
+/* PresenceDot brings its own dark cutout ring. */
 .av .av-dot {
     position: absolute;
     left: 2%;
     bottom: 2%;
     --pdot-size: clamp(8px, 18%, 18px);
-    box-shadow: 0 0 0 1px #fff;
 }
 
 /* State lives on the ring around the face, never on top of it. Same colours

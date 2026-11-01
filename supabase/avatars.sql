@@ -12,6 +12,11 @@
 alter table public.profiles
     add column if not exists avatar_version bigint;
 
+-- results-hardening.sql grants profile updates column by column, so a new
+-- column is read-only until it is listed. Without this the upload lands and
+-- the save fails with "permission denied for table profiles".
+grant update (avatar_version) on public.profiles to authenticated;
+
 -- Small squares only: the client crops and re-encodes to 256px before upload.
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('avatars', 'avatars', true, 262144, array['image/webp', 'image/jpeg'])

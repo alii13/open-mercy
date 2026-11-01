@@ -2625,7 +2625,7 @@ function copyLink() {
   height: 8px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.22);
-  box-shadow: 0 0 0 1px #fff;
+  box-shadow: 0 0 0 2px var(--bg-concrete);
   transition: background var(--duration-snap) var(--ease-snap);
 }
 

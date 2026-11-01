@@ -58,16 +58,19 @@ export function avatarUrlFor(id: string | null | undefined): string | null {
 export async function uploadAvatar(userId: string, photo: Blob): Promise<{ error: string | null }> {
     const previous = versions.get(userId) ?? null
     const version = Date.now()
+    const path = avatarPath(userId, version)
     const { error } = await supabase.storage
         .from('avatars')
-        .upload(avatarPath(userId, version), photo, { contentType: photo.type, cacheControl: '31536000' })
+        .upload(path, photo, { contentType: photo.type, cacheControl: '31536000' })
     if (error) return { error: error.message }
     const { error: saveError } = await supabase.from('profiles').update({ avatar_version: version }).eq('id', userId)
-    if (saveError) return { error: saveError.message }
+    if (saveError) {
+        // Nothing points at the new object, so it goes rather than lingering.
+        void supabase.storage.from('avatars').remove([path])
+        return { error: saveError.message }
+    }
     asked.add(userId)
     versions.set(userId, version)
-    // ponytail: only the version we know about is cleaned up; an orphan from a
-    // failed save stays in the bucket. List the folder if storage ever matters.
     if (previous != null) void supabase.storage.from('avatars').remove([avatarPath(userId, previous)])
     return { error: null }
 }

@@ -120,6 +120,16 @@ describe('saving a photo', () => {
         expect(avatarUrlFor(ME)).toBeNull()
     })
 
+    it('deletes its own upload when the profile refuses the save', async () => {
+        update.mockResolvedValueOnce({ error: { message: 'permission denied for table profiles' } })
+        const { uploadAvatar, avatarUrlFor } = await fresh()
+        const result = await uploadAvatar(ME, new Blob(['x'], { type: 'image/webp' }))
+        expect(result.error).toBeTruthy()
+        const uploadedPath = upload.mock.calls[0]![0]
+        expect(remove).toHaveBeenCalledWith([uploadedPath])
+        expect(avatarUrlFor(ME)).toBeNull()
+    })
+
     it('removes the photo and falls back to the initial', async () => {
         const { uploadAvatar, removeAvatar, avatarUrlFor } = await fresh()
         await uploadAvatar(ME, new Blob(['x'], { type: 'image/webp' }))
