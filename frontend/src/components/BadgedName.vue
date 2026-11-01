@@ -1,30 +1,30 @@
 <template>
     <span class="badged-name">
-        <!-- Presence rides on the shield, so one component puts the same mark
-             in every place a badge appears. Without a badge there is nothing
-             to sit on, and the dot stands beside the name instead. -->
-        <Badge
-            v-if="badge"
+        <!-- The player's photo (or initial) with presence and the tier shield
+             riding on it, so every row shows the same mark the seats do. -->
+        <Avatar
+            :uid="uid"
+            :name="name"
+            :size="24"
             :badge="badge"
-            size="mark"
             :points="points"
             :progress="progress"
-            :link="link"
+            :badge-link="link"
             :presence="presence"
             class="bn-badge"
         />
-        <PresenceDot v-else-if="presence !== undefined" :last-seen-at="presence" class="bn-dot" />
         <span class="bn-name"><slot>{{ name }}</slot></span>
     </span>
 </template>
 
 <script setup lang="ts">
-import Badge from './Badge.vue'
-import PresenceDot from './PresenceDot.vue'
+import Avatar from './Avatar.vue'
 import type { Badge as BadgeType, Progress } from '../utils/badges'
 
 withDefaults(
     defineProps<{
+        /** Whose photo to show; without it the initial stands in. */
+        uid?: string | null
         /** Plain-text name; or use the default slot for custom markup. */
         name?: string
         badge?: BadgeType
@@ -40,7 +40,7 @@ withDefaults(
          */
         presence?: string | null
     }>(),
-    { name: '', badge: undefined, points: undefined, progress: undefined, link: true, presence: undefined },
+    { uid: undefined, name: '', badge: undefined, points: undefined, progress: undefined, link: true, presence: undefined },
 )
 </script>
 
@@ -48,14 +48,11 @@ withDefaults(
 .badged-name {
     display: inline-flex;
     align-items: center;
-    gap: 0.4em;
+    gap: 0.6em;
     min-width: 0;
 }
 .bn-badge {
     flex: none;
-}
-.bn-dot {
-    margin-left: 0.15em;
 }
 .bn-name {
     min-width: 0;

@@ -61,6 +61,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: '2026-11-02',
+        level: 'loud',
+        tag: 'NEW',
+        title: 'Add a profile photo',
+        body: 'Your photo now sits in every seat, with your rank badge on its corner. Open the menu under your name and pick Profile photo. Guests claim their account first.',
+    },
+    {
         id: '2026-10-29',
         level: 'loud',
         tag: 'FIXED',

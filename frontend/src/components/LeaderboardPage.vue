@@ -73,14 +73,14 @@
             @click="openProfile(row)"
           >
             <Crown v-if="row.rank === 1" class="lb-pod-crown" :size="16" aria-hidden="true" />
-            <Badge
-              v-if="badgeInfoFor(row)?.badge"
-              :badge="badgeInfoFor(row)!.badge"
-              :points="badgeInfoFor(row)!.points"
-              :progress="badgeInfoFor(row)!.progress"
+            <Avatar
+              :uid="row.user_id"
+              :name="row.username"
+              :badge="badgeInfoFor(row)?.badge"
+              :points="badgeInfoFor(row)?.points"
+              :progress="badgeInfoFor(row)?.progress"
               :presence="row.user_id ? presence[row.user_id] ?? null : undefined"
-              size="mark"
-              link
+              badge-link
               class="lb-pod-emblem"
             />
             <span class="lb-pod-badge" :class="medalClass(row.rank)">{{ row.rank }}</span>
@@ -107,6 +107,8 @@
           >
             <span class="lb-rank">{{ row.rank }}</span>
             <BadgedName
+              :uid="row.user_id"
+              :name="row.username"
               :badge="badgeInfoFor(row)?.badge"
               :points="badgeInfoFor(row)?.points"
               :progress="badgeInfoFor(row)?.progress"
@@ -168,7 +170,7 @@ import SiteFooter from './SiteFooter.vue'
 import AllTimeBoard from './AllTimeBoard.vue'
 import { useAuthStore } from '../stores/authStore'
 import { track } from '../utils/analytics'
-import Badge from './Badge.vue'
+import Avatar from './Avatar.vue'
 import BadgedName from './BadgedName.vue'
 
 defineEmits<{ (e: 'back'): void }>()
@@ -480,11 +482,10 @@ onUnmounted(() => { if (ticker) clearInterval(ticker) })
   filter: drop-shadow(0 0 4px rgba(255, 215, 0, 0.5));
 }
 
-.lb-pod-emblem { flex: none; }
-.lb-pod-emblem :deep(.badge-emblem) { width: 48px; height: 48px; }
-.lb-pod--1 .lb-pod-emblem :deep(.badge-emblem) { width: 60px; height: 60px; }
+.lb-pod-emblem { --av-size: 52px; }
+.lb-pod--1 .lb-pod-emblem { --av-size: 64px; }
 
-/* Medal badge overlaps the emblem's lower edge. */
+/* Medal badge overlaps the avatar's lower edge, between presence and pip. */
 .lb-pod-badge {
   width: 20px;
   height: 20px;

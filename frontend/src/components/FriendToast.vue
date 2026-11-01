@@ -12,14 +12,14 @@
       @focusout="resume"
     >
       <div class="ft-head">
-        <Badge
-          v-if="info"
-          :badge="info.badge"
-          :points="info.points"
-          :progress="info.progress"
-          size="mark"
+        <Avatar
+          :uid="notice.row.user_id"
+          :name="notice.row.username"
+          :size="44"
+          :badge="info?.badge"
+          :points="info?.points"
+          :progress="info?.progress"
           class="ft-badge"
-          :style="{ '--emblem-size': '48px' }"
         />
         <div class="ft-text">
           <span class="ft-name">{{ title }}</span>
@@ -65,7 +65,7 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { X } from 'lucide-vue-next'
-import Badge from './Badge.vue'
+import Avatar from './Avatar.vue'
 import Button from './ui/Button.vue'
 import { useSocialStore } from '../stores/socialStore'
 import { useBadges } from '../composables/useBadges'
