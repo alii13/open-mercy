@@ -60,7 +60,7 @@
               <span v-if="social.incoming.length" class="account-count">{{ social.incoming.length }}</span>
             </button>
             <button class="account-item" role="menuitem" @click="editNameFromMenu">Edit name</button>
-            <button class="account-item" role="menuitem" @click="photoFromMenu">Profile photo</button>
+            <button v-if="avatarsAvailable" class="account-item" role="menuitem" @click="photoFromMenu">Profile photo</button>
             <button class="account-item account-item--out" role="menuitem" @click="signOutFromMenu">Sign out</button>
           </div>
         </div>
@@ -655,6 +655,7 @@ import { track } from '../utils/analytics'
 import { isRoomCode, normalizeRoomCode, roomCodeProblem } from '@roomCode'
 import { useBadges } from '../composables/useBadges'
 import { openPhotoSheet } from '../composables/usePhotoSheet'
+import { avatarsAvailable } from '../composables/useAvatars'
 import Avatar from './Avatar.vue'
 import AutoStartRing from './AutoStartRing.vue'
 import QuickChat from './QuickChat.vue'

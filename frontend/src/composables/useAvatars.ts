@@ -5,15 +5,15 @@
  *
  * Every Avatar asks for its own player, and the asks made in the same tick go
  * out as one query, so a table of ten seats is one round trip. Feature-detects
- * like useBadges: until the column exists the first query fails, lookups stop
- * for the session, and every avatar shows its initial.
+ * like useBadges: when the column is missing, lookups stop for the session,
+ * every avatar shows its initial and `avatarsAvailable` hides the upload
+ * entry points. A dropped connection is not that - those ids are asked again.
  */
 
-import { reactive } from 'vue'
+import { reactive, ref } from 'vue'
 import { supabase } from '../lib/supabase'
-import { avatarPath, avatarUrl } from '../utils/avatar'
-
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string
+import { avatarPath } from '../utils/avatar'
+import { isFatalSchemaError } from '../utils/supabaseErrors'
 
 /** user id -> photo version; null means the player has no photo. */
 const versions = reactive(new Map<string, number | null>())
@@ -21,9 +21,11 @@ const asked = new Set<string>()
 const queued = new Set<string>()
 let broken = false
 
+/** False once the database says photos are not installed. */
+export const avatarsAvailable = ref(true)
+
 // Bots and local seats carry ids like 'bot-1'. One of those in the batch makes
-// Postgres reject the whole query, which would read as "column missing" and
-// switch photos off for the session.
+// Postgres reject the whole query, so they never join it.
 const USER_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export function requestAvatars(ids: readonly (string | null | undefined)[]): void {
@@ -43,7 +45,12 @@ async function flush() {
     queued.clear()
     const { data, error } = await supabase.from('profiles').select('id, avatar_version').in('id', ids)
     if (error) {
-        broken = true
+        if (isFatalSchemaError(error)) {
+            broken = true
+            avatarsAvailable.value = false
+        }
+        // Forget them so the next mount asks again.
+        for (const id of ids) asked.delete(id)
         return
     }
     const byId = new Map((data ?? []).map(r => [r.id as string, r.avatar_version as number | null]))
@@ -51,12 +58,21 @@ async function flush() {
 }
 
 export function avatarUrlFor(id: string | null | undefined): string | null {
-    if (!id) return null
-    return avatarUrl(SUPABASE_URL, id, versions.get(id) ?? null)
+    const version = id ? versions.get(id) ?? null : null
+    if (!id || version == null) return null
+    // From the client, so photos follow it if it is ever pointed at the proxy.
+    return supabase.storage.from('avatars').getPublicUrl(avatarPath(id, version)).data.publicUrl
+}
+
+/** Deletes every object in the player's folder except `keep`. Listing rather
+ *  than trusting this tab's cache catches photos saved from another device. */
+async function clearFolder(userId: string, keep: string | null) {
+    const { data } = await supabase.storage.from('avatars').list(userId)
+    const stale = (data ?? []).map(f => `${userId}/${f.name}`).filter(p => p !== keep)
+    if (stale.length) await supabase.storage.from('avatars').remove(stale)
 }
 
 export async function uploadAvatar(userId: string, photo: Blob): Promise<{ error: string | null }> {
-    const previous = versions.get(userId) ?? null
     const version = Date.now()
     const path = avatarPath(userId, version)
     const { error } = await supabase.storage
@@ -71,15 +87,15 @@ export async function uploadAvatar(userId: string, photo: Blob): Promise<{ error
     }
     asked.add(userId)
     versions.set(userId, version)
-    if (previous != null) void supabase.storage.from('avatars').remove([avatarPath(userId, previous)])
+    void clearFolder(userId, path)
     return { error: null }
 }
 
 export async function removeAvatar(userId: string): Promise<{ error: string | null }> {
-    const current = versions.get(userId) ?? null
     const { error } = await supabase.from('profiles').update({ avatar_version: null }).eq('id', userId)
     if (error) return { error: error.message }
+    asked.add(userId)
     versions.set(userId, null)
-    if (current != null) await supabase.storage.from('avatars').remove([avatarPath(userId, current)])
+    await clearFolder(userId, null)
     return { error: null }
 }

@@ -111,14 +111,14 @@
             badge-link
           />
           <button
-            v-if="isOwn"
+            v-if="isOwn && avatarsAvailable"
             type="button"
             class="pp-photo-btn"
             aria-label="Change profile photo"
             title="Profile photo"
             @click="openPhotoSheet"
           >
-            <Camera :size="16" :stroke-width="2" aria-hidden="true" />
+            <Camera :size="20" :stroke-width="2" aria-hidden="true" />
           </button>
         </div>
         <Badge
@@ -310,6 +310,7 @@ import Button from './ui/Button.vue'
 import Badge from './Badge.vue'
 import Avatar from './Avatar.vue'
 import { openPhotoSheet } from '../composables/usePhotoSheet'
+import { avatarsAvailable } from '../composables/useAvatars'
 import ShareStatsCard from './ShareStatsCard.vue'
 
 const props = defineProps<{ code: string }>()
@@ -1315,13 +1316,13 @@ watch(() => props.code, (code) => {
 /* The camera sits top-right: the pip owns bottom-right, presence bottom-left. */
 .pp-photo-btn {
   position: absolute;
-  top: 0;
-  right: -4px;
+  top: -4px;
+  right: -8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   border: 1px solid rgba(255, 255, 255, 0.18);
   background: var(--surface-metal);

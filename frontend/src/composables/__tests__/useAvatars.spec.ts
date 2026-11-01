@@ -1,12 +1,14 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 
-type Rows = { data: { id: string; avatar_version: number | null }[] | null; error: { message: string } | null }
+type DbError = { message: string; code?: string }
+type Rows = { data: { id: string; avatar_version: number | null }[] | null; error: DbError | null }
 
-const { lookup, update, upload, remove } = vi.hoisted(() => ({
+const { lookup, update, upload, remove, list } = vi.hoisted(() => ({
     lookup: vi.fn<(ids: string[]) => Promise<Rows>>(),
-    update: vi.fn<(patch: Record<string, unknown>, id: string) => Promise<{ error: null | { message: string } }>>(async () => ({ error: null })),
-    upload: vi.fn<(path: string, blob: Blob, opts: Record<string, unknown>) => Promise<{ error: null | { message: string } }>>(async () => ({ error: null })),
+    update: vi.fn<(patch: Record<string, unknown>, id: string) => Promise<{ error: null | DbError }>>(async () => ({ error: null })),
+    upload: vi.fn<(path: string, blob: Blob, opts: Record<string, unknown>) => Promise<{ error: null | DbError }>>(async () => ({ error: null })),
     remove: vi.fn<(paths: string[]) => Promise<{ error: null }>>(async () => ({ error: null })),
+    list: vi.fn<(folder: string) => Promise<{ data: { name: string }[] | null; error: null }>>(async () => ({ data: [], error: null })),
 }))
 
 vi.mock('../../lib/supabase', () => ({
@@ -15,7 +17,14 @@ vi.mock('../../lib/supabase', () => ({
             select: () => ({ in: (_col: string, ids: string[]) => lookup(ids) }),
             update: (patch: Record<string, unknown>) => ({ eq: (_col: string, id: string) => update(patch, id) }),
         }),
-        storage: { from: () => ({ upload, remove }) },
+        storage: {
+            from: () => ({
+                upload,
+                remove,
+                list,
+                getPublicUrl: (path: string) => ({ data: { publicUrl: `https://x.supabase.co/storage/v1/object/public/avatars/${path}` } }),
+            }),
+        },
     },
 }))
 
@@ -41,6 +50,8 @@ beforeEach(() => {
     update.mockClear()
     upload.mockClear()
     remove.mockClear()
+    list.mockReset()
+    list.mockResolvedValue({ data: [], error: null })
 })
 
 describe('photo lookup', () => {
@@ -74,18 +85,31 @@ describe('photo lookup', () => {
         requestAvatars([A, PHOTO])
         await tick()
         expect(avatarUrlFor(A)).toBeNull()
-        expect(avatarUrlFor(PHOTO)).toMatch(new RegExp(`/avatars/${PHOTO}/42$`))
+        expect(avatarUrlFor(PHOTO)).toBe(`https://x.supabase.co/storage/v1/object/public/avatars/${PHOTO}/42`)
     })
 
-    it('stops asking when the column is not there yet', async () => {
-        lookup.mockResolvedValue({ data: null, error: { message: 'column profiles.avatar_version does not exist' } })
-        const { requestAvatars, avatarUrlFor } = await fresh()
+    it('stops asking, and hides uploads, when the column is not there yet', async () => {
+        lookup.mockResolvedValue({ data: null, error: { message: 'column profiles.avatar_version does not exist', code: '42703' } })
+        const { requestAvatars, avatarUrlFor, avatarsAvailable } = await fresh()
         requestAvatars([A])
         await tick()
         requestAvatars([B])
         await tick()
         expect(lookup).toHaveBeenCalledTimes(1)
         expect(avatarUrlFor(B)).toBeNull()
+        expect(avatarsAvailable.value).toBe(false)
+    })
+
+    it('asks again after a dropped connection instead of giving up', async () => {
+        lookup.mockResolvedValueOnce({ data: null, error: { message: 'TypeError: Failed to fetch' } })
+        const { requestAvatars, avatarUrlFor, avatarsAvailable } = await fresh()
+        requestAvatars([PHOTO])
+        await tick()
+        requestAvatars([PHOTO])
+        await tick()
+        expect(lookup).toHaveBeenCalledTimes(2)
+        expect(avatarUrlFor(PHOTO)).toMatch(/\/42$/)
+        expect(avatarsAvailable.value).toBe(true)
     })
 })
 
@@ -102,13 +126,16 @@ describe('saving a photo', () => {
         expect(avatarUrlFor(ME)).toMatch(new RegExp(`/avatars/${ME}/${patch.avatar_version}$`))
     })
 
-    it('deletes the previous photo once the new one is saved', async () => {
-        lookup.mockResolvedValue({ data: [{ id: ME, avatar_version: 7 }], error: null })
-        const { requestAvatars, uploadAvatar } = await fresh()
-        requestAvatars([ME])
-        await tick()
+    it('deletes every other photo in the folder once the new one is saved', async () => {
+        const { uploadAvatar } = await fresh()
+        list.mockImplementation(async () => ({
+            data: [{ name: '7' }, { name: '9' }, { name: String(update.mock.calls[0]![0].avatar_version) }],
+            error: null,
+        }))
         await uploadAvatar(ME, new Blob(['x'], { type: 'image/webp' }))
-        expect(remove).toHaveBeenCalledWith([`${ME}/7`])
+        await tick()
+        expect(list).toHaveBeenCalledWith(ME)
+        expect(remove).toHaveBeenCalledWith([`${ME}/7`, `${ME}/9`])
     })
 
     it('keeps the old photo when the upload is refused', async () => {
@@ -130,13 +157,12 @@ describe('saving a photo', () => {
         expect(avatarUrlFor(ME)).toBeNull()
     })
 
-    it('removes the photo and falls back to the initial', async () => {
-        const { uploadAvatar, removeAvatar, avatarUrlFor } = await fresh()
-        await uploadAvatar(ME, new Blob(['x'], { type: 'image/webp' }))
-        const version = update.mock.calls[0]![0].avatar_version
+    it('removes every photo in the folder and falls back to the initial', async () => {
+        list.mockResolvedValue({ data: [{ name: '5' }, { name: '6' }], error: null })
+        const { removeAvatar, avatarUrlFor } = await fresh()
         await removeAvatar(ME)
-        expect(remove).toHaveBeenLastCalledWith([`${ME}/${version}`])
         expect(update).toHaveBeenLastCalledWith({ avatar_version: null }, ME)
+        expect(remove).toHaveBeenLastCalledWith([`${ME}/5`, `${ME}/6`])
         expect(avatarUrlFor(ME)).toBeNull()
     })
 })

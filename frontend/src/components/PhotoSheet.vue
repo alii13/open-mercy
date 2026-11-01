@@ -8,7 +8,6 @@
       aria-labelledby="ps-title"
       tabindex="-1"
       @click.self="close"
-      @keydown.esc="close"
     >
       <div class="ps-sheet">
         <span class="ps-grabber" aria-hidden="true"></span>
@@ -125,9 +124,26 @@ const fileEl = ref<HTMLInputElement | null>(null)
 const busy = ref(false)
 const error = ref('')
 
+// Same contract as ui/Modal.vue: Escape works wherever focus is, and focus
+// goes back to whatever opened the sheet.
+const opener = document.activeElement as HTMLElement | null
+let unmounted = false
+
+function onKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape') close()
+}
+
 onMounted(() => {
+  document.addEventListener('keydown', onKeydown)
   overlayEl.value?.focus()
   if (uid.value) void fetchBadges([uid.value])
+})
+
+onBeforeUnmount(() => {
+  unmounted = true
+  document.removeEventListener('keydown', onKeydown)
+  if (photo.value) URL.revokeObjectURL(photo.value.url)
+  opener?.focus?.()
 })
 
 function close() {
@@ -139,6 +155,8 @@ function close() {
 interface Photo { url: string; width: number; height: number }
 const photo = shallowRef<Photo | null>(null)
 let image: HTMLImageElement | null = null
+/** Bumped per pick, so a slow decode that lost the race is thrown away. */
+let pickSeq = 0
 
 function pick() {
   error.value = ''
@@ -154,6 +172,7 @@ async function onFile(e: Event) {
     error.value = 'That file is not a picture. Pick a photo.'
     return
   }
+  const seq = ++pickSeq
   const url = URL.createObjectURL(file)
   const next = new Image()
   next.src = url
@@ -161,7 +180,12 @@ async function onFile(e: Event) {
     await next.decode()
   } catch {
     URL.revokeObjectURL(url)
-    error.value = 'That picture could not be opened. Try another one.'
+    if (!unmounted && seq === pickSeq) error.value = 'That picture could not be opened. Try another one.'
+    return
+  }
+  // The sheet closed, or a newer pick started, while this one decoded.
+  if (unmounted || seq !== pickSeq) {
+    URL.revokeObjectURL(url)
     return
   }
   if (photo.value) URL.revokeObjectURL(photo.value.url)
@@ -172,10 +196,6 @@ async function onFile(e: Event) {
   photo.value = { url, width: next.naturalWidth, height: next.naturalHeight }
   refreshPreview()
 }
-
-onBeforeUnmount(() => {
-  if (photo.value) URL.revokeObjectURL(photo.value.url)
-})
 
 // ---- cropping -------------------------------------------------------------
 
@@ -209,7 +229,8 @@ function settleOffset() {
 let dragFrom: { x: number; y: number; ox: number; oy: number } | null = null
 
 function startDrag(e: PointerEvent) {
-  if (!photo.value) return
+  // One finger moves the photo; a second would hijack the drag and jump it.
+  if (!photo.value || !e.isPrimary) return
   ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
   dragFrom = { x: e.clientX, y: e.clientY, ox: offset.x, oy: offset.y }
 }
@@ -274,7 +295,7 @@ async function save() {
     error.value = "Couldn't save your photo. Check your connection and try again."
     return
   }
-  track('avatar_saved', { content_type: blob?.type ?? 'unknown' })
+  track('avatar_saved')
   closePhotoSheet()
 }
 

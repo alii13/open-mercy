@@ -18,9 +18,14 @@ alter table public.profiles
 grant update (avatar_version) on public.profiles to authenticated;
 
 -- Small squares only: the client crops and re-encodes to 256px before upload.
+-- A re-run re-applies the limits, which are the only server-side check on what
+-- gets uploaded, even if the bucket was first made by hand.
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('avatars', 'avatars', true, 262144, array['image/webp', 'image/jpeg'])
-on conflict (id) do nothing;
+on conflict (id) do update set
+    public = excluded.public,
+    file_size_limit = excluded.file_size_limit,
+    allowed_mime_types = excluded.allowed_mime_types;
 
 -- Claimed accounts write inside their own folder. Anonymous (guest) sessions
 -- are refused here, which is the real gate; the app's claim sheet only

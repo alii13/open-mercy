@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { AVATAR_TINTS, avatarTint, avatarUrl, cropRect, initialOf } from '../avatar'
+import { AVATAR_TINTS, avatarPath, avatarTint, cropRect, initialOf } from '../avatar'
 
 describe('avatar fallback', () => {
     it('gives the same player the same tint every time', () => {
@@ -38,13 +38,8 @@ describe('crop', () => {
     })
 })
 
-describe('photo url', () => {
-    it('points at the version inside the player folder, so a new photo is a new url', () => {
-        expect(avatarUrl('https://x.supabase.co', 'abc', 1730000000000))
-            .toBe('https://x.supabase.co/storage/v1/object/public/avatars/abc/1730000000000')
-    })
-
-    it('has no url when the player has no photo', () => {
-        expect(avatarUrl('https://x.supabase.co', 'abc', null)).toBeNull()
+describe('photo path', () => {
+    it('keeps each version inside the player folder, so a new photo is a new url', () => {
+        expect(avatarPath('abc', 1730000000000)).toBe('abc/1730000000000')
     })
 })

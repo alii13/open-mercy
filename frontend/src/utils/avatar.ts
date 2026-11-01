@@ -1,6 +1,6 @@
 /**
- * Pure helpers for profile pictures: the no-photo fallback, the rank pip's
- * size, the crop the photo sheet saves, and the public url of a saved photo.
+ * Pure helpers for profile pictures: the no-photo fallback, the crop the
+ * photo sheet saves, and where a saved photo lives in the bucket.
  */
 
 export interface AvatarTint {
@@ -49,9 +49,4 @@ export function cropRect(
 /** Each save is a new object, so the url changes with the photo and caches forever. */
 export function avatarPath(userId: string, version: number): string {
     return `${userId}/${version}`
-}
-
-export function avatarUrl(supabaseUrl: string, userId: string, version: number | null): string | null {
-    if (version == null) return null
-    return `${supabaseUrl}/storage/v1/object/public/avatars/${avatarPath(userId, version)}`
 }
