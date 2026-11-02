@@ -11,8 +11,7 @@
         </div>
         <ul class="fs-card">
           <li v-for="f in online" :key="f.user_id" class="fs-row">
-            <Badge v-if="badges[f.user_id]" v-bind="badgeProps(f)" :presence="f.last_seen_at" size="mark" class="fs-shield" :style="{ '--emblem-size': '44px' }" />
-            <span v-else class="fs-shield-gap" aria-hidden="true" />
+            <Avatar :uid="f.user_id" :name="f.username" :size="40" v-bind="badgeProps(f)" :presence="f.last_seen_at" class="fs-shield" />
             <div class="fs-who">
               <button class="fs-name" @click="openProfile(f)">{{ f.username }}</button>
               <span class="fs-status">{{ onlineLabel(f) }}</span>
@@ -32,8 +31,7 @@
         <div class="fs-label"><span>Offline</span></div>
         <ul class="fs-card">
           <li v-for="f in offline" :key="f.user_id" class="fs-row fs-row--away">
-            <Badge v-if="badges[f.user_id]" v-bind="badgeProps(f)" size="mark" class="fs-shield fs-shield--away" :style="{ '--emblem-size': '44px' }" />
-            <span v-else class="fs-shield-gap" aria-hidden="true" />
+            <Avatar :uid="f.user_id" :name="f.username" :size="40" v-bind="badgeProps(f)" class="fs-shield fs-shield--away" />
             <div class="fs-who">
               <button class="fs-name" @click="openProfile(f)">{{ f.username }}</button>
               <span class="fs-status">{{ seenLabel(f) }}</span>
@@ -80,7 +78,7 @@
         <div class="fs-requests">
           <div v-for="r in social.incoming" :key="r.user_id" class="fs-request">
             <div class="fs-request-head">
-              <Badge v-if="badges[r.user_id]" v-bind="badgeProps(r)" size="mark" :style="{ '--emblem-size': '56px' }" />
+              <Avatar :uid="r.user_id" :name="r.username" :size="48" v-bind="badgeProps(r)" />
               <div class="fs-who">
                 <button class="fs-name fs-name--lg" @click="openProfile(r)">{{ r.username }}</button>
                 <span class="fs-status">Asked {{ askedAgo(r) }}</span>
@@ -98,7 +96,7 @@
         <div class="fs-label"><span>Waiting on a reply</span></div>
         <ul class="fs-card">
           <li v-for="o in social.outgoing" :key="o.user_id" class="fs-row fs-row--compact">
-            <Badge v-if="badges[o.user_id]" v-bind="badgeProps(o)" size="mark" :style="{ '--emblem-size': '34px' }" />
+            <Avatar :uid="o.user_id" :name="o.username" :size="32" v-bind="badgeProps(o)" />
             <div class="fs-who">
               <button class="fs-name" @click="openProfile(o)">{{ o.username }}</button>
               <span class="fs-status">Asked {{ askedAgo(o) }}</span>
@@ -112,7 +110,7 @@
         <div class="fs-label"><span>Played recently</span></div>
         <ul class="fs-card">
           <li v-for="o in social.recent" :key="o.user_id" class="fs-row fs-row--compact">
-            <Badge v-if="badges[o.user_id]" v-bind="badgeProps(o)" size="mark" :style="{ '--emblem-size': '34px' }" />
+            <Avatar :uid="o.user_id" :name="o.username" :size="32" v-bind="badgeProps(o)" />
             <div class="fs-who">
               <button class="fs-name" @click="openProfile(o)">{{ o.username }}</button>
               <span class="fs-status" :class="{ 'fs-status--warn': addFailed[o.user_id] }">{{ addFailed[o.user_id] ?? headToHead(o) }}</span>
@@ -178,7 +176,7 @@ import { isOnline, relativeTime, byPresence } from '../utils/relativeTime'
 import { useNow, usePoll } from '../composables/useClock'
 import { useBadges } from '../composables/useBadges'
 import { usePlayWithFriend } from '../composables/usePlayWithFriend'
-import Badge from './Badge.vue'
+import Avatar from './Avatar.vue'
 import Button from './ui/Button.vue'
 import FriendMore from './FriendMore.vue'
 import { navigate } from '../utils/routes'
@@ -234,8 +232,8 @@ watch(() => shownIds.value.join(','), () => {
 
 /** Only called under a v-if on the same lookup. */
 function badgeProps(r: { user_id: string }) {
-  const info = badges.value[r.user_id]!
-  return { badge: info.badge, points: info.points, progress: info.progress }
+  const info = badges.value[r.user_id]
+  return { badge: info?.badge, points: info?.points, progress: info?.progress }
 }
 
 // A request that did not go out says why, in the row, rather than the row
@@ -457,12 +455,6 @@ onUnmounted(() => {
 
 .fs-shield--away {
   opacity: 0.5;
-}
-
-.fs-shield-gap {
-  width: 44px;
-  height: 44px;
-  flex: none;
 }
 
 .fs-who {

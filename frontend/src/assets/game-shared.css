@@ -247,13 +247,9 @@
   box-shadow: 0 0 8px var(--color-neon-blue);
 }
 
-/* Who's in voice / who's talking — on the opponent chips. (The mic cluster
-   itself is self-styled in VoiceMicCluster.vue so it works outside the game
-   views too.) */
-.opponent-card .avatar.speaking {
-  box-shadow: 0 0 0 2px var(--color-neon-green), 0 0 12px rgba(0, 255, 102, 0.7);
-}
-
+/* Who's in voice / who's talking — on the opponent chips. Speaking rings the
+   chip's Avatar itself. (The mic cluster is self-styled in VoiceMicCluster.vue
+   so it works outside the game views too.) */
 .voice-dot {
   display: inline-block;
   width: 7px;
@@ -299,13 +295,9 @@
     box-shadow var(--duration-soft) var(--ease-soft);
 }
 
-/* The tier badge stands in for the seat's avatar. */
+/* The seat's photo (or initial), with the tier badge as its pip. */
 .opponent-card .seat-avatar {
-  flex: none;
-}
-.opponent-card .seat-avatar .badge-emblem {
-  width: 30px;
-  height: 30px;
+  --av-size: 32px;
 }
 
 .opponent-card.active {
@@ -315,15 +307,12 @@
   color: var(--text-primary);
 }
 
-/* Knocked out: dim the seat and flag it red, but grayscale only the avatar so
-   the OUT badge stays full-color and unmissable (a filter on the whole card
-   would gray the badge too). */
+/* Knocked out: dim the seat and flag it red. The Avatar grays only the face,
+   so the OUT text and the tier pip stay full-color (a filter on the whole card
+   would gray them too). */
 .opponent-card.eliminated {
   opacity: 0.6;
   border-color: var(--color-alert);
-}
-.opponent-card.eliminated .avatar {
-  filter: grayscale(1);
 }
 
 /* KO beat: the board desaturates for ~half a second when a player is knocked
@@ -443,26 +432,6 @@ body.fx-ko-desat .game-view {
 @media (prefers-reduced-motion: reduce) {
   .opponent-card.selectable { animation: none; }
   .opponent-card .dc-text { animation: none; }
-}
-
-.opponent-card .avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.06);
-  border: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-display);
-  font-size: var(--text-sm);
-  color: var(--text-primary);
-  flex-shrink: 0;
-}
-
-.opponent-card .avatar-active {
-  background: var(--color-neon-blue);
-  color: var(--bg-concrete);
 }
 
 .opponent-card .opponent-info {
@@ -1486,10 +1455,8 @@ body.fx-ko-desat .game-view {
     gap: var(--spacing-2);
   }
 
-  .opponent-card .avatar {
-    width: 36px;
-    height: 36px;
-    font-size: 1rem;
+  .opponent-card .seat-avatar {
+    --av-size: 36px;
   }
 
   .terminal-modal {
@@ -1549,10 +1516,8 @@ body.fx-ko-desat .game-view {
     gap: 0.4rem;
   }
 
-  .opponent-card .avatar {
-    width: 28px;
-    height: 28px;
-    font-size: 0.8rem;
+  .opponent-card .seat-avatar {
+    --av-size: 28px;
   }
 
   .opponent-card .name {

@@ -96,15 +96,37 @@
       </header>
 
       <div class="pp-side">
-      <!-- RAIL — the badge is the hero of this page -->
+      <!-- RAIL — the player's photo is the hero, their tier shield its pip;
+           the full badge below keeps the tier name and progress bar. -->
       <aside class="pp-rail">
+        <div class="pp-rail-face">
+          <Avatar
+            class="pp-rail-avatar"
+            :uid="p.user_id"
+            :name="p.username"
+            :badge="badgeInfo?.badge"
+            :points="badgeInfo?.points"
+            :progress="badgeInfo?.progress"
+            :presence="lastSeen"
+            badge-link
+          />
+          <button
+            v-if="isOwn && avatarsAvailable"
+            type="button"
+            class="pp-photo-btn"
+            aria-label="Change profile photo"
+            title="Profile photo"
+            @click="openPhotoSheet"
+          >
+            <Camera :size="20" :stroke-width="2" aria-hidden="true" />
+          </button>
+        </div>
         <Badge
           v-if="badgeInfo"
           class="pp-rail-badge"
           :badge="badgeInfo.badge"
           :points="badgeInfo.points"
           :progress="badgeInfo.progress"
-          :presence="lastSeen"
           size="full"
           link
         />
@@ -268,7 +290,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
-import { ArrowRight, Check, ChevronLeft, Pencil, UserPlus, X } from 'lucide-vue-next'
+import { ArrowRight, Camera, Check, ChevronLeft, Pencil, UserPlus, X } from 'lucide-vue-next'
 import gsap from 'gsap'
 import { useProfile } from '../composables/useProfile'
 import { useMotion } from '../composables/useMotion'
@@ -286,6 +308,9 @@ import { BADGES } from '../utils/badges'
 import SiteFooter from './SiteFooter.vue'
 import Button from './ui/Button.vue'
 import Badge from './Badge.vue'
+import Avatar from './Avatar.vue'
+import { openPhotoSheet } from '../composables/usePhotoSheet'
+import { avatarsAvailable } from '../composables/useAvatars'
 import ShareStatsCard from './ShareStatsCard.vue'
 
 const props = defineProps<{ code: string }>()
@@ -1280,7 +1305,39 @@ watch(() => props.code, (code) => {
   border-radius: var(--radius-md);
 }
 
-.pp-rail-badge :deep(.badge-emblem) { width: 132px; height: 132px; }
+.pp-rail-face {
+  position: relative;
+  /* Room for the pip, which hangs below the photo's edge. */
+  padding-bottom: var(--spacing-3);
+}
+.pp-rail-avatar {
+  --av-size: 128px;
+}
+/* The camera sits top-right: the pip owns bottom-right, presence bottom-left. */
+.pp-photo-btn {
+  position: absolute;
+  top: -4px;
+  right: -8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: var(--surface-metal);
+  color: var(--text-primary);
+  box-shadow: 0 0 0 3px var(--bg-concrete);
+  cursor: pointer;
+  transition: background var(--duration-snap) var(--ease-snap);
+}
+.pp-photo-btn:hover,
+.pp-photo-btn:focus-visible {
+  background: #2a2d32;
+}
+/* The shield rides the photo as its pip, so the full badge shows only its
+   tier name and progress bar here. */
+.pp-rail-badge :deep(.badge-emblem) { display: none; }
 .pp-rail-badge :deep(.badge-label) { font-size: var(--text-2xl); }
 
 .pp-rail-tier,
@@ -1383,7 +1440,7 @@ watch(() => props.code, (code) => {
     padding: var(--spacing-4) var(--spacing-3) var(--spacing-8);
   }
 
-  .pp-rail-badge :deep(.badge-emblem) { width: 104px; height: 104px; }
+  .pp-rail-avatar { --av-size: 104px; }
   .pp-record-card { flex: 1 1 calc(50% - var(--spacing-2)); }
 }
 

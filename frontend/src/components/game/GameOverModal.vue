@@ -57,8 +57,9 @@
             :disabled="social.pendingIds.has(o.userId) || FINAL_ADD_STATES.has(addState[o.userId] ?? '')"
             @click="addOpponent(o.userId)"
           >
-            <UserPlus :size="14" :stroke-width="2" aria-hidden="true" />
+            <Avatar :uid="o.userId" :name="o.name" :size="20" />
             {{ addState[o.userId] ?? o.name }}
+            <UserPlus :size="14" :stroke-width="2" aria-hidden="true" />
           </button>
         </div>
 
@@ -146,6 +147,7 @@ import gsap from 'gsap'
 import { ArrowRight, Flame, ImageDown, UserPlus } from 'lucide-vue-next'
 import { siX, siWhatsapp } from 'simple-icons'
 import { useSocialStore } from '../../stores/socialStore'
+import Avatar from '../Avatar.vue'
 import { generateShareImage, shareOrDownload } from '../../utils/shareImage'
 import { shouldSpotlightClaim, markClaimSpotlightShown } from '../../utils/claimSpotlight'
 import { track } from '../../utils/analytics'
@@ -752,9 +754,9 @@ function confettiStyle(i: number) {
 .add-chip {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: 0.4rem;
   max-width: 12rem;
-  padding: 0.25rem 0.6rem;
+  padding: 0.2rem 0.6rem 0.2rem 0.2rem;
   background: transparent;
   border: 1px solid rgba(0, 243, 255, 0.3);
   border-radius: 999px;

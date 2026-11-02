@@ -41,6 +41,8 @@
  *   signin_retry       {}
  *   leaderboard_tab_viewed { tab: daily|weekly|alltime }
  *   leaderboard_filtered   { country: <ISO-3166 alpha-2>|global }
+ *   avatar_saved       {}  - a claimed player saved a profile photo
+ *   avatar_removed     {}  - and removed it
  *
  * What's New. The card trio is the whole evidence base for the loud-or-quiet
  * call that every release has to make (see "Shipping updates to players" in

@@ -15,15 +15,15 @@
     @keydown.enter.prevent="isSelectable && $emit('click')"
     @keydown.space.prevent="isSelectable && $emit('click')"
   >
-    <Badge
-      v-if="badge"
+    <Avatar
+      :uid="uid"
+      :name="name"
       :badge="badge"
       :points="badgePoints"
       :progress="badgeProgress"
-      size="mark"
+      :state="avatarState"
       class="seat-avatar"
     />
-    <div v-else class="avatar" :class="{ 'avatar-active': isActive, speaking: isSpeaking }">{{ name.charAt(0).toUpperCase() }}</div>
     <div class="opponent-info">
       <span class="name">{{ name }}
         <span v-if="inVoice" class="voice-dot" :class="{ speaking: isSpeaking }" title="In voice"></span>
@@ -57,7 +57,7 @@
 <script setup lang="ts">
 import { Volume1, VolumeX, X } from 'lucide-vue-next'
 import { computed } from 'vue'
-import Badge from '../Badge.vue'
+import Avatar from '../Avatar.vue'
 import type { Badge as BadgeType, Progress } from '../../utils/badges'
 
 const props = defineProps<{
@@ -84,4 +84,13 @@ defineEmits<{ click: []; kick: []; voiceMute: [] }>()
 
 // Explicit label (e.g. multiplayer's "INTEL") wins; otherwise pluralize.
 const displayLabel = computed(() => props.countLabel ?? (props.cardCount === 1 ? 'card' : 'cards'))
+
+// One ring at a time, most final first: out beats gone beats talking beats turn.
+const avatarState = computed(() => {
+  if (props.isEliminated) return 'out'
+  if (props.isDisconnected) return 'disconnected'
+  if (props.isSpeaking) return 'speaking'
+  if (props.isActive) return 'turn'
+  return null
+})
 </script>

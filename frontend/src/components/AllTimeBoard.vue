@@ -26,13 +26,13 @@
             <template v-if="champion.member_since"> · playing since {{ since(champion.member_since) }}</template>
           </span>
         </div>
-        <Badge
-          v-if="championBadge"
-          :badge="championBadge.badge"
-          :points="championBadge.points"
-          :progress="championBadge.progress"
-          size="mark"
-          link
+        <Avatar
+          :uid="champion.user_id"
+          :name="champion.username"
+          :badge="championBadge?.badge"
+          :points="championBadge?.points"
+          :progress="championBadge?.progress"
+          badge-link
           class="at-hero-emblem"
         />
       </section>
@@ -96,14 +96,15 @@
             >
               <td class="c-rank">{{ row.rank }}</td>
               <td class="c-mark">
-                <Badge
-                  v-if="badgeFor(row)"
-                  :badge="badgeFor(row)!.badge"
-                  :points="badgeFor(row)!.points"
-                  :progress="badgeFor(row)!.progress"
+                <Avatar
+                  :uid="row.user_id"
+                  :name="row.username"
+                  :size="24"
+                  :badge="badgeFor(row)?.badge"
+                  :points="badgeFor(row)?.points"
+                  :progress="badgeFor(row)?.progress"
                   :presence="row.user_id ? presence[row.user_id] ?? null : undefined"
-                  size="mark"
-                  link
+                  badge-link
                 />
               </td>
               <td class="c-player">
@@ -124,12 +125,13 @@
       <div v-if="showSelf" class="at-self">
         <span class="c-rank">{{ context!.my_rank }}</span>
         <span class="c-mark">
-          <Badge
-            v-if="selfBadge"
-            :badge="selfBadge.badge"
-            :points="selfBadge.points"
-            :progress="selfBadge.progress"
-            size="mark"
+          <Avatar
+            :uid="authStore.user?.id"
+            :name="authStore.username"
+            :size="24"
+            :badge="selfBadge?.badge"
+            :points="selfBadge?.points"
+            :progress="selfBadge?.progress"
           />
         </span>
         <span class="c-player">
@@ -147,8 +149,9 @@
 
 <script setup lang="ts">
 import { computed, watch } from 'vue'
-import Badge from './Badge.vue'
+import Avatar from './Avatar.vue'
 import CountrySelect from './CountrySelect.vue'
+import { useAuthStore } from '../stores/authStore'
 import { flagEmoji } from '../utils/country'
 import { countryName } from '../utils/countryName'
 import { navigate } from '../utils/routes'
@@ -182,6 +185,8 @@ watch(() => props.rows, (rs) => {
         void fetchPresence(ids)
     }
 }, { immediate: true })
+
+const authStore = useAuthStore()
 
 function badgeFor(row: AlltimeRow) {
     return row.user_id ? badges.value[row.user_id] : undefined
@@ -312,8 +317,7 @@ function openProfile(code: string | null | undefined) {
   color: var(--text-muted);
 }
 
-.at-hero-emblem { flex: none; }
-.at-hero-emblem :deep(.badge-emblem) { width: 96px; height: 96px; }
+.at-hero-emblem { --av-size: 96px; }
 
 .at-rail {
   display: flex;
@@ -492,7 +496,7 @@ function openProfile(code: string | null | undefined) {
   /* Slightly under the letters on a phone, where a full-height flag next to
      a shorter name crowds the line. */
   .at-name-flag { font-size: 0.9em; }
-  .at-hero-emblem :deep(.badge-emblem) { width: 60px; height: 60px; }
+  .at-hero-emblem { --av-size: 60px; }
   .at-stat { padding-left: var(--spacing-3); }
   .at-stat dd { font-size: var(--text-lg); }
   .at-self { overflow-x: auto; }

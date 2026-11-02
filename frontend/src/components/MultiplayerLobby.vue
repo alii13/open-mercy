@@ -48,7 +48,8 @@
             :aria-expanded="accountOpen"
             @click="accountOpen = !accountOpen"
           >
-            {{ authStore.username }}
+            <Avatar :uid="authStore.user?.id" :name="authStore.username" :size="22" class="chip-avatar" />
+            <span class="chip-name">{{ authStore.username }}</span>
             <span v-if="social.incoming.length" class="chip-badge" :title="`${social.incoming.length} friend request${social.incoming.length > 1 ? 's' : ''}`">{{ social.incoming.length }}</span>
             <ChevronDown class="chip-edit-icon" :stroke-width="2" aria-hidden="true" />
           </button>
@@ -59,6 +60,7 @@
               <span v-if="social.incoming.length" class="account-count">{{ social.incoming.length }}</span>
             </button>
             <button class="account-item" role="menuitem" @click="editNameFromMenu">Edit name</button>
+            <button v-if="avatarsAvailable" class="account-item" role="menuitem" @click="photoFromMenu">Profile photo</button>
             <button class="account-item account-item--out" role="menuitem" @click="signOutFromMenu">Sign out</button>
           </div>
         </div>
@@ -169,14 +171,15 @@
               :class="{ mine: row.is_me }"
             >
               <span class="board-rank">{{ row.rank }}</span>
-              <Badge
-                v-if="dailyBadgeFor(row)?.badge"
-                :badge="dailyBadgeFor(row)!.badge"
-                :points="dailyBadgeFor(row)!.points"
-                :progress="dailyBadgeFor(row)!.progress"
+              <Avatar
+                :uid="row.user_id"
+                :name="row.username"
+                :size="24"
+                :badge="dailyBadgeFor(row)?.badge"
+                :points="dailyBadgeFor(row)?.points"
+                :progress="dailyBadgeFor(row)?.progress"
                 :presence="row.user_id ? presence[row.user_id] ?? null : undefined"
-                size="mark"
-                link
+                badge-link
                 class="board-badge"
               />
               <!-- share_code only exists once the v2 SQL is installed, so the
@@ -356,22 +359,18 @@
               :key="player.id"
               class="player-chip"
             >
-              <!-- The tier shield is the avatar (the shared Badge carries the
-                   hover tooltip); the letter circle is only the no-data
-                   fallback, same contract as the in-game seats. -->
+              <!-- Photo (or initial) with the tier shield as its pip, same
+                   contract as the in-game seats. -->
               <div class="seat-avatar-wrap">
-                <Badge
-                  v-if="seatBadges[player.user_id]"
-                  :badge="seatBadges[player.user_id]!.badge"
-                  :points="seatBadges[player.user_id]!.points"
-                  :progress="seatBadges[player.user_id]!.progress"
-                  size="mark"
-                  link
-                  class="seat-avatar"
+                <Avatar
+                  :uid="player.user_id"
+                  :name="player.name ?? ''"
+                  :size="32"
+                  :badge="seatBadges[player.user_id]?.badge"
+                  :points="seatBadges[player.user_id]?.points"
+                  :progress="seatBadges[player.user_id]?.progress"
+                  badge-link
                 />
-                <div v-else class="player-avatar">
-                  {{ player.name?.charAt(0) }}
-                </div>
                 <span
                   class="presence-dot"
                   :class="{ connected: isPlayerConnected(player.user_id) }"
@@ -655,7 +654,9 @@ import { navigate } from '../utils/routes'
 import { track } from '../utils/analytics'
 import { isRoomCode, normalizeRoomCode, roomCodeProblem } from '@roomCode'
 import { useBadges } from '../composables/useBadges'
-import Badge from './Badge.vue'
+import { openPhotoSheet } from '../composables/usePhotoSheet'
+import { avatarsAvailable } from '../composables/useAvatars'
+import Avatar from './Avatar.vue'
 import AutoStartRing from './AutoStartRing.vue'
 import QuickChat from './QuickChat.vue'
 import { vFocusRing } from '../directives/focusRing'
@@ -1133,6 +1134,11 @@ function editNameFromMenu() {
     startEditName('bar')
 }
 
+function photoFromMenu() {
+    closeAccount()
+    openPhotoSheet()
+}
+
 function signOutFromMenu() {
     closeAccount()
     requestSignOut()
@@ -1333,6 +1339,10 @@ function copyLink() {
 .username-chip-editable:hover {
   color: var(--text-primary);
   border-color: rgba(255, 255, 255, 0.25);
+}
+
+.chip-avatar {
+  margin: -3px 2px -3px -6px;
 }
 
 .chip-edit-icon {
@@ -2604,23 +2614,19 @@ function copyLink() {
   align-items: center;
 }
 
-.seat-avatar :deep(.badge-emblem) {
-  width: 28px;
-  height: 28px;
-}
-
 /* Same green, same size as PresenceDot elsewhere. This one means "socket is
    live in this room", which is a stricter fact than last-seen, but a player
-   should not have to learn two marks that both mean "here". */
+   should not have to learn two marks that both mean "here". Bottom-left, the
+   same corner as every presence dot; the tier pip owns the bottom-right. */
 .presence-dot {
   position: absolute;
-  bottom: -1px;
-  right: -1px;
-  width: 7px;
-  height: 7px;
+  bottom: 0;
+  left: 0;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.22);
-  border: 2px solid var(--bg-concrete);
+  box-shadow: 0 0 0 2px var(--bg-concrete);
   transition: background var(--duration-snap) var(--ease-snap);
 }
 
@@ -2914,13 +2920,19 @@ function copyLink() {
      was tight. It is now the only route to profile, stats and sign out, so it
      has to survive on a phone — truncated rather than hidden. */
   .username-chip {
-    max-width: 8.5rem;
+    max-width: 10.5rem;
     overflow: hidden;
-    text-overflow: ellipsis;
     white-space: nowrap;
     font-size: 0.7rem;
     padding: var(--spacing-1) var(--spacing-2);
     min-height: 36px;
+  }
+
+  /* Only the name gives way, so the avatar and the menu chevron always show. */
+  .chip-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   /* Menu items keep a comfortable tap target and may wrap on a narrow phone. */

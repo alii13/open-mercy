@@ -9,17 +9,16 @@
     </div>
     <ul class="inv-card">
       <li v-for="f in rows" :key="f.user_id" class="inv-row">
-        <Badge
-          v-if="badges[f.user_id]"
-          :badge="badges[f.user_id]!.badge"
-          :points="badges[f.user_id]!.points"
-          :progress="badges[f.user_id]!.progress"
-          size="mark"
+        <Avatar
+          :uid="f.user_id"
+          :name="f.username"
+          :size="32"
+          :badge="badges[f.user_id]?.badge"
+          :points="badges[f.user_id]?.points"
+          :progress="badges[f.user_id]?.progress"
           class="inv-shield"
           :class="{ 'inv-shield--away': state(f.user_id) === 'missed' || state(f.user_id) === 'declined' }"
-          :style="{ '--emblem-size': '36px' }"
         />
-        <span v-else class="inv-shield-gap" aria-hidden="true" />
         <div class="inv-who">
           <span class="inv-name">{{ f.username }}</span>
           <span class="inv-hint" :class="{ 'inv-hint--warn': !!errors[f.user_id] }">{{ hint(f) }}</span>
@@ -62,7 +61,7 @@ import { hasLiveSession } from '../utils/liveSession'
 import { isFatalSchemaError } from '../utils/supabaseErrors'
 import { useNow, usePoll } from '../composables/useClock'
 import { useBadges } from '../composables/useBadges'
-import Badge from './Badge.vue'
+import Avatar from './Avatar.vue'
 import Button from './ui/Button.vue'
 
 const social = useSocialStore()
@@ -236,11 +235,6 @@ async function invite(userId: string) {
   opacity: 0.5;
 }
 
-.inv-shield-gap {
-  flex: none;
-  width: 36px;
-  height: 36px;
-}
 
 .inv-who {
   flex: 1;
