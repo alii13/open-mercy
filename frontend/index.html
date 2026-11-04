@@ -191,11 +191,34 @@
          footer's Privacy settings keep working here. -->
     <meta name="google-adsense-account" content="ca-pub-5481263585202262">
     <script>
-      // Google's consent message and tags (~500 KB of script) were all of the
-      // page's blocking time in PageSpeed. They load on the visitor's first
-      // scroll, tap or key press, or after 15 s if there is none. Consent Mode
-      // keeps tags denied in the EEA and UK until the message records a choice,
-      // and gtag() calls made before then wait in dataLayer.
+      // Consent Mode v2: Google tags start denied in the EEA, UK and Switzerland
+      // until the AdSense consent message (Google's certified CMP) records a choice.
+      // Queued before any Google script is requested, so nothing runs ahead of it.
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('consent', 'default', {
+        ad_storage: 'denied',
+        ad_user_data: 'denied',
+        ad_personalization: 'denied',
+        analytics_storage: 'denied',
+        region: ['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH'],
+        wait_for_update: 500
+      });
+
+      // The consent message loads async on arrival, so a visitor who has to answer
+      // it sees it while the landing page settles. Waiting for the first tap put it
+      // on top of the game, because that tap was usually Play. An immediate click on
+      // a slow connection can still beat it.
+      (function () {
+        var s = document.createElement('script');
+        s.async = true;
+        s.src = 'https://fundingchoicesmessages.google.com/i/pub-5481263585202262?ers=1';
+        document.head.appendChild(s);
+      })();
+
+      // gtag.js for GA and Ads was most of the page's remaining blocking time in
+      // PageSpeed, so it still waits for the first scroll, tap or key press, or
+      // 15 s if there is none. gtag() calls made before then wait in dataLayer.
       // ponytail: a visit that leaves within 15 s without touching the page is
       // not counted in GA; shorten the fallback if that number matters.
       window.whenEngaged = function (fn) {
@@ -210,12 +233,6 @@
         events.forEach(function (e) { window.addEventListener(e, run, { passive: true }); });
         setTimeout(run, 15000);
       };
-      whenEngaged(function () {
-        var s = document.createElement('script');
-        s.async = true;
-        s.src = 'https://fundingchoicesmessages.google.com/i/pub-5481263585202262?ers=1';
-        document.head.appendChild(s);
-      });
     </script>
     <script>(function() {function signalGooglefcPresent() {if (!window.frames['googlefcPresent']) {if (document.body) {const iframe = document.createElement('iframe'); iframe.style = 'width: 0; height: 0; border: none; z-index: -1000; left: -1000px; top: -1000px;'; iframe.style.display = 'none'; iframe.name = 'googlefcPresent'; document.body.appendChild(iframe);} else {setTimeout(signalGooglefcPresent, 0);}}}signalGooglefcPresent();})();</script>
 
@@ -226,18 +243,6 @@
     <script>
       var GA_HOSTS = ['open-mercy.com', 'www.open-mercy.com', 'uno-no-mercy.com', 'www.uno-no-mercy.com'];
       var GA_ENABLED = GA_HOSTS.indexOf(location.hostname) !== -1;
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      // Consent Mode v2: Google tags start denied in the EEA, UK and Switzerland
-      // until the AdSense consent message (Google's certified CMP) records a choice.
-      gtag('consent', 'default', {
-        ad_storage: 'denied',
-        ad_user_data: 'denied',
-        ad_personalization: 'denied',
-        analytics_storage: 'denied',
-        region: ['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH'],
-        wait_for_update: 500
-      });
       if (GA_ENABLED) {
         whenEngaged(function () {
           var gaLoader = document.createElement('script');
