@@ -119,7 +119,7 @@
         </button>
       </Transition>
       <span
-        v-if="myTimeouts > 0 && !iAmOut"
+        v-if="myTimeouts > 0 && !iAmOut && gameStatus === 'playing'"
         class="timeout-badge"
         :title="`You ran out of time ${myTimeouts} of ${MAX_TURN_TIMEOUTS} turns in a row`"
       >TIMED OUT {{ myTimeouts }}/{{ MAX_TURN_TIMEOUTS }}</span>
