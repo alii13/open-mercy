@@ -4,100 +4,60 @@
     :style="{
       width: `${size.width}px`,
       height: `${size.height}px`,
-      // Per-instance skin override (someone else's seat). Undefined values
-      // are dropped by Vue, so the root-level equipped skin still applies.
       '--card-back-accent': accent,
       '--card-back-stripe': stripe,
     }"
+    role="img"
+    aria-label="RUNE RIOT card back"
   >
-    <svg 
-      :width="size.width" 
-      :height="size.height" 
-      viewBox="0 0 250 350" 
-      xmlns="http://www.w3.org/2000/svg"
-      class="card-back-svg"
-    >
-      <!-- Base Card Shape -->
-      <rect 
-        x="0" y="0" 
-        width="250" height="350" 
-        rx="16" ry="16"
-        fill="#111"
-      />
-
-      <!-- Industrial Plate Texture -->
-      <rect 
-        x="6" y="6" 
-        width="238" height="338" 
-        rx="12" ry="12"
-        fill="url(#plateGradient)"
-        stroke="#333"
-        stroke-width="2"
-      />
-      
-      <!-- Hazard Stripes Top/Bottom -->
-      <path d="M 6 40 L 244 40" stroke="url(#hazardStripe)" stroke-width="12" />
-      <path d="M 6 310 L 244 310" stroke="url(#hazardStripe)" stroke-width="12" />
-
-      <!-- Center Warning Circle -->
-      <circle 
-        cx="125" cy="175" 
-        r="90" 
-        fill="none" 
-        stroke="rgba(255,255,255,0.1)" 
-        stroke-width="2" 
-        stroke-dasharray="10 5"
-      />
-      
-      <circle 
-        cx="125" cy="175" 
-        r="75" 
-        fill="#000" 
-        style="stroke: var(--card-back-accent, #ff3333)" 
-        stroke-width="4"
-      />
-
-      <!-- OPEN MERCY Text -->
-      <text
-        x="125" y="165"
-        font-family="Black Ops One, cursive"
-        font-size="42"
-        style="fill: var(--card-back-accent, #ff3333)"
-        text-anchor="middle"
-        dominant-baseline="middle"
-      >OPEN</text>
-      <text 
-        x="125" y="205" 
-        font-family="Black Ops One, cursive" 
-        font-size="32" 
-        fill="#e6e6e6"
-        text-anchor="middle"
-        dominant-baseline="middle"
-      >MERCY</text>
-      
-      <!-- Definitions -->
+    <svg viewBox="0 0 250 350" xmlns="http://www.w3.org/2000/svg" class="card-back-svg" aria-hidden="true">
       <defs>
-        <linearGradient id="plateGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" style="stop-color:#2a2a2a" />
-          <stop offset="100%" style="stop-color:#1a1a1a" />
+        <radialGradient id="obsidianCore" cx="50%" cy="42%" r="72%">
+          <stop offset="0%" stop-color="#2d1745" />
+          <stop offset="52%" stop-color="#130d1c" />
+          <stop offset="100%" stop-color="#07060a" />
+        </radialGradient>
+        <linearGradient id="oldGold" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#f0d78f" />
+          <stop offset="45%" stop-color="#9a7334" />
+          <stop offset="100%" stop-color="#e8c46c" />
         </linearGradient>
-
-        <pattern id="hazardStripe" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-          <rect x="0" y="0" width="10" height="20" style="fill: var(--card-back-stripe, #ffcc00)" />
-          <rect x="10" y="0" width="10" height="20" fill="#000" />
-        </pattern>
+        <filter id="runeGlow" x="-60%" y="-60%" width="220%" height="220%">
+          <feGaussianBlur stdDeviation="5" result="blur" />
+          <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+        </filter>
       </defs>
+
+      <rect x="2" y="2" width="246" height="346" rx="18" fill="#07060a" stroke="#342742" stroke-width="4" />
+      <rect x="10" y="10" width="230" height="330" rx="13" fill="url(#obsidianCore)" stroke="url(#oldGold)" stroke-width="2" />
+      <path d="M26 48 48 26h154l22 22v254l-22 22H48l-22-22Z" fill="none" stroke="url(#oldGold)" stroke-width="2" opacity=".78" />
+      <path d="M39 59 59 39h132l20 20v232l-20 20H59l-20-20Z" fill="none" stroke="var(--card-back-accent, #8d63d1)" stroke-width="1.5" opacity=".55" />
+
+      <g opacity=".28" stroke="var(--card-back-stripe, #55c889)" fill="none" stroke-width="2">
+        <path d="M38 82h28l12-20 12 40 14-28 13 18" />
+        <path d="M212 268h-28l-12 20-12-40-14 28-13-18" />
+        <path d="M46 122c24 17 27 42 8 64 22 15 24 41 4 62" />
+        <path d="M204 102c-24 17-27 42-8 64-22 15-24 41-4 62" />
+      </g>
+
+      <g transform="translate(125 171)" filter="url(#runeGlow)">
+        <circle r="77" fill="#09070d" stroke="url(#oldGold)" stroke-width="3" />
+        <circle r="63" fill="none" stroke="var(--card-back-accent, #8d63d1)" stroke-width="2" stroke-dasharray="3 8" />
+        <path d="M0-56 17-25 52-17 25 7 32 44 0 27-32 44-25 7-52-17-17-25Z" fill="none" stroke="url(#oldGold)" stroke-width="3" stroke-linejoin="round" />
+        <path d="M0-36 10-11 37 0 10 11 0 36-10 11-37 0-10-11Z" fill="var(--card-back-accent, #8d63d1)" fill-opacity=".2" stroke="var(--card-back-accent, #8d63d1)" stroke-width="2" />
+        <circle r="9" fill="#07150f" stroke="var(--card-back-stripe, #55c889)" stroke-width="3" />
+      </g>
+
+      <text x="125" y="278" text-anchor="middle" fill="#ead492" font-family="Georgia, serif" font-size="25" font-weight="700" letter-spacing="4">RUNE</text>
+      <text x="125" y="305" text-anchor="middle" fill="var(--card-back-accent, #a77ae4)" font-family="Georgia, serif" font-size="19" font-weight="700" letter-spacing="7">RIOT</text>
     </svg>
-    
-    <!-- Scratches Overlay -->
-    <div class="scratches"></div>
+    <div class="stone-grain" aria-hidden="true"></div>
   </div>
 </template>
 
 <script setup lang="ts">
 interface Props {
   size?: { width: number; height: number }
-  /** Skin override for rendering someone else's card back. */
   accent?: string
   stripe?: string
 }
@@ -112,25 +72,25 @@ withDefaults(defineProps<Props>(), {
 <style scoped>
 .card-back {
   display: inline-block;
-  border-radius: 12px;
-  overflow: hidden;
   position: relative;
-  box-shadow: 
-    0 10px 20px rgba(0,0,0,0.5),
-    inset 0 0 0 1px rgba(255,255,255,0.1);
+  overflow: hidden;
+  border-radius: 6%;
+  background: #07060a;
+  box-shadow:
+    0 12px 25px rgba(0, 0, 0, 0.62),
+    0 0 18px color-mix(in srgb, var(--card-back-accent, #8d63d1) 35%, transparent),
+    inset 0 0 0 1px rgba(241, 211, 135, 0.18);
 }
-
-.scratches {
+.card-back-svg { display: block; width: 100%; height: 100%; }
+.stone-grain {
   position: absolute;
   inset: 0;
-  background-image: repeating-linear-gradient(
-    135deg,
-    rgba(255,255,255,0.03) 0px,
-    rgba(255,255,255,0.03) 1px,
-    transparent 1px,
-    transparent 10px
-  );
   pointer-events: none;
-  opacity: 0.5;
+  opacity: 0.34;
+  background:
+    repeating-linear-gradient(118deg, transparent 0 9px, rgba(255,255,255,.025) 10px, transparent 11px 24px),
+    radial-gradient(circle at 22% 31%, rgba(255,255,255,.05) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 73% 68%, rgba(0,0,0,.28) 0 1px, transparent 1.5px);
+  background-size: auto, 17px 19px, 23px 21px;
 }
 </style>

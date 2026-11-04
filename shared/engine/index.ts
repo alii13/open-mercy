@@ -4,6 +4,7 @@ export type {
     CardType,
     Player,
     GameState,
+    GameRuleset,
     TurnState,
     StackingMode,
     Rng,
@@ -13,6 +14,8 @@ export type {
 
 export {
     generateFullDeck,
+    generateClassicDeck,
+    generateChaosDeck,
     shuffleDeck,
     verifyDeck,
     getDeckBreakdown,

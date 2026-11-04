@@ -5,14 +5,14 @@
       <slot />
     </div>
 
-    <!-- MERCY! (right thumb). Drawing is done by tapping the deck. -->
+    <!-- Last-card call (right thumb). The engine event remains CALL_UNO. -->
     <button
       v-if="showUnoButton"
       class="dock-btn uno-btn"
       type="button"
       @click="$emit('call-uno')"
     >
-      MERCY!
+      RIOT!
     </button>
   </div>
 </template>

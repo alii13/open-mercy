@@ -53,7 +53,7 @@ const copied = ref(false)
 
 function shareText(): string {
     const article = /^[AEIOU]/i.test(props.badge.title) ? 'an' : 'a'
-    return `I'm ${article} ${props.badge.title} in Open Mercy - ${props.winRate}% win rate across ${props.games} games. Think you can beat me?`
+    return `I'm ${article} ${props.badge.title} in RUNE RIOT - ${props.winRate}% win rate across ${props.games} games. Think you can beat me?`
 }
 
 function render() {
@@ -70,7 +70,7 @@ function render() {
 
     ctx.fillStyle = '#e6e6e6'
     ctx.font = 'bold 28px monospace'
-    ctx.fillText('OPEN MERCY', 30, 55)
+    ctx.fillText('RUNE RIOT', 30, 55)
 
     ctx.fillStyle = props.badge.color
     ctx.font = 'bold 18px monospace'

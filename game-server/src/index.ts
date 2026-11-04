@@ -1,26 +1,29 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { verifySupabaseToken, type AuthEnv } from './auth'
-import type { ClientMsg, GameEvent, PresencePlayer, ServerMsg } from './protocol'
-import { applyIntent, applyUnoCatch, autoResolveAbsentTurn, forceEliminate, persistResults, personalView, startGame, updateStats, viewEventFor, type GameRecord } from './game'
+import type { ClientMsg, GameEvent, PresencePlayer, PublicView, ServerMsg } from './protocol'
+import { applyIntent, applyUnoCatch, autoResolveAbsentTurn, forceEliminate, maybeStartChaosEvent, nextChaosDeadline, persistResults, personalView, processChaosDeadline, startGame, updateStats, viewEventFor, type GameRecord } from './game'
 import { dirCodes, dirRegister, liveTables, normalizeDir } from './directory'
-import { cleanName, cleanSkin, isStackingMode } from './validate'
+import { cleanCouchName, cleanName, cleanSkin, couchNameTaken, isStackingMode } from './validate'
 import { newBucket, socketVerdict, type Bucket } from './socketLimit'
 import { createAllowed } from './createLimit'
 import { addParticipant, createMeeting, deactivateMeeting, voiceConfigured, type VoiceEnv } from './voice'
 import { gcWindowMs } from './roomGc'
 import { ROOM_CODE_ALPHABET, isRoomCode, normalizeRoomCode } from '../../shared/roomCode'
-import { canSeat, MAX_PLAYERS } from './seats'
+import { canSeat, canSeatCouch, MAX_PLAYERS } from './seats'
 import { autoStartTick, autoStartBump, autoStartBumpsLeft, AUTO_START_MIN_PLAYERS, type AutoStartState } from './autoStart'
 import { chatAllowed } from './chatLimit'
 import { sendRoomInvite } from './invites'
 import { quickChatPhrase } from '../../shared/quickChat'
-import type { StackingMode } from '../../shared/engine'
+import type { GameRuleset, StackingMode } from '../../shared/engine'
+import { couchHostActionError } from './couchHostActions'
 
 interface Env extends AuthEnv, VoiceEnv {
     ROOM: DurableObjectNamespace
     /** Optional wrangler secret; enables server-side game_results persistence. */
     SUPABASE_SERVICE_KEY?: string
+    /** Exact development origin exposed to phones on the local network. */
+    COUCH_ALLOWED_ORIGIN?: string
 }
 
 const CONTINENT_HINTS: Record<string, string> = {
@@ -81,13 +84,15 @@ async function locateRoom(env: Env, code: string): Promise<DurableObjectStub | n
 
 // Browser origins allowed to call the HTTP endpoints (WebSockets don't
 // preflight). Allowlist, not '*': the game's domains plus local dev.
-function corsOrigin(req: Request): string | null {
+function corsOrigin(req: Request, env: Env): string | null {
     const origin = req.headers.get('Origin')
     if (!origin) return null
     if (origin === 'https://uno-no-mercy.com' || origin === 'https://www.uno-no-mercy.com') return origin
     if (origin === 'https://open-mercy.com' || origin === 'https://www.open-mercy.com') return origin
     if (origin === 'https://uno-no-mercy.pages.dev') return origin
     if (/^http:\/\/localhost(:\d+)?$/.test(origin)) return origin
+    if (/^http:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) return origin
+    if (env.COUCH_ALLOWED_ORIGIN && origin === env.COUCH_ALLOWED_ORIGIN) return origin
     if (/^https:\/\/[a-z0-9-]+\.uno-no-mercy\.pages\.dev$/.test(origin)) return origin
     return null
 }
@@ -102,8 +107,8 @@ function roomGoneSocket(): Response {
     return new Response(null, { status: 101, webSocket: pair[0] })
 }
 
-function withCors(res: Response, req: Request): Response {
-    const origin = corsOrigin(req)
+function withCors(res: Response, req: Request, env: Env): Response {
+    const origin = corsOrigin(req, env)
     if (!origin) return res
     const out = new Response(res.body, res)
     out.headers.set('Access-Control-Allow-Origin', origin)
@@ -117,7 +122,7 @@ export default {
         const hint = CONTINENT_HINTS[(req.cf?.continent as string) ?? '']
 
         if (req.method === 'OPTIONS') {
-            const origin = corsOrigin(req)
+            const origin = corsOrigin(req, env)
             if (!origin) return new Response(null, { status: 403 })
             return new Response(null, {
                 headers: {
@@ -135,12 +140,12 @@ export default {
         if (req.method === 'POST' && url.pathname === '/rooms') {
             const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '')
             const creator = await verifySupabaseToken(token, env)
-            if (!creator) return withCors(new Response('unauthorized', { status: 401 }), req)
+            if (!creator) return withCors(new Response('unauthorized', { status: 401 }), req, env)
             const allowed = await directoryStub(env).fetch('https://do/create-allow', {
                 method: 'POST', body: JSON.stringify({ userId: creator.userId }),
             })
-            if (!(await allowed.json<boolean>())) return withCors(new Response('too many rooms', { status: 429 }), req)
-            const opts = await req.json<{ public?: boolean; stackingMode?: string }>().catch(() => ({} as { public?: boolean; stackingMode?: string }))
+            if (!(await allowed.json<boolean>())) return withCors(new Response('too many rooms', { status: 429 }), req, env)
+            const opts = await req.json<{ public?: boolean; stackingMode?: string; couch?: boolean; ruleset?: GameRuleset }>().catch(() => ({} as { public?: boolean; stackingMode?: string; couch?: boolean; ruleset?: GameRuleset }))
             const stackingMode: StackingMode = isStackingMode(opts.stackingMode) ? opts.stackingMode : 'official'
             const code = generateRoomCode()
             const timings = await Promise.all(
@@ -158,17 +163,24 @@ export default {
             const winner = timings[0]!
             await candidateStub(env, code, winner.i).fetch('https://do/activate', {
                 method: 'POST',
-                body: JSON.stringify({ code, hostUserId: creator.userId, stackingMode, isPublic: !!opts.public }),
+                body: JSON.stringify({
+                    code,
+                    hostUserId: creator.userId,
+                    stackingMode,
+                    ruleset: opts.couch ? (opts.ruleset === 'chaos' ? 'chaos' : 'classic') : 'mercy',
+                    isPublic: !!opts.public,
+                    couch: !!opts.couch,
+                }),
             })
             if (opts.public) {
                 await directoryStub(env).fetch('https://do/dir-register', { method: 'POST', body: JSON.stringify({ code }) })
             }
-            return withCors(Response.json({ code, placementMs: winner.ms }), req)
+            return withCors(Response.json({ code, placementMs: winner.ms, couch: !!opts.couch }), req, env)
         }
 
         if (url.pathname === '/health') {
             console.log('health check, secret bound:', !!env.SUPABASE_SERVICE_KEY)
-            return withCors(Response.json({ ok: true, resultsPersistence: !!env.SUPABASE_SERVICE_KEY, voice: voiceConfigured(env) }), req)
+            return withCors(Response.json({ ok: true, resultsPersistence: !!env.SUPABASE_SERVICE_KEY, voice: voiceConfigured(env) }), req, env)
         }
 
         // Open public rooms for quick match. Stays a bare array of codes:
@@ -176,14 +188,14 @@ export default {
         // the frontend.
         if (url.pathname === '/public-rooms') {
             const res = await directoryStub(env).fetch('https://do/dir-list')
-            return withCors(Response.json(await res.json()), req)
+            return withCors(Response.json(await res.json()), req, env)
         }
 
         // Same directory, enough detail to render a table without a round trip
         // per room. Carries no player names by design — see directory.ts.
         if (url.pathname === '/live-tables') {
             const res = await directoryStub(env).fetch('https://do/dir-tables')
-            return withCors(Response.json(await res.json()), req)
+            return withCors(Response.json(await res.json()), req, env)
         }
 
         // Join a room over WebSocket: /room/CODE/ws
@@ -196,6 +208,9 @@ export default {
         if (roomWs) {
             if (req.headers.get('Upgrade') !== 'websocket') {
                 return new Response('expected websocket', { status: 426 })
+            }
+            if (req.headers.get('Origin') && !corsOrigin(req, env)) {
+                return new Response('origin not allowed', { status: 403 })
             }
             // A 404 on the upgrade reaches the client as an anonymous 1006 —
             // indistinguishable from a network drop. Accept the socket and
@@ -216,7 +231,9 @@ interface RoomRecord {
     createdAt: number
     hostUserId: string
     stackingMode: string
+    ruleset?: GameRuleset
     isPublic: boolean
+    couch?: boolean
     /** RealtimeKit meeting backing this room's voice channel; created lazily. */
     voiceMeetingId?: string
 }
@@ -226,6 +243,7 @@ interface RosterEntry {
     joinedAt: number
     /** Equipped card-back skin id — cosmetic, client-reported at auth. */
     skin?: string
+    ready?: boolean
 }
 
 // One DO alarm serves four clocks; the earliest due time is armed.
@@ -245,7 +263,7 @@ interface RoomTimers {
     startBumps?: number
 }
 
-type SocketTag = { userId: string } | null
+type SocketTag = { role: 'player'; userId: string } | { role: 'display'; userId: string } | null
 
 export class GameRoomDO {
     // In-memory game cache; undefined = not loaded from storage yet (fresh
@@ -295,7 +313,7 @@ export class GameRoomDO {
 
     private async putTimers(t: RoomTimers): Promise<void> {
         await this.ctx.storage.put('timers', t)
-        const due = [t.gcAt, t.graceAt, t.catchAt, t.startAt].filter((x): x is number => !!x)
+        const due = [t.gcAt, t.graceAt, t.catchAt, t.startAt, nextChaosDeadline(this.game ?? null)].filter((x): x is number => !!x)
         if (due.length) await this.ctx.storage.setAlarm(Math.min(...due))
     }
 
@@ -372,8 +390,24 @@ export class GameRoomDO {
         // Same id scheme as game_results rows — distinct per dealt game.
         const gameId = this.game && roomRec ? `do-${roomRec.code}-${this.game.startedAt}` : null
         const view = personalView(this.game ?? null, this.roomStatus(), userId, roster, connected, roomRec?.hostUserId ?? null, gameId)
-        if (!this.game && roomRec) view.stackingMode = roomRec.stackingMode as StackingMode
+        if (!this.game && roomRec) {
+            view.stackingMode = roomRec.stackingMode as StackingMode
+            view.ruleset = roomRec.ruleset ?? (roomRec.couch ? 'classic' : 'mercy')
+        }
         return view
+    }
+
+    private publicViewFor(roster: { userId: string; name: string }[], roomRec: RoomRecord | undefined): PublicView {
+        // A display id can never match a seated player. personalView therefore
+        // withholds every hand and pending private choice by construction.
+        const view = this.viewFor('!couch-display', roster, roomRec)
+        return {
+            ...view,
+            you: null,
+            pendingDiscardAllCards: null,
+            pendingDrawnWildCard: null,
+            pendingDrawnCard: null,
+        }
     }
 
     private async snapshotFor(userId: string): Promise<ServerMsg> {
@@ -394,6 +428,12 @@ export class GameRoomDO {
                 this.send(ws, { t: 'event', seq: this.seq, ev: viewEventFor(ev, userId), intentId })
             }
             this.send(ws, { t: 'snapshot', seq: this.seq, game: this.viewFor(userId, roster, roomRec) })
+        }
+        for (const { ws } of this.displaySockets()) {
+            for (const ev of events) {
+                this.send(ws, { t: 'event', seq: this.seq, ev: viewEventFor(ev, '!couch-display'), intentId })
+            }
+            this.send(ws, { t: 'snapshot', seq: this.seq, game: this.publicViewFor(roster, roomRec) })
         }
         if (this.game && roomRec && events.some(e => e.t === 'GAME_OVER')) {
             await persistResults(this.game, roomRec.code, this.env)
@@ -420,10 +460,12 @@ export class GameRoomDO {
                 return Response.json(!!(await this.ctx.storage.get('room')))
 
             case '/activate': {
-                const body = await req.json<{ code: string; hostUserId: string; stackingMode?: string; isPublic?: boolean }>()
+                const body = await req.json<{ code: string; hostUserId: string; stackingMode?: string; ruleset?: GameRuleset; isPublic?: boolean; couch?: boolean }>()
                 const room: RoomRecord = {
                     code: body.code, createdAt: Date.now(), hostUserId: body.hostUserId,
                     stackingMode: isStackingMode(body.stackingMode) ? body.stackingMode : 'official', isPublic: !!body.isPublic,
+                    couch: !!body.couch,
+                    ruleset: body.couch ? (body.ruleset === 'chaos' ? 'chaos' : 'classic') : 'mercy',
                 }
                 await this.ctx.storage.put('room', room)
                 this.roomIsPublic = !!body.isPublic
@@ -500,7 +542,7 @@ export class GameRoomDO {
 
         // First frame must authenticate the socket.
         if (!tag) {
-            if (msg.t !== 'auth') {
+            if (msg.t !== 'auth' && msg.t !== 'couch-auth') {
                 this.send(ws, { t: 'error', code: 'unauthorized' })
                 ws.close(1008, 'auth required')
                 return
@@ -517,33 +559,68 @@ export class GameRoomDO {
                 ws.close(1011, 'room gone')
                 return
             }
+
+            if (msg.t === 'couch-auth') {
+                if (!room.couch || room.hostUserId !== verified.userId) {
+                    this.send(ws, { t: 'error', code: 'not-host' })
+                    ws.close(1008, 'not couch host')
+                    return
+                }
+                ws.serializeAttachment({ role: 'display', userId: verified.userId })
+                await this.touchGc()
+                this.send(ws, { t: 'hello', roomCode: room.code, userId: verified.userId, hostUserId: room.hostUserId, role: 'display', couch: true })
+                await this.loadGame()
+                const roster = (await this.ctx.storage.get<Record<string, RosterEntry>>('roster')) ?? {}
+                await this.broadcastPresence(roster)
+                const list = await this.rosterList()
+                this.send(ws, { t: 'snapshot', seq: this.seq, game: this.publicViewFor(list, room) })
+                return
+            }
             const roster = (await this.ctx.storage.get<Record<string, RosterEntry>>('roster')) ?? {}
-            if (!canSeat(roster, verified.userId)) {
+            const hasSeat = room.couch ? canSeatCouch(roster, verified.userId) : canSeat(roster, verified.userId)
+            if (!hasSeat) {
                 this.send(ws, { t: 'error', code: 'room-full' })
                 ws.close(1008, 'room full')
                 return
             }
             const entry = roster[verified.userId]
-            const name = cleanName(msg.name)
+            const couchName = room.couch ? cleanCouchName(msg.name) : null
+            if (room.couch && !couchName) {
+                this.send(ws, { t: 'error', code: 'name-invalid' })
+                ws.close(1008, 'invalid name')
+                return
+            }
+            const name = couchName ?? cleanName(msg.name)
+            if (room.couch && couchNameTaken(roster, name, verified.userId)) {
+                this.send(ws, { t: 'error', code: 'name-taken' })
+                ws.close(1008, 'name taken')
+                return
+            }
             const skin = cleanSkin(msg.skin)
             if (entry) {
-                if (name !== 'PLAYER') entry.name = name
+                const gameStarted = room.couch && !!(await this.loadGame())
+                if (name !== 'PLAYER' && !gameStarted) entry.name = name
                 entry.skin = skin || entry.skin
             } else {
-                roster[verified.userId] = { name, joinedAt: Date.now(), skin }
+                roster[verified.userId] = { name, joinedAt: Date.now(), skin, ready: room.couch ? false : undefined }
             }
             await this.ctx.storage.put('roster', roster)
-            ws.serializeAttachment({ userId: verified.userId })
+            ws.serializeAttachment({ role: 'player', userId: verified.userId })
             // Activity resets the GC clock.
             await this.touchGc()
 
-            this.send(ws, { t: 'hello', roomCode: room.code, userId: verified.userId, hostUserId: room.hostUserId })
+            this.send(ws, { t: 'hello', roomCode: room.code, userId: verified.userId, hostUserId: room.hostUserId, role: 'player', couch: !!room.couch })
             await this.broadcastPresence(roster)
             // Catch the joiner up — lobby state or a running game.
             await this.loadGame()
             this.send(ws, await this.snapshotFor(verified.userId))
             // A reconnecting current player cancels their grace clock.
             await this.armTurnGrace()
+            return
+        }
+
+        if (tag.role === 'display' && !['ping', 'start', 'kick', 'return-lobby', 'close-room'].includes(msg.t)) {
+            this.send(ws, { t: 'error', code: 'bad-message' })
             return
         }
 
@@ -569,7 +646,21 @@ export class GameRoomDO {
                 const roster = (await this.ctx.storage.get<Record<string, RosterEntry>>('roster')) ?? {}
                 const entry = roster[tag.userId]
                 if (entry && msg.name) {
-                    const name = cleanName(msg.name)
+                    const room = await this.ctx.storage.get<RoomRecord>('room')
+                    await this.loadGame()
+                    if (room?.couch && this.roomStatus() !== 'lobby') {
+                        this.send(ws, { t: 'error', code: 'not-in-lobby' })
+                        return
+                    }
+                    const name = room?.couch ? cleanCouchName(msg.name) : cleanName(msg.name)
+                    if (!name) {
+                        this.send(ws, { t: 'error', code: 'name-invalid' })
+                        return
+                    }
+                    if (room?.couch && couchNameTaken(roster, name, tag.userId)) {
+                        this.send(ws, { t: 'error', code: 'name-taken' })
+                        return
+                    }
                     entry.name = name
                     await this.ctx.storage.put('roster', roster)
                     await this.loadGame()
@@ -578,6 +669,23 @@ export class GameRoomDO {
                     await this.saveGame()
                 }
                 await this.broadcastPresence(roster)
+                return
+            }
+
+            case 'ready': {
+                const room = await this.ctx.storage.get<RoomRecord>('room')
+                await this.loadGame()
+                if (!room?.couch || this.roomStatus() !== 'lobby' || tag.role !== 'player') {
+                    this.send(ws, { t: 'error', code: 'not-in-lobby' })
+                    return
+                }
+                const roster = (await this.ctx.storage.get<Record<string, RosterEntry>>('roster')) ?? {}
+                const entry = roster[tag.userId]
+                if (entry) {
+                    entry.ready = msg.ready === true
+                    await this.ctx.storage.put('roster', roster)
+                    await this.broadcastPresence(roster)
+                }
                 return
             }
 
@@ -661,9 +769,83 @@ export class GameRoomDO {
                 return
             }
 
+            case 'return-lobby': {
+                const roomRec = await this.ctx.storage.get<RoomRecord>('room')
+                const denied = roomRec ? couchHostActionError('return-lobby', {
+                    couch: !!roomRec.couch,
+                    hostUserId: roomRec.hostUserId,
+                    socketUserId: tag.userId,
+                    role: tag.role,
+                    phase: this.roomStatus(),
+                }) : 'not-host'
+                if (denied) {
+                    this.send(ws, { t: 'error', code: denied })
+                    return
+                }
+
+                this.game = null
+                this.seq++
+                await this.ctx.storage.delete('game')
+                const roster = (await this.ctx.storage.get<Record<string, RosterEntry>>('roster')) ?? {}
+                for (const entry of Object.values(roster)) entry.ready = false
+                await this.ctx.storage.put('roster', roster)
+                const timers = await this.getTimers()
+                delete timers.graceAt
+                delete timers.graceSeat
+                delete timers.catchAt
+                delete timers.catchFor
+                await this.putTimers(timers)
+                await this.broadcastPresence(roster)
+                const list = await this.rosterList()
+                for (const player of this.roomSockets()) {
+                    this.send(player.ws, { t: 'snapshot', seq: this.seq, game: this.viewFor(player.userId, list, roomRec!) })
+                }
+                for (const display of this.displaySockets()) {
+                    this.send(display.ws, { t: 'snapshot', seq: this.seq, game: this.publicViewFor(list, roomRec!) })
+                }
+                await this.touchGc()
+                return
+            }
+
+            case 'close-room': {
+                const roomRec = await this.ctx.storage.get<RoomRecord>('room')
+                const denied = roomRec ? couchHostActionError('close-room', {
+                    couch: !!roomRec.couch,
+                    hostUserId: roomRec.hostUserId,
+                    socketUserId: tag.userId,
+                    role: tag.role,
+                    phase: this.roomStatus(),
+                }) : 'not-host'
+                if (denied) {
+                    this.send(ws, { t: 'error', code: denied })
+                    return
+                }
+                const sockets = [...this.roomSockets(), ...this.displaySockets()]
+                for (const connection of sockets) this.send(connection.ws, { t: 'error', code: 'room-closed' })
+                if (roomRec?.voiceMeetingId) await deactivateMeeting(this.env, roomRec.voiceMeetingId)
+                await this.ctx.storage.deleteAll()
+                this.game = undefined
+                this.roomIsPublic = undefined
+                for (const connection of sockets) connection.ws.close(1000, 'room-closed')
+                return
+            }
+
             case 'kick': {
                 const roomRec = await this.ctx.storage.get<RoomRecord>('room')
-                if (roomRec?.hostUserId !== tag.userId || msg.userId === tag.userId) {
+                if (roomRec?.couch) {
+                    await this.loadGame()
+                    const denied = couchHostActionError('kick', {
+                        couch: true,
+                        hostUserId: roomRec.hostUserId,
+                        socketUserId: tag.userId,
+                        role: tag.role,
+                        phase: this.roomStatus(),
+                    })
+                    if (denied) {
+                        this.send(ws, { t: 'error', code: denied })
+                        return
+                    }
+                } else if (roomRec?.hostUserId !== tag.userId || msg.userId === tag.userId) {
                     this.send(ws, { t: 'error', code: 'not-host' })
                     return
                 }
@@ -674,7 +856,8 @@ export class GameRoomDO {
                     if (s.userId === msg.userId) s.ws.close(1008, 'kicked')
                 }
                 await this.broadcastPresence(roster)
-                // Mid-game, a kick is a forced elimination — the seat can't return.
+                // Classic rooms retain their existing mid-game behavior.
+                // Couch-room kicks are rejected above outside the lobby.
                 await this.loadGame()
                 if (this.game && this.roomStatus() === 'playing') {
                     const events = forceEliminate(this.game, msg.userId)
@@ -690,7 +873,9 @@ export class GameRoomDO {
                     return
                 }
                 const roomRec = await this.ctx.storage.get<RoomRecord>('room')
-                if (roomRec?.hostUserId !== tag.userId) {
+                const allowedHost = roomRec?.hostUserId === tag.userId
+                    && (roomRec?.couch ? tag.role === 'display' : tag.role === 'player')
+                if (!allowedHost) {
                     this.send(ws, { t: 'error', code: 'not-host' })
                     return
                 }
@@ -701,9 +886,17 @@ export class GameRoomDO {
                     this.send(ws, { t: 'error', code: 'need-players' })
                     return
                 }
+                if (roomRec.couch) {
+                    const storedRoster = (await this.ctx.storage.get<Record<string, RosterEntry>>('roster')) ?? {}
+                    if (seated.some(player => !storedRoster[player.userId]?.ready)) {
+                        this.send(ws, { t: 'error', code: 'not-ready' })
+                        return
+                    }
+                }
                 const mode = isStackingMode(msg.stackingMode) ? msg.stackingMode
                     : isStackingMode(roomRec.stackingMode) ? roomRec.stackingMode : 'official'
-                const { game, events } = startGame(seated, mode)
+                const ruleset: GameRuleset = roomRec.couch ? (roomRec.ruleset === 'chaos' ? 'chaos' : 'classic') : 'mercy'
+                const { game, events } = startGame(seated, mode, ruleset)
                 this.game = game
                 {
                     // A manual start beats the countdown to the punch —
@@ -724,6 +917,25 @@ export class GameRoomDO {
                     await this.refreshDirectory(await this.ctx.storage.get<Record<string, RosterEntry>>('roster') ?? {})
                 }
                 await this.broadcastGame(events)
+                return
+            }
+
+            case 'set-couch-mode': {
+                const roomRec = await this.ctx.storage.get<RoomRecord>('room')
+                const denied = roomRec ? couchHostActionError('return-lobby', {
+                    couch: !!roomRec.couch,
+                    role: tag.role,
+                    socketUserId: tag.userId,
+                    hostUserId: roomRec.hostUserId,
+                    phase: this.roomStatus(),
+                }) : 'not-host'
+                if (denied || this.roomStatus() !== 'lobby' || (msg.ruleset !== 'classic' && msg.ruleset !== 'chaos')) {
+                    this.send(ws, { t: 'error', code: denied === 'not-host' ? 'not-host' : 'not-in-lobby' })
+                    return
+                }
+                roomRec!.ruleset = msg.ruleset
+                await this.ctx.storage.put('room', roomRec)
+                await this.broadcastGame([])
                 return
             }
 
@@ -772,6 +984,10 @@ export class GameRoomDO {
             }
 
             case 'intent': {
+                if (tag.role !== 'player') {
+                    this.send(ws, { t: 'error', code: 'invalid-intent', intentId: msg.id })
+                    return
+                }
                 const game = await this.loadGame()
                 if (!game || this.roomStatus() !== 'playing') {
                     this.send(ws, { t: 'error', code: 'not-started', intentId: msg.id })
@@ -803,7 +1019,8 @@ export class GameRoomDO {
                     this.send(ws, { t: 'error', code: 'invalid-intent', intentId: msg.id })
                     return
                 }
-                await this.broadcastGame(res.events, msg.id)
+                const chaosEvents = msg.action.kind === 'CALL_UNO' ? [] : maybeStartChaosEvent(game)
+                await this.broadcastGame([...res.events, ...chaosEvents], msg.id)
                 return
             }
 
@@ -845,6 +1062,14 @@ export class GameRoomDO {
         if (gcDue) t.gcAt = now + gcWindowMs(await this.isRoomPublic())
         await this.putTimers(t)
 
+        await this.loadGame()
+        if (this.game?.chaos) {
+            const before = `${this.game.engine.gameState}:${this.game.engine.turnState}:${this.game.chaos.event?.phase ?? 'none'}:${this.game.chaos.eventDue}`
+            const chaosEvents = processChaosDeadline(this.game, now)
+            const after = `${this.game.engine.gameState}:${this.game.engine.turnState}:${this.game.chaos.event?.phase ?? 'none'}:${this.game.chaos.eventDue}`
+            if (chaosEvents.length || before !== after) await this.broadcastGame(chaosEvents)
+        }
+
         if (catchDue && catchWho) {
             await this.loadGame()
             if (this.game && this.roomStatus() === 'playing') {
@@ -860,6 +1085,7 @@ export class GameRoomDO {
                 && s.players[s.currentPlayerIndex]?.id === graceSeat
                 && !connected.has(graceSeat)) {
                 const events = autoResolveAbsentTurn(this.game, graceSeat)
+                events.push(...maybeStartChaosEvent(this.game, now))
                 await this.broadcastGame(events)
             }
         }
@@ -873,14 +1099,14 @@ export class GameRoomDO {
             const connected = new Set(this.roomSockets().map(x => x.userId))
             const seated = (await this.rosterList()).filter(r => connected.has(r.userId))
             if (roomRec?.isPublic && this.roomStatus() === 'lobby' && seated.length >= AUTO_START_MIN_PLAYERS) {
-                const { game, events } = startGame(seated, roomRec.stackingMode as StackingMode)
+                const { game, events } = startGame(seated, roomRec.stackingMode as StackingMode, roomRec.ruleset ?? 'mercy')
                 this.game = game
                 await this.refreshDirectory(await this.ctx.storage.get<Record<string, RosterEntry>>('roster') ?? {})
                 await this.broadcastGame(events)
             }
         }
 
-        if (gcDue && this.roomSockets().length === 0) {
+        if (gcDue && this.authenticatedSocketCount() === 0) {
             const roomRec = await this.ctx.storage.get<RoomRecord>('room')
             if (roomRec?.isPublic) {
                 await directoryStub(this.env).fetch('https://do/dir-unregister', {
@@ -899,9 +1125,23 @@ export class GameRoomDO {
         for (const ws of this.ctx.getWebSockets()) {
             if (ws === exclude) continue
             const tag = ws.deserializeAttachment() as SocketTag
-            if (tag && 'userId' in tag) sockets.push({ ws, userId: tag.userId })
+            if (tag && 'userId' in tag && tag.role !== 'display') sockets.push({ ws, userId: tag.userId })
         }
         return sockets
+    }
+
+    private displaySockets(exclude?: WebSocket): { ws: WebSocket; userId: string }[] {
+        const sockets: { ws: WebSocket; userId: string }[] = []
+        for (const ws of this.ctx.getWebSockets()) {
+            if (ws === exclude) continue
+            const tag = ws.deserializeAttachment() as SocketTag
+            if (tag?.role === 'display') sockets.push({ ws, userId: tag.userId })
+        }
+        return sockets
+    }
+
+    private authenticatedSocketCount(): number {
+        return this.roomSockets().length + this.displaySockets().length
     }
 
     private send(ws: WebSocket, msg: ServerMsg) {
@@ -916,12 +1156,18 @@ export class GameRoomDO {
         const connectedIds = new Set(sockets.map(s => s.userId))
         const players: PresencePlayer[] = Object.entries(roster)
             .sort((a, b) => a[1].joinedAt - b[1].joinedAt)
-            .map(([userId, entry]) => ({ userId, name: entry.name, connected: connectedIds.has(userId), skin: entry.skin }))
+            .map(([userId, entry]) => ({
+                userId,
+                name: entry.name,
+                connected: connectedIds.has(userId),
+                skin: entry.skin,
+                ready: entry.ready,
+            }))
         // Presence changes are exactly when the auto-start clock moves, so the
         // frame carries it and the clients never need to poll.
         const auto = await this.tickAutoStart([...connectedIds], Object.keys(roster).length)
         const frame: ServerMsg = { t: 'presence', players, ...auto }
-        for (const { ws } of sockets) {
+        for (const { ws } of [...sockets, ...this.displaySockets(exclude)]) {
             this.send(ws, frame)
         }
         // Pass the connected count: this path runs from close handlers where

@@ -25,8 +25,9 @@ const H = 1920
 function drawBackground(ctx: CanvasRenderingContext2D) {
     // Radial dark gradient — same as the game bg pattern.
     const g = ctx.createRadialGradient(W / 2, H / 2, 100, W / 2, H / 2, W)
-    g.addColorStop(0, '#18191b')
-    g.addColorStop(1, '#0a0a0b')
+    g.addColorStop(0, '#241433')
+    g.addColorStop(0.55, '#120c1b')
+    g.addColorStop(1, '#08060c')
     ctx.fillStyle = g
     ctx.fillRect(0, 0, W, H)
 
@@ -41,22 +42,21 @@ function drawBackground(ctx: CanvasRenderingContext2D) {
     ctx.restore()
 
     // Danger tape strips at top and bottom — brand recognition
-    drawDangerTape(ctx, 0, 0, W, 24)
-    drawDangerTape(ctx, 0, H - 24, W, 24)
+    drawRuneRail(ctx, 0)
+    drawRuneRail(ctx, H - 24)
 }
 
-function drawDangerTape(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) {
+function drawRuneRail(ctx: CanvasRenderingContext2D, y: number) {
     ctx.save()
-    ctx.fillStyle = '#ffcc00'
-    ctx.fillRect(x, y, w, h)
-    ctx.fillStyle = '#0a0a0b'
-    const stripeW = 36
-    for (let i = -h; i < w + h; i += stripeW * 2) {
+    ctx.fillStyle = '#d4af37'
+    ctx.fillRect(0, y, W, 3)
+    ctx.fillStyle = 'rgba(155,123,232,0.45)'
+    for (let x = 18; x < W; x += 48) {
         ctx.beginPath()
-        ctx.moveTo(x + i, y)
-        ctx.lineTo(x + i + stripeW, y)
-        ctx.lineTo(x + i + stripeW + h, y + h)
-        ctx.lineTo(x + i + h, y + h)
+        ctx.moveTo(x, y + 5)
+        ctx.lineTo(x + 12, y + 12)
+        ctx.lineTo(x, y + 19)
+        ctx.lineTo(x - 12, y + 12)
         ctx.closePath()
         ctx.fill()
     }
@@ -64,24 +64,24 @@ function drawDangerTape(ctx: CanvasRenderingContext2D, x: number, y: number, w: 
 }
 
 function drawTitle(ctx: CanvasRenderingContext2D) {
-    // OPEN MERCY logo, large
+    // RUNE RIOT wordmark, large
     ctx.save()
     ctx.textAlign = 'center'
     ctx.textBaseline = 'top'
 
     // OPEN — huge red glow
-    ctx.font = 'bold 240px "Black Ops One", Impact, sans-serif'
-    ctx.fillStyle = '#ff2a2a'
-    ctx.shadowColor = 'rgba(255, 42, 42, 0.7)'
+    ctx.font = 'bold 220px Cinzel, Georgia, serif'
+    ctx.fillStyle = '#d4af37'
+    ctx.shadowColor = 'rgba(212, 175, 55, 0.55)'
     ctx.shadowBlur = 40
-    ctx.fillText('OPEN', W / 2, 140)
+    ctx.fillText('RUNE', W / 2, 140)
 
     // MERCY — smaller, gold
-    ctx.shadowColor = 'rgba(255, 204, 0, 0.55)'
+    ctx.shadowColor = 'rgba(123, 74, 226, 0.6)'
     ctx.shadowBlur = 25
-    ctx.font = 'bold 96px "Black Ops One", Impact, sans-serif'
-    ctx.fillStyle = '#ffcc00'
-    ctx.fillText('MERCY', W / 2, 400)
+    ctx.font = 'bold 96px Cinzel, Georgia, serif'
+    ctx.fillStyle = '#9b7be8'
+    ctx.fillText('RIOT', W / 2, 390)
     ctx.restore()
 }
 
@@ -93,15 +93,15 @@ function drawVerdict(ctx: CanvasRenderingContext2D, payload: ShareImagePayload) 
     // Verdict stamp
     ctx.translate(W / 2, 620)
     ctx.rotate(-0.05)
-    ctx.font = 'bold 180px "Black Ops One", Impact, sans-serif'
+    ctx.font = 'bold 160px Cinzel, Georgia, serif'
     if (payload.isWinner) {
-        ctx.fillStyle = '#ffcc00'
-        ctx.shadowColor = 'rgba(255, 204, 0, 0.5)'
+        ctx.fillStyle = '#d4af37'
+        ctx.shadowColor = 'rgba(212, 175, 55, 0.5)'
         ctx.shadowBlur = 35
         ctx.fillText('VICTORY', 0, 0)
     } else {
-        ctx.fillStyle = '#ff2a2a'
-        ctx.shadowColor = 'rgba(255, 42, 42, 0.5)'
+        ctx.fillStyle = '#9b7be8'
+        ctx.shadowColor = 'rgba(123, 74, 226, 0.55)'
         ctx.shadowBlur = 35
         ctx.fillText('DEFEATED', 0, 0)
     }
@@ -111,7 +111,7 @@ function drawVerdict(ctx: CanvasRenderingContext2D, payload: ShareImagePayload) 
     ctx.save()
     ctx.textAlign = 'center'
     ctx.textBaseline = 'top'
-    ctx.font = '32px "Chakra Petch", sans-serif'
+    ctx.font = '32px Inter, sans-serif'
     ctx.fillStyle = '#a1a1aa'
     const subline = payload.isWinner
         ? `I broke ${payload.opponentName}.`
@@ -126,7 +126,7 @@ function drawStats(ctx: CanvasRenderingContext2D, payload: ShareImagePayload) {
     const cells = [
         { value: String(payload.cardsPlayed), label: 'CARDS PLAYED' },
         { value: String(payload.biggestStack), label: 'BIGGEST STACK' },
-        { value: String(payload.unosCalled), label: 'MERCY CALLS' },
+        { value: String(payload.unosCalled), label: 'RIOT CALLS' },
         { value: String(payload.peakHand), label: 'PEAK HAND' },
     ]
 
@@ -144,19 +144,19 @@ function drawStats(ctx: CanvasRenderingContext2D, payload: ShareImagePayload) {
         const y = gridTop + row * (cellH + gapY)
 
         // Cell border
-        ctx.strokeStyle = 'rgba(255, 204, 0, 0.18)'
+        ctx.strokeStyle = 'rgba(212, 175, 55, 0.28)'
         ctx.lineWidth = 2
         ctx.strokeRect(x, y, cellW, cellH)
 
         // Value
         ctx.textAlign = 'center'
         ctx.textBaseline = 'top'
-        ctx.font = 'bold 140px "Black Ops One", Impact, sans-serif'
-        ctx.fillStyle = payload.isWinner ? '#ffcc00' : '#e6e6e6'
+        ctx.font = 'bold 140px Cinzel, Georgia, serif'
+        ctx.fillStyle = payload.isWinner ? '#d4af37' : '#f5ecd8'
         ctx.fillText(cell.value, x + cellW / 2, y + 24)
 
         // Label
-        ctx.font = '24px "Chakra Petch", sans-serif'
+        ctx.font = '24px Inter, sans-serif'
         ctx.fillStyle = '#52525b'
         ctx.fillText(cell.label, x + cellW / 2, y + cellH - 50)
     })
@@ -168,12 +168,12 @@ function drawFooter(ctx: CanvasRenderingContext2D, payload: { siteUrl: string })
     ctx.textAlign = 'center'
     ctx.textBaseline = 'bottom'
 
-    ctx.font = '28px "Chakra Petch", sans-serif'
+    ctx.font = '28px Inter, sans-serif'
     ctx.fillStyle = '#a1a1aa'
     ctx.fillText('PLAY FREE', W / 2, H - 100)
 
-    ctx.font = 'bold 34px "Chakra Petch", sans-serif'
-    ctx.fillStyle = '#00f3ff'
+    ctx.font = 'bold 34px Inter, sans-serif'
+    ctx.fillStyle = '#55d6a7'
     ctx.fillText(payload.siteUrl, W / 2, H - 60)
     ctx.restore()
 }
@@ -203,7 +203,7 @@ export async function generateShareImage(payload: ShareImagePayload): Promise<Bl
  * Trigger native share if supported, otherwise download. Returns true on
  * either successful share or download.
  */
-export async function shareOrDownload(blob: Blob, filename = 'open-mercy-win.png'): Promise<boolean> {
+export async function shareOrDownload(blob: Blob, filename = 'rune-riot-win.png'): Promise<boolean> {
     const file = new File([blob], filename, { type: 'image/png' })
 
     // Native share with file (mobile mainly)
@@ -212,8 +212,8 @@ export async function shareOrDownload(blob: Blob, filename = 'open-mercy-win.png
         try {
             await navAny.share({
                 files: [file],
-                title: 'Open Mercy',
-                text: 'I just won at Open Mercy.',
+                title: 'RUNE RIOT',
+                text: 'I just won at RUNE RIOT.',
             })
             return true
         } catch {
@@ -276,7 +276,7 @@ function drawDailyHead(ctx: CanvasRenderingContext2D, p: DailyShareImagePayload)
     ctx.textAlign = 'center'
     ctx.textBaseline = 'top'
 
-    ctx.font = '30px "Chakra Petch", sans-serif'
+    ctx.font = '30px Inter, sans-serif'
     ctx.fillStyle = '#a1a1aa'
     ctx.letterSpacing = '6px'
     ctx.fillText(`DAILY DEAL · ${p.date}`, W / 2, 545)
@@ -284,10 +284,10 @@ function drawDailyHead(ctx: CanvasRenderingContext2D, p: DailyShareImagePayload)
 
     const headline =
         p.result === 'won' ? `CLEARED IN ${p.turns}` :
-        p.result === 'eliminated' ? 'MERCY GOT ME' : 'DIDN’T CLEAR IT'
-    ctx.font = 'bold 104px "Black Ops One", Impact, sans-serif'
-    ctx.fillStyle = p.result === 'won' ? '#ffcc00' : '#ff2a2a'
-    ctx.shadowColor = p.result === 'won' ? 'rgba(255,204,0,0.45)' : 'rgba(255,42,42,0.45)'
+        p.result === 'eliminated' ? 'RUIN CLAIMED ME' : 'DIDN’T CLEAR IT'
+    ctx.font = 'bold 104px Cinzel, Georgia, serif'
+    ctx.fillStyle = p.result === 'won' ? '#d4af37' : '#9b7be8'
+    ctx.shadowColor = p.result === 'won' ? 'rgba(212,175,55,0.45)' : 'rgba(123,74,226,0.5)'
     ctx.shadowBlur = 30
     ctx.fillText(headline, W / 2, 620)
     ctx.restore()
@@ -326,7 +326,7 @@ function drawDailyLegend(ctx: CanvasRenderingContext2D, y: number) {
         ['stacked', 'STACKED ON'],
     ]
     ctx.save()
-    ctx.font = '26px "Chakra Petch", sans-serif'
+    ctx.font = '26px Inter, sans-serif'
     ctx.textBaseline = 'middle'
 
     const swatch = 24
@@ -351,8 +351,8 @@ function drawDailyPercentile(ctx: CanvasRenderingContext2D, pct: number, y: numb
     ctx.save()
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.font = 'bold 42px "Chakra Petch", sans-serif'
-    ctx.fillStyle = '#00f3ff'
+    ctx.font = 'bold 42px Inter, sans-serif'
+    ctx.fillStyle = '#55d6a7'
     ctx.fillText(`TOP ${pct}% TODAY`, W / 2, y)
     ctx.restore()
 }

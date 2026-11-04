@@ -1,4 +1,4 @@
-import type { Card, CardColor, Rng } from './types'
+import type { Card, CardColor, GameRuleset, Rng } from './types'
 import { shuffleDeck } from './deck'
 
 export type { StackingMode } from './types'
@@ -19,8 +19,13 @@ export function canPlayCard(
     topCard: Card,
     currentColor: CardColor,
     drawStack: number,
-    stackingMode: StackingMode = DEFAULT_STACKING_MODE
+    stackingMode: StackingMode = DEFAULT_STACKING_MODE,
+    ruleset: GameRuleset = 'mercy',
 ): boolean {
+    // Classic penalties are never stackable. The affected player must resolve
+    // the draw (or the dedicated +4 challenge) instead of playing a card.
+    if (ruleset !== 'mercy' && drawStack > 0) return false
+
     // 1. Stacking Logic - varies by stacking mode
     if (drawStack > 0) {
         const drawVal = getDrawValue(card)

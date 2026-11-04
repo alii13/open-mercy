@@ -87,6 +87,7 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
     let ws: WebSocket | null = null
     let closedByUs = false
     let reconnectAttempts = 0
+    let couchConnectionName: string | null = null
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null
     // Why the last connect() failed when the server never said (for mp_join_failed).
     let connectFailReason: string | null = null
@@ -204,6 +205,7 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
             roulette_target_color: v.rouletteTargetColor,
             eliminated_user_ids: v.players.filter(p => p.isEliminated).map(p => p.userId),
             stacking_mode: v.stackingMode,
+            ruleset: v.ruleset ?? 'mercy',
             is_public: false,
             version: lastSeq,
             created_at: '',
@@ -256,6 +258,10 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
         return (view.value?.players ?? []).map(p => p.userId).filter(id => !connected.has(id))
     })
     const pendingDrawnWildCard = computed(() => view.value?.pendingDrawnWildCard ?? null)
+    const pendingDrawnCard = computed(() => view.value?.pendingDrawnCard ?? null)
+    const canChallengeDraw4 = computed(() => !!view.value?.canChallengeDraw4)
+    const ruleset = computed(() => view.value?.ruleset ?? 'mercy')
+    const chaos = computed(() => view.value?.chaos ?? null)
     const pendingDiscardAllCards = computed(() => view.value?.pendingDiscardAllCards ?? [])
 
     // --- Wire handling ---
@@ -438,13 +444,18 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
                 if (msg.code === 'need-players') {
                     error.value = 'Need at least 2 connected players to start'
                 }
+                if (msg.code === 'not-ready') error.value = 'Every connected player must be ready'
+                if (msg.code === 'name-invalid') error.value = 'Name must contain 2 to 16 characters'
+                if (msg.code === 'name-taken') error.value = 'That name is already taken in this room'
+                if (msg.code === 'invalid-intent') error.value = 'That move is not allowed'
+                if (msg.code === 'room-closed') error.value = 'Der TV-Host hat den Raum geschlossen.'
                 if (msg.intentId && pendingIntent?.id === msg.intentId) {
                     // Server refused the intent — roll the optimistic render back.
                     view.value = pendingIntent.prevView
                     pendingIntent = null
                     actionInProgress.value = false
                 }
-                if (msg.code === 'room-not-found') {
+                if (msg.code === 'room-not-found' || msg.code === 'room-closed') {
                     try { localStorage.removeItem(STORED_ROOM_KEY) } catch { /* noop */ }
                 }
                 break
@@ -500,7 +511,7 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
             const settle = (result: boolean | 'superseded') => { if (!settled) { settled = true; clearTimeout(timer); resolve(result) } }
 
             socket.onopen = () => {
-                socket.send(JSON.stringify({ t: 'auth', token, name: myNickname(), skin: getEquippedId() } satisfies ClientMsg))
+                socket.send(JSON.stringify({ t: 'auth', token, name: couchConnectionName ?? myNickname(), skin: getEquippedId() } satisfies ClientMsg))
             }
             socket.onmessage = (e) => {
                 // Only the current socket may drive the store.
@@ -542,6 +553,14 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
                     try { localStorage.removeItem(STORED_ROOM_KEY) } catch { /* noop */ }
                     resetState()
                     error.value = 'You were removed from the room'
+                    return
+                }
+                if (e?.reason === 'room-closed') {
+                    closedByUs = true
+                    void useVoiceStore().leaveVoice()
+                    try { localStorage.removeItem(STORED_ROOM_KEY) } catch { /* noop */ }
+                    resetState()
+                    error.value = 'Der TV-Host hat den Raum geschlossen.'
                     return
                 }
                 if (!closedByUs && roomCodeRef.value) scheduleReconnect()
@@ -629,6 +648,7 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
     }
 
     function sendIntent(action: IntentAction, opts: { optimistic?: (v: PersonalView) => void } = {}) {
+        error.value = null
         const id = `i${++intentN}`
         if (opts.optimistic && view.value) {
             pendingIntent = { id, prevView: JSON.parse(JSON.stringify(view.value)) }
@@ -765,6 +785,20 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
         }
     }
 
+    /** Join the private phone-controller route with the name chosen there. */
+    async function joinCouchGame(code: string, name: string) {
+        loading.value = true
+        error.value = null
+        resetState()
+        couchConnectionName = name.trim()
+        try {
+            const ok = await connectWithRetry(code.trim().toUpperCase(), 'code')
+            return ok === true ? currentGame.value : null
+        } finally {
+            loading.value = false
+        }
+    }
+
     async function quickMatch(mode: StackingMode = DEFAULT_STACKING_MODE) {
         loading.value = true
         error.value = null
@@ -885,7 +919,12 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
     }
 
     async function updateMyName(name: string) {
+        couchConnectionName = name.trim()
         sendMsg({ t: 'rename', name })
+    }
+
+    function setReady(ready: boolean) {
+        sendMsg({ t: 'ready', ready })
     }
 
     // --- Game intents ---
@@ -906,6 +945,30 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
             },
         })
     }
+
+    async function playChaosCard(card: Card, selectedColor: CardColor, targetUserId?: string) {
+        if (!isMyTurn.value || actionInProgress.value) return
+        actionInProgress.value = true
+        sendIntent({ kind: 'PLAY_CHAOS_CARD', cardId: card.id, chosenColor: selectedColor, targetUserId })
+    }
+
+    function chaosReact(cardId?: string, targetUserId?: string, treasure = false) {
+        if (actionInProgress.value) return
+        actionInProgress.value = true
+        sendIntent({ kind: 'CHAOS_REACT', cardId, targetUserId, treasure })
+    }
+
+    function declineChaosReaction() {
+        if (actionInProgress.value) return
+        actionInProgress.value = true
+        sendIntent({ kind: 'CHAOS_DECLINE_REACTION' })
+    }
+
+    function chaosEventRoll() { actionInProgress.value = true; sendIntent({ kind: 'CHAOS_EVENT_ROLL' }) }
+    function chaosEventSelectCard(cardId: string) { actionInProgress.value = true; sendIntent({ kind: 'CHAOS_EVENT_SELECT_CARD', cardId }) }
+    function chaosEventSelectPlayer(targetUserId: string) { actionInProgress.value = true; sendIntent({ kind: 'CHAOS_EVENT_SELECT_PLAYER', targetUserId }) }
+    function chaosEventChooseColor(color: CardColor) { actionInProgress.value = true; sendIntent({ kind: 'CHAOS_EVENT_CHOOSE_COLOR', color }) }
+    function useTreasure(targetUserId?: string, cardId?: string) { actionInProgress.value = true; sendIntent({ kind: 'USE_TREASURE', targetUserId, cardId }) }
 
     async function drawCard() {
         if (!isMyTurn.value || actionInProgress.value) return
@@ -932,6 +995,22 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
         sendIntent({ kind: 'CHOOSE_DRAWN_WILD_COLOR', color })
     }
 
+    async function playDrawnCard(color?: CardColor) {
+        sendIntent({ kind: 'PLAY_DRAWN_CARD', chosenColor: color })
+    }
+
+    async function passDrawnCard() {
+        sendIntent({ kind: 'PASS_DRAWN_CARD' })
+    }
+
+    async function acceptDraw4() {
+        sendIntent({ kind: 'ACCEPT_DRAW4' })
+    }
+
+    async function challengeDraw4() {
+        sendIntent({ kind: 'CHALLENGE_DRAW4' })
+    }
+
     async function selectDiscardAllTop(cardId: string) {
         sendIntent({ kind: 'PICK_DISCARD_ALL_TOP', cardId })
     }
@@ -949,6 +1028,7 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
         currentGame,
         gamePlayers,
         myPlayer,
+        myUserId,
         opponent,
         opponents,
         eliminatedIds,
@@ -962,11 +1042,15 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
         gameStatus,
         roomCode,
         stackingMode,
+        ruleset,
+        chaos,
         opponentLeft,
         realtimeStatus,
         actionInProgress,
         suppressDiscardSlam,
         pendingDrawnWildCard,
+        pendingDrawnCard,
+        canChallengeDraw4,
         pendingDiscardAllCards,
         presentUserIds,
         presence,
@@ -992,19 +1076,33 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
         mpStats,
         createGame,
         joinGame,
+        joinCouchGame,
         quickMatch,
         restoreActiveGame,
         startGame,
         playCard,
+        playChaosCard,
+        chaosReact,
+        declineChaosReaction,
+        chaosEventRoll,
+        chaosEventSelectCard,
+        chaosEventSelectPlayer,
+        chaosEventChooseColor,
+        useTreasure,
         drawCard,
         swapHands,
         skipSwap,
         setRouletteColor,
         playDrawnWildCard,
+        playDrawnCard,
+        passDrawnCard,
+        acceptDraw4,
+        challengeDraw4,
         selectDiscardAllTop,
         callUno,
         kickPlayer,
         updateMyName,
+        setReady,
         requestVoiceJoin,
         leaveGame,
     }

@@ -6,6 +6,12 @@ describe('parseRoute', () => {
         expect(parseRoute('/')).toEqual({ name: 'home' })
     })
 
+    it('maps the couch TV and normalized phone join routes', () => {
+        expect(parseRoute('/couch')).toEqual({ name: 'couch' })
+        expect(parseRoute('/join/ab23cd')).toEqual({ name: 'couch-join', roomCode: 'AB23CD' })
+        expect(parseRoute('/join/INVALID!')).toEqual({ name: 'home' })
+    })
+
     it('maps /leaderboard to the leaderboard', () => {
         expect(parseRoute('/leaderboard')).toEqual({ name: 'leaderboard' })
     })
@@ -46,6 +52,8 @@ describe('parseRoute', () => {
 describe('routePath', () => {
     it('is the inverse of parseRoute', () => {
         expect(routePath({ name: 'home' })).toBe('/')
+        expect(routePath({ name: 'couch' })).toBe('/couch')
+        expect(routePath({ name: 'couch-join', roomCode: 'AB23CD' })).toBe('/join/AB23CD')
         expect(routePath({ name: 'leaderboard' })).toBe('/leaderboard')
         expect(routePath({ name: 'leaderboard', tab: 'alltime' })).toBe('/leaderboard/alltime')
         // daily is the default, so it keeps the bare path rather than

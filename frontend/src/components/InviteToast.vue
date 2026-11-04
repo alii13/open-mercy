@@ -148,7 +148,7 @@ async function join(invite = showing.value) {
   border: 1px solid rgba(0, 243, 255, 0.4);
   border-radius: var(--radius-md);
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.55);
-  font-family: 'Chakra Petch', sans-serif;
+  font-family: var(--font-body);
   font-size: 0.85rem;
   color: var(--text-secondary);
 }

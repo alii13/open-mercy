@@ -41,6 +41,7 @@ export function drawCardToHand(s: EngineState, playerId: string, ev: EngineEvent
 
 /** Eliminates the player if they crossed the mercy threshold; ends the game if one player remains. */
 export function checkMercyElimination(s: EngineState, player: Player, ev: EngineEvent[]): boolean {
+    if (s.ruleset === 'classic' || s.ruleset === 'chaos') return false
     if (!checkMercyRule(player.hand.length)) return false
     player.isEliminated = true
     s.discardPile.push(...player.hand)
@@ -150,7 +151,7 @@ export function playCard(s: EngineState, playerId: string, cardId: string, opts:
     const cardIndex = player.hand.findIndex(c => c.id === cardId)
     if (cardIndex === -1) return { ok: false, events: ev }
     const card = player.hand[cardIndex]!
-    if (!canPlayCard(card, top, s.currentColor, s.drawStack, s.stackingMode)) return { ok: false, events: ev }
+    if (!canPlayCard(card, top, s.currentColor, s.drawStack, s.stackingMode, s.ruleset ?? 'mercy')) return { ok: false, events: ev }
 
     player.hand.splice(cardIndex, 1)
     s.discardPile.push(card)
@@ -220,6 +221,7 @@ export function applyCardEffect(s: EngineState, card: Card, ev: EngineEvent[], o
 
     // Handle special number cards (0 and 7)
     if (card.type === 'number') {
+        if (s.ruleset === 'classic' || s.ruleset === 'chaos') return
         if (card.value === 0) {
             // A 0 that empties the hand is a win; rotating first would hand the
             // empty hand to the next seat and the winner a full one.

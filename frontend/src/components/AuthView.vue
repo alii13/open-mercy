@@ -8,8 +8,8 @@
 
       <header class="auth-header">
         <h1 class="auth-brand">
-          <span class="auth-brand-uno">OPEN</span>
-          <span class="auth-brand-nomercy">MERCY</span>
+          <span class="auth-brand-uno">RUNE</span>
+          <span class="auth-brand-nomercy">RIOT</span>
         </h1>
         <p class="auth-tagline">
           {{ mode === 'claim' ? 'Keep your stats forever'

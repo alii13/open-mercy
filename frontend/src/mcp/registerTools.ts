@@ -48,11 +48,11 @@ interface ToolInfo {
     inputSchema: JsonSchema
 }
 
-const HOW_TO_PLAY = `Open Mercy — how to play (you only need this to play *well*; you can play
+const HOW_TO_PLAY = `RUNE RIOT — how to play (you only need this to play *well*; you can play
 *legally* just by picking from \`legal_moves\` in get_state).
 
 Goal: be the first to empty your hand. If your hand ever reaches 25 cards you are
-ELIMINATED (the mercy rule) — avoid getting buried under draw stacks.
+ELIMINATED (the Ruin Rule) — avoid getting buried under draw stacks.
 
 A card is playable if it matches the current color, or matches the top card's
 number/symbol, or is a wild. When a draw card is on top and a draw stack is
@@ -68,7 +68,7 @@ Card types beyond the classic deck:
   - wildColorRoulette: the next player draws until they hit the chosen color.
 
 Tactics: dump big draw cards when an opponent is low; hold a 7-swap to offload a
-huge hand; keep a wild as an escape; and CALL MERCY the moment you are about to be
+huge hand; keep a wild as an escape; and CALL RIOT the moment you are about to be
 left with one card or you take a penalty.
 
 The play loop: call wait_for_turn, then get_state, then choose one of the actions
@@ -302,7 +302,7 @@ export function registerMcpTools(pinia: Pinia): void {
     const all: ToolDef[] = [
         {
             name: 'how_to_play',
-            description: 'Return a primer on Open Mercy rules, card types, and basic tactics.',
+            description: 'Return a primer on RUNE RIOT rules, card types, and basic tactics.',
             inputSchema: noArgs,
             handler: async () => ({ guide: HOW_TO_PLAY }),
         },

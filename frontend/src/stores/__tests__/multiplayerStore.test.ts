@@ -87,6 +87,8 @@ function playingView(overrides: Partial<PersonalView> = {}): PersonalView {
         rouletteTargetColor: null,
         pendingDiscardAllCards: null,
         pendingDrawnWildCard: null,
+        pendingDrawnCard: null,
+        canChallengeDraw4: false,
         stackingMode: 'official',
         winnerId: null,
         ...overrides,
@@ -117,6 +119,21 @@ beforeEach(() => {
 })
 
 describe('joining and the lobby adapter', () => {
+    it('uses the chosen Couch name and sends readiness over the authoritative socket', async () => {
+        const mp = useMultiplayerStore()
+        const joining = mp.joinCouchGame('AB12CD', 'Rúna 🐉')
+        for (let i = 0; i < 20 && FakeWebSocket.instances.length === 0; i++) await Promise.resolve()
+        const ws = FakeWebSocket.instances[FakeWebSocket.instances.length - 1]!
+        ws.open()
+        expect(ws.lastSent()).toMatchObject({ t: 'auth', name: 'Rúna 🐉', token: 'test-token' })
+        ws.receive({ t: 'hello', roomCode: 'AB12CD', userId: 'me', hostUserId: 'tv', role: 'player', couch: true })
+        ws.receive({ t: 'presence', players: [{ userId: 'me', name: 'Rúna 🐉', connected: true, ready: false }] })
+        ws.receive({ t: 'snapshot', seq: 0, game: playingView({ status: 'lobby', you: null, currentPlayerId: null, players: [] }) })
+        await joining
+        mp.setReady(true)
+        expect(ws.lastSent()).toEqual({ t: 'ready', ready: true })
+    })
+
     it('authenticates, exposes the waiting room from presence, and knows the host', async () => {
         const mp = useMultiplayerStore()
         const ws = await joinRoom(mp)
@@ -199,6 +216,7 @@ describe('optimistic play', () => {
 
         expect(mp.myPlayer?.hand.map(c => c.id)).toEqual(['c-r5', 'c-b3'])
         expect(mp.actionInProgress).toBe(false)
+        expect(mp.error).toBe('That move is not allowed')
     })
 })
 
@@ -294,6 +312,22 @@ describe('presence skins', () => {
             { userId: 'opp', name: 'RIVAL', connected: true, skin: 'toxic' },
         ] })
         expect(mp.presence.find(p => p.userId === 'opp')?.skin).toBe('toxic')
+    })
+})
+
+describe('couch room closure', () => {
+    it('does not reconnect after the authorized TV host closes the room', async () => {
+        const mp = useMultiplayerStore()
+        const ws = await joinRoom(mp)
+        ws.receive({ t: 'snapshot', seq: 2, game: playingView() })
+
+        ws.receive({ t: 'error', code: 'room-closed' })
+        ws.onclose?.({ code: 1000, reason: 'room-closed' })
+
+        expect(mp.roomCode).toBe('')
+        expect(mp.currentGame).toBeNull()
+        expect(mp.error).toBe('Der TV-Host hat den Raum geschlossen.')
+        expect(FakeWebSocket.instances).toHaveLength(1)
     })
 })
 
@@ -920,7 +954,7 @@ describe('quick chat', () => {
 
         ws.receive({ t: 'chat', userId: 'opp', phraseId: 'mercy' })
 
-        expect(mp.lastChat).toMatchObject({ userId: 'opp', name: 'RIVAL', text: 'Mercy!' })
+        expect(mp.lastChat).toMatchObject({ userId: 'opp', name: 'RIVAL', text: 'Riot!' })
         expect(mp.chatLog).toHaveLength(1)
     })
 

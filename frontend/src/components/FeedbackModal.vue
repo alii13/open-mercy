@@ -113,7 +113,7 @@ async function submit() {
         Accept: 'application/json',
       },
       body: JSON.stringify({
-        _subject: 'Open Mercy - New feedback',
+        _subject: 'RUNE RIOT - New feedback',
         _template: 'box',
         message: payload.message,
         reply_to: payload.email || 'no-reply@open-mercy.com',

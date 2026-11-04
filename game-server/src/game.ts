@@ -1,7 +1,19 @@
 import * as engine from '../../shared/engine'
-import type { Card, EngineEvent, EngineState, StackingMode } from '../../shared/engine'
+import type { Card, CardColor, EngineEvent, EngineState, GameRuleset, StackingMode } from '../../shared/engine'
 import type { GameEvent, IntentAction, PersonalView, SnapshotPlayer } from './protocol'
 import { isWildColor } from './validate'
+import {
+    applyChaosEventAction,
+    autoResolveChaosEvent,
+    chaosViewFor,
+    createChaosRuntime,
+    endChaosByTime,
+    finishResolvedChaosEvent,
+    markChaosEventDue,
+    rollD6,
+    startDueChaosEvent,
+    type ChaosRuntime,
+} from './chaos'
 
 export interface PlayerGameStats {
     cardsPlayedTotal: number
@@ -28,6 +40,16 @@ export interface GameRecord {
     engine: EngineState
     /** Card drawn via draw-until-playable that is a wild — waiting for its color. */
     pendingDrawnWildCardId: string | null
+    /** Classic draw-one: only this freshly drawn card may still be played. */
+    pendingDrawnCardId?: string | null
+    /** A final +2/+4 must still be paid before the round is declared over. */
+    pendingWinnerId?: string | null
+    /** Server-private +4 legality; no hand contents cross the wire. */
+    pendingDraw4Challenge?: {
+        offenderId: string
+        victimId: string
+        wasLegal: boolean
+    } | null
     startedAt: number
     /** Per-player stats, persisted to game_results at game end. */
     stats?: Record<string, PlayerGameStats>
@@ -35,6 +57,8 @@ export interface GameRecord {
     /** A seat was kicked out of this game. Such games are not scored: a host
      *  could otherwise kick the table and farm wins. */
     hadKick?: boolean
+    /** Present only in Couch Chaos games; persisted with the authoritative game. */
+    chaos?: ChaosRuntime
 }
 
 export function statsFor(game: GameRecord, userId: string): PlayerGameStats {
@@ -88,10 +112,12 @@ export interface IntentResult {
 }
 
 /** Deal and start a game for the seated players (roster join order = seats). */
-export function startGame(players: SeatedPlayer[], stackingMode: StackingMode): { game: GameRecord; events: GameEvent[] } {
+export function startGame(players: SeatedPlayer[], stackingMode: StackingMode, ruleset: GameRuleset = 'mercy', now = Date.now()): { game: GameRecord; events: GameEvent[] } {
     const s: EngineState = {
         players: players.map(p => ({ id: p.userId, name: p.name, hand: [], isEliminated: false, score: 0 })),
-        deck: engine.shuffleDeck(engine.generateFullDeck()),
+        deck: engine.shuffleDeck(ruleset === 'chaos'
+            ? engine.generateChaosDeck()
+            : ruleset === 'classic' ? engine.generateClassicDeck() : engine.generateFullDeck()),
         discardPile: [],
         currentPlayerIndex: 0,
         direction: 1,
@@ -105,6 +131,7 @@ export function startGame(players: SeatedPlayer[], stackingMode: StackingMode): 
         swapInitiatorId: null,
         hasCalledUno: {},
         stackingMode,
+        ruleset,
     }
 
     // Server-side deal: hands never leave this object except to their owner.
@@ -124,7 +151,17 @@ export function startGame(players: SeatedPlayer[], stackingMode: StackingMode): 
     }
 
     return {
-        game: { engine: s, pendingDrawnWildCardId: null, startedAt: Date.now(), stats, resultsLogged: false },
+        game: {
+            engine: s,
+            pendingDrawnWildCardId: null,
+            pendingDrawnCardId: null,
+            pendingWinnerId: null,
+            pendingDraw4Challenge: null,
+            startedAt: now,
+            stats,
+            resultsLogged: false,
+            chaos: ruleset === 'chaos' ? createChaosRuntime(now) : undefined,
+        },
         events: [{ t: 'STARTED' }, ...translateEngineEvents(ev)],
     }
 }
@@ -135,6 +172,17 @@ export function applyIntent(game: GameRecord, userId: string, action: IntentActi
     const invalid: IntentResult = { ok: false, errorCode: 'invalid-intent', events: [] }
 
     if (s.gameState !== 'PLAYING') return invalid
+
+    if (game.chaos?.event) {
+        const result = applyChaosEventAction(s, game.chaos, userId, action, Date.now())
+        return result.ok ? { ok: true, events: result.events } : invalid
+    }
+
+    if (game.chaos?.reaction) {
+        if (action.kind === 'CHAOS_REACT') return resolveChaosReaction(game, userId, action)
+        if (action.kind === 'CHAOS_DECLINE_REACTION') return declineChaosReaction(game, userId)
+        return invalid
+    }
 
     // CALL_UNO is the only intent allowed off-turn.
     if (action.kind === 'CALL_UNO') {
@@ -147,26 +195,53 @@ export function applyIntent(game: GameRecord, userId: string, action: IntentActi
     if (engine.currentPlayer(s)?.id !== userId) return invalid
 
     switch (action.kind) {
+        case 'PLAY_CHAOS_CARD': {
+            if (s.ruleset !== 'chaos' || (s.turnState !== 'WAITING_FOR_ACTION' && s.turnState !== 'CHOOSING_DRAWN_CARD')) return invalid
+            const card = engine.currentPlayer(s)?.hand.find(c => c.id === action.cardId)
+            if (!card || !isChaosCard(card)) return invalid
+            if (s.turnState === 'CHOOSING_DRAWN_CARD' && game.pendingDrawnCardId !== card.id) return invalid
+            game.pendingDrawnCardId = null
+            return playChaosCard(game, userId, card, action.chosenColor, action.targetUserId)
+        }
+
+        case 'USE_TREASURE':
+            return useTreasure(game, userId, action)
+
         case 'PLAY_CARD': {
             if (s.turnState !== 'WAITING_FOR_ACTION') return invalid
-            if (action.chosenColor !== undefined && !isWildColor(action.chosenColor)) return invalid
             const card = engine.currentPlayer(s)?.hand.find(c => c.id === action.cardId)
-            if (!card) return invalid
-            const res = engine.playCard(s, userId, action.cardId, { selectedColor: action.chosenColor })
-            if (!res.ok) return invalid
-            return {
-                ok: true,
-                events: [
-                    { t: 'CARD_PLAYED', by: userId, card, chosenColor: action.chosenColor },
-                    ...translateEngineEvents(res.events),
-                ],
-            }
+            if (!card || isChaosCard(card)) return invalid
+            return playCardIntent(game, userId, card, action.chosenColor)
         }
 
         case 'DRAW': {
             if (s.turnState !== 'WAITING_FOR_ACTION') return invalid
             return resolveDraw(game, userId)
         }
+
+        case 'PLAY_DRAWN_CARD': {
+            if (s.ruleset === 'mercy' || s.turnState !== 'CHOOSING_DRAWN_CARD' || !game.pendingDrawnCardId) return invalid
+            const card = engine.currentPlayer(s)?.hand.find(c => c.id === game.pendingDrawnCardId)
+            if (!card) return invalid
+            game.pendingDrawnCardId = null
+            s.turnState = 'WAITING_FOR_ACTION'
+            return playCardIntent(game, userId, card, action.chosenColor)
+        }
+
+        case 'PASS_DRAWN_CARD': {
+            if (s.ruleset === 'mercy' || s.turnState !== 'CHOOSING_DRAWN_CARD' || !game.pendingDrawnCardId) return invalid
+            game.pendingDrawnCardId = null
+            s.turnState = 'WAITING_FOR_ACTION'
+            const ev: EngineEvent[] = []
+            engine.advanceTurn(s, ev)
+            return { ok: true, events: translateEngineEvents(ev) }
+        }
+
+        case 'ACCEPT_DRAW4':
+            return resolveClassicDraw4(game, userId, false)
+
+        case 'CHALLENGE_DRAW4':
+            return resolveClassicDraw4(game, userId, true)
 
         case 'PICK_DISCARD_ALL_TOP': {
             if (s.turnState !== 'CHOOSING_DISCARD_ALL_TOP') return invalid
@@ -241,6 +316,298 @@ export function applyIntent(game: GameRecord, userId: string, action: IntentActi
     }
 }
 
+const CHAOS_CARD_TYPES = new Set(['fateSwap', 'curseMirror', 'diceCurse', 'runeShield', 'runeWhirl'])
+
+function isChaosCard(card: Card): boolean {
+    return CHAOS_CARD_TYPES.has(card.type)
+}
+
+function canChaosReact(game: GameRecord, userId: string): boolean {
+    const player = game.engine.players.find(candidate => candidate.id === userId)
+    return !!player?.hand.some(card => card.type === 'runeShield' || card.type === 'curseMirror')
+        || game.chaos?.treasures[userId] === 'block-penalty'
+}
+
+function setCurrentPlayer(game: GameRecord, userId: string): void {
+    const index = game.engine.players.findIndex(player => player.id === userId)
+    if (index >= 0) game.engine.currentPlayerIndex = index
+}
+
+function beginChaosReaction(
+    game: GameRecord,
+    sourceId: string,
+    targetId: string,
+    amount: number,
+    resumePlayerId: string,
+    after: 'advance' | 'draw4-challenge' | 'keep-turn',
+): void {
+    if (!game.chaos) return
+    game.engine.drawStack = 0
+    game.engine.turnState = 'AWAITING_CHAOS_REACTION'
+    game.chaos.reaction = { sourceId, targetId, amount, reflected: false, resumePlayerId, after, deadlineAt: Date.now() + 12_000 }
+}
+
+function removeReactionCard(game: GameRecord, userId: string, cardId: string | undefined, type: 'runeShield' | 'curseMirror'): Card | null {
+    if (!cardId) return null
+    const player = game.engine.players.find(candidate => candidate.id === userId)
+    const index = player?.hand.findIndex(card => card.id === cardId && card.type === type) ?? -1
+    if (!player || index < 0) return null
+    const card = player.hand.splice(index, 1)[0]!
+    game.engine.discardPile.push(card)
+    return card
+}
+
+function drawCards(game: GameRecord, userId: string, amount: number): GameEvent[] {
+    const ev: EngineEvent[] = []
+    for (let i = 0; i < amount; i++) engine.drawCardToHand(game.engine, userId, ev)
+    return translateEngineEvents(ev)
+}
+
+function settleReaction(game: GameRecord): void {
+    if (!game.chaos) return
+    const reaction = game.chaos.reaction
+    game.chaos.reaction = null
+    game.pendingDraw4Challenge = null
+    game.engine.drawStack = 0
+    if (reaction) setCurrentPlayer(game, reaction.resumePlayerId)
+    game.engine.turnState = 'WAITING_FOR_ACTION'
+}
+
+function resolveChaosReaction(game: GameRecord, userId: string, action: Extract<IntentAction, { kind: 'CHAOS_REACT' }>): IntentResult {
+    const reaction = game.chaos?.reaction
+    const invalid: IntentResult = { ok: false, errorCode: 'invalid-intent', events: [] }
+    if (!reaction || reaction.targetId !== userId) return invalid
+
+    if (action.treasure) {
+        if (game.chaos?.treasures[userId] !== 'block-penalty') return invalid
+        delete game.chaos.treasures[userId]
+        settleReaction(game)
+        const ev: EngineEvent[] = []
+        finishPendingClassicWinner(game, ev)
+        return { ok: true, events: [{ t: 'CHAOS_REACTION', by: userId, reaction: 'shield' }, ...translateEngineEvents(ev)] }
+    }
+
+    const player = game.engine.players.find(candidate => candidate.id === userId)
+    const selected = player?.hand.find(card => card.id === action.cardId)
+    if (selected?.type === 'runeShield') {
+        if (!removeReactionCard(game, userId, action.cardId, 'runeShield')) return invalid
+        settleReaction(game)
+        const ev: EngineEvent[] = []
+        finishPendingClassicWinner(game, ev)
+        return { ok: true, events: [{ t: 'CHAOS_REACTION', by: userId, reaction: 'shield' }, ...translateEngineEvents(ev)] }
+    }
+    if (selected?.type === 'curseMirror' && !reaction.reflected) {
+        const target = game.engine.players.find(candidate => candidate.id === action.targetUserId && !candidate.isEliminated)
+        if (!target || target.id === userId) return invalid
+        if (!removeReactionCard(game, userId, action.cardId, 'curseMirror')) return invalid
+        const events = drawCards(game, target.id, reaction.amount)
+        settleReaction(game)
+        const ev: EngineEvent[] = []
+        finishPendingClassicWinner(game, ev)
+        return {
+            ok: true,
+            events: [{ t: 'CHAOS_REACTION', by: userId, reaction: 'mirror', targetUserId: target.id }, ...events, ...translateEngineEvents(ev)],
+        }
+    }
+    return invalid
+}
+
+function declineChaosReaction(game: GameRecord, userId: string): IntentResult {
+    const reaction = game.chaos?.reaction
+    const invalid: IntentResult = { ok: false, errorCode: 'invalid-intent', events: [] }
+    if (!reaction || reaction.targetId !== userId) return invalid
+    if (reaction.after === 'draw4-challenge') {
+        game.chaos!.reaction = null
+        game.engine.drawStack = reaction.amount
+        game.engine.turnState = 'AWAITING_DRAW4_CHALLENGE'
+        return { ok: true, events: [{ t: 'CHAOS_REACTION', by: userId, reaction: 'decline' }] }
+    }
+    const events = drawCards(game, userId, reaction.amount)
+    game.chaos!.reaction = null
+    setCurrentPlayer(game, reaction.resumePlayerId)
+    game.engine.turnState = 'WAITING_FOR_ACTION'
+    if (reaction.after === 'advance') {
+        const ev: EngineEvent[] = []
+        engine.advanceTurn(game.engine, ev)
+        events.push(...translateEngineEvents(ev))
+    }
+    const ev: EngineEvent[] = []
+    finishPendingClassicWinner(game, ev)
+    return { ok: true, events: [{ t: 'CHAOS_REACTION', by: userId, reaction: 'decline' }, ...events, ...translateEngineEvents(ev)] }
+}
+
+function playChaosCard(game: GameRecord, userId: string, card: Card, chosenColor: CardColor, targetUserId?: string): IntentResult {
+    const s = game.engine
+    const invalid: IntentResult = { ok: false, errorCode: 'invalid-intent', events: [] }
+    if (chosenColor === 'wild' || card.type === 'curseMirror' || card.type === 'runeShield') return invalid
+    const player = engine.currentPlayer(s)
+    const top = engine.topCard(s)
+    if (!player || player.id !== userId || !top || !engine.canPlayCard(card, top, s.currentColor, s.drawStack, s.stackingMode, 'chaos')) return invalid
+    const cardIndex = player.hand.findIndex(candidate => candidate.id === card.id)
+    if (cardIndex < 0) return invalid
+    const target = targetUserId ? s.players.find(candidate => candidate.id === targetUserId && !candidate.isEliminated) : undefined
+    if ((card.type === 'fateSwap' || card.type === 'diceCurse') && (!target || target.id === userId)) return invalid
+
+    player.hand.splice(cardIndex, 1)
+    s.discardPile.push(card)
+    s.currentColor = chosenColor
+    const events: GameEvent[] = []
+    let roll: number | undefined
+
+    if (card.type === 'fateSwap') {
+        const own = player.hand
+        player.hand = target!.hand
+        target!.hand = own
+        statsFor(game, userId).swapsMade++
+    } else if (card.type === 'runeWhirl') {
+        engine.rotateActiveHands(s)
+    } else if (card.type === 'diceCurse') {
+        roll = rollD6()
+    }
+
+    events.push({ t: 'CHAOS_CARD', by: userId, card, targetUserId: target?.id, roll })
+    const engineEvents: EngineEvent[] = []
+    if (player.hand.length === 1 && !s.hasCalledUno[player.id]) engineEvents.push({ t: 'AT_ONE_UNCALLED', playerId: player.id })
+    if (player.hand.length === 0) game.pendingWinnerId = player.id
+    engine.advanceTurn(s, engineEvents)
+
+    if (card.type === 'diceCurse') {
+        const resume = engine.currentPlayer(s)?.id ?? userId
+        if (canChaosReact(game, target!.id)) beginChaosReaction(game, userId, target!.id, roll!, resume, 'keep-turn')
+        else events.push(...drawCards(game, target!.id, roll!))
+    }
+    if (!game.chaos?.reaction) finishPendingClassicWinner(game, engineEvents)
+    events.push(...translateEngineEvents(engineEvents))
+    return { ok: true, events }
+}
+
+function useTreasure(game: GameRecord, userId: string, action: Extract<IntentAction, { kind: 'USE_TREASURE' }>): IntentResult {
+    const invalid: IntentResult = { ok: false, errorCode: 'invalid-intent', events: [] }
+    const chaos = game.chaos
+    const player = engine.currentPlayer(game.engine)
+    const ability = chaos?.treasures[userId]
+    if (!chaos || !ability || !player || player.id !== userId || game.engine.turnState !== 'WAITING_FOR_ACTION') return invalid
+    if (ability === 'block-penalty') return invalid
+
+    if (ability === 'discard-one') {
+        const index = player.hand.findIndex(card => card.id === action.cardId)
+        if (index < 0 || player.hand.length <= 1) return invalid
+        game.engine.discardPile.push(player.hand.splice(index, 1)[0]!)
+        delete chaos.treasures[userId]
+        return { ok: true, events: [{ t: 'TREASURE_USED', by: userId, ability }] }
+    }
+
+    const target = game.engine.players.find(candidate => candidate.id === action.targetUserId && !candidate.isEliminated)
+    if (!target || target.id === userId) return invalid
+    delete chaos.treasures[userId]
+    const events: GameEvent[] = [{ t: 'TREASURE_USED', by: userId, ability, targetUserId: target.id }]
+    if (canChaosReact(game, target.id)) beginChaosReaction(game, userId, target.id, 3, userId, 'keep-turn')
+    else events.push(...drawCards(game, target.id, 3))
+    return { ok: true, events }
+}
+
+function playCardIntent(game: GameRecord, userId: string, card: Card, chosenColor?: CardColor): IntentResult {
+    const s = game.engine
+    const invalid: IntentResult = { ok: false, errorCode: 'invalid-intent', events: [] }
+    if (chosenColor !== undefined && !isWildColor(chosenColor)) return invalid
+    if (s.ruleset !== 'mercy' && card.color === 'wild' && !isWildColor(chosenColor)) return invalid
+
+    const activeColorBefore = s.currentColor
+    const player = engine.currentPlayer(s)
+    if (!player || player.id !== userId) return invalid
+    const draw4WasLegal = card.type !== 'draw4'
+        || !player.hand.some(held => held.id !== card.id && held.color === activeColorBefore)
+    const scoreBefore = player.score
+    const res = engine.playCard(s, userId, card.id, { selectedColor: chosenColor })
+    if (!res.ok) return invalid
+
+    const engineEvents = [...res.events]
+    const isClassicFinalPenalty = s.ruleset !== 'mercy'
+        && player.hand.length === 0
+        && (card.type === 'draw2' || card.type === 'draw4')
+    if (isClassicFinalPenalty) {
+        // Official play still charges a final +2/+4. The shared Mercy path
+        // ends immediately, so defer that result until the penalty resolves.
+        s.gameState = 'PLAYING'
+        s.winnerId = null
+        player.score = scoreBefore
+        game.pendingWinnerId = userId
+        for (let i = engineEvents.length - 1; i >= 0; i--) {
+            if (engineEvents[i]?.t === 'GAME_OVER') engineEvents.splice(i, 1)
+        }
+        engine.advanceTurn(s, engineEvents)
+    }
+
+    if (s.ruleset !== 'mercy' && card.type === 'draw4') {
+        const victim = engine.currentPlayer(s)
+        if (!victim) return invalid
+        game.pendingDraw4Challenge = { offenderId: userId, victimId: victim.id, wasLegal: draw4WasLegal }
+        s.turnState = 'AWAITING_DRAW4_CHALLENGE'
+    }
+
+    if (s.ruleset === 'chaos' && (card.type === 'draw2' || card.type === 'draw4')) {
+        const victim = engine.currentPlayer(s)
+        if (victim && canChaosReact(game, victim.id)) {
+            const after = card.type === 'draw4' ? 'draw4-challenge' : 'advance'
+            beginChaosReaction(game, userId, victim.id, card.type === 'draw4' ? 4 : 2, victim.id, after)
+        }
+    }
+
+    return {
+        ok: true,
+        events: [
+            { t: 'CARD_PLAYED', by: userId, card, chosenColor },
+            ...translateEngineEvents(engineEvents),
+        ],
+    }
+}
+
+function finishPendingClassicWinner(game: GameRecord, ev: EngineEvent[]): void {
+    const winnerId = game.pendingWinnerId
+    game.pendingWinnerId = null
+    if (!winnerId) return
+    const winner = game.engine.players.find(player => player.id === winnerId)
+    if (winner?.hand.length === 0) engine.endGame(game.engine, winnerId, ev)
+}
+
+function drawPenalty(game: GameRecord, playerId: string, amount: number, ev: EngineEvent[]): void {
+    for (let i = 0; i < amount; i++) engine.drawCardToHand(game.engine, playerId, ev)
+}
+
+function resolveClassicDraw4(game: GameRecord, userId: string, challenge: boolean): IntentResult {
+    const s = game.engine
+    const pending = game.pendingDraw4Challenge
+    const invalid: IntentResult = { ok: false, errorCode: 'invalid-intent', events: [] }
+    if (s.ruleset === 'mercy' || s.turnState !== 'AWAITING_DRAW4_CHALLENGE'
+        || !pending || pending.victimId !== userId || engine.currentPlayer(s)?.id !== userId) return invalid
+
+    const ev: EngineEvent[] = []
+    const events: GameEvent[] = []
+    game.pendingDraw4Challenge = null
+    s.drawStack = 0
+
+    if (challenge && !pending.wasLegal) {
+        drawPenalty(game, pending.offenderId, 4, ev)
+        s.turnState = 'WAITING_FOR_ACTION'
+        events.push({
+            t: 'DRAW4_RESOLVED', challengerId: userId, offenderId: pending.offenderId,
+            outcome: 'challenge-succeeded', amount: 4,
+        })
+    } else {
+        const amount = challenge ? 6 : 4
+        drawPenalty(game, userId, amount, ev)
+        s.turnState = 'WAITING_FOR_ACTION'
+        engine.advanceTurn(s, ev)
+        events.push({
+            t: 'DRAW4_RESOLVED', challengerId: userId, offenderId: pending.offenderId,
+            outcome: challenge ? 'challenge-failed' : 'accepted', amount,
+        })
+    }
+
+    finishPendingClassicWinner(game, ev)
+    return { ok: true, events: [...events, ...translateEngineEvents(ev)] }
+}
+
 /**
  * DRAW resolves server-side exactly like single-player:
  *  - facing a stack: draw it all (mercy may fire mid-stack), then pass the turn
@@ -253,6 +620,38 @@ function resolveDraw(game: GameRecord, userId: string): IntentResult {
     const events: GameEvent[] = []
     const player = engine.currentPlayer(s)
     if (!player) return { ok: false, errorCode: 'invalid-intent', events: [] }
+
+    if (s.ruleset !== 'mercy') {
+        if (s.drawStack > 0) {
+            const count = s.drawStack
+            s.drawStack = 0
+            drawPenalty(game, userId, count, ev)
+            if (s.gameState !== 'GAME_OVER') engine.advanceTurn(s, ev)
+            finishPendingClassicWinner(game, ev)
+            return {
+                ok: true,
+                events: [{ t: 'STACK_EATEN', playerId: userId, amount: count }, ...translateEngineEvents(ev)],
+            }
+        }
+
+        const top = engine.topCard(s)
+        if (!top) {
+            engine.advanceTurn(s, ev)
+            return { ok: true, events: translateEngineEvents(ev) }
+        }
+        const card = engine.drawCardToHand(s, userId, ev)
+        if (!card) {
+            engine.advanceTurn(s, ev)
+            return { ok: true, events: translateEngineEvents(ev) }
+        }
+        if (engine.canPlayCard(card, top, s.currentColor, 0, s.stackingMode, 'classic')) {
+            game.pendingDrawnCardId = card.id
+            s.turnState = 'CHOOSING_DRAWN_CARD'
+        } else {
+            engine.advanceTurn(s, ev)
+        }
+        return { ok: true, events: translateEngineEvents(ev) }
+    }
 
     if (s.drawStack > 0) {
         const count = s.drawStack
@@ -328,7 +727,21 @@ export function autoResolveAbsentTurn(game: GameRecord, userId: string): GameEve
             if (!gameOver() && engine.currentPlayer(s)?.id === userId) {
                 engine.advanceTurn(s, ev)
             }
+            if (s.ruleset !== 'mercy') finishPendingClassicWinner(game, ev)
             out.push(...translateEngineEvents(ev))
+            continue
+        }
+
+        if (s.turnState === 'AWAITING_DRAW4_CHALLENGE') {
+            const res = applyIntent(game, userId, { kind: 'ACCEPT_DRAW4' })
+            out.push(...res.events)
+            if (!res.ok) break
+            continue
+        }
+        if (s.turnState === 'CHOOSING_DRAWN_CARD') {
+            const res = applyIntent(game, userId, { kind: 'PASS_DRAWN_CARD' })
+            out.push(...res.events)
+            if (!res.ok) break
             continue
         }
 
@@ -359,6 +772,61 @@ export function autoResolveAbsentTurn(game: GameRecord, userId: string): GameEve
         break
     }
     return out
+}
+
+/** Mark the three-minute clock due without interrupting the current turn. */
+export function markChaosDue(game: GameRecord, now = Date.now()): boolean {
+    return game.chaos ? markChaosEventDue(game.chaos, now) : false
+}
+
+/** Called after a completed normal action; events only start from a stable turn boundary. */
+export function maybeStartChaosEvent(game: GameRecord, now = Date.now()): GameEvent[] {
+    if (!game.chaos) return []
+    markChaosEventDue(game.chaos, now)
+    return startDueChaosEvent(game.engine, game.chaos, now)
+}
+
+/** Earliest authoritative Chaos deadline for Durable Object alarm multiplexing. */
+export function nextChaosDeadline(game: GameRecord | null): number | undefined {
+    const chaos = game?.chaos
+    if (!chaos || game?.engine.gameState !== 'PLAYING') return undefined
+    const deadlines = [
+        chaos.matchEndsAt,
+        chaos.event?.deadlineAt,
+        chaos.reaction?.deadlineAt,
+        chaos.eventDue ? undefined : chaos.nextEventAt,
+    ].filter((value): value is number => typeof value === 'number')
+    return deadlines.length ? Math.min(...deadlines) : undefined
+}
+
+/** Resolve timeouts deterministically enough for tests, securely by default. */
+export function processChaosDeadline(game: GameRecord, now = Date.now()): GameEvent[] {
+    const chaos = game.chaos
+    if (!chaos || game.engine.gameState !== 'PLAYING') return []
+    const events: GameEvent[] = []
+
+    if (now >= chaos.matchEndsAt) {
+        if (chaos.event && chaos.event.phase !== 'resolved') events.push(...autoResolveChaosEvent(game.engine, chaos, now))
+        if (chaos.reaction) {
+            const result = declineChaosReaction(game, chaos.reaction.targetId)
+            if (result.ok) events.push(...result.events)
+        }
+        chaos.event = null
+        game.engine.turnState = 'WAITING_FOR_ACTION'
+        events.push(...endChaosByTime(game.engine, chaos))
+        return events
+    }
+
+    if (chaos.reaction && chaos.reaction.deadlineAt <= now) {
+        const result = declineChaosReaction(game, chaos.reaction.targetId)
+        if (result.ok) events.push(...result.events)
+    }
+    if (chaos.event?.deadlineAt && chaos.event.deadlineAt <= now) {
+        if (chaos.event.phase === 'resolved') finishResolvedChaosEvent(game.engine, chaos, now)
+        else events.push(...autoResolveChaosEvent(game.engine, chaos, now))
+    }
+    markChaosEventDue(chaos, now)
+    return events
 }
 
 /**
@@ -423,7 +891,7 @@ export async function persistResults(
 /** Draw-10 penalty for a caught UNO miss. Window validation is the room's job. */
 export function applyUnoCatch(game: GameRecord, targetUserId: string): GameEvent[] {
     const ev: EngineEvent[] = []
-    engine.penalizeUnoDraws(game.engine, targetUserId, 10, ev)
+    engine.penalizeUnoDraws(game.engine, targetUserId, game.engine.ruleset === 'mercy' ? 10 : 2, ev)
     return [{ t: 'UNO_PENALTY', playerId: targetUserId }, ...translateEngineEvents(ev)]
 }
 
@@ -502,12 +970,16 @@ export function personalView(
             rouletteTargetColor: null,
             pendingDiscardAllCards: null,
             pendingDrawnWildCard: null,
+            pendingDrawnCard: null,
+            canChallengeDraw4: false,
             stackingMode: 'official',
+            ruleset: 'mercy',
             winnerId: null,
         }
     }
 
     const s = game.engine
+    if (game.chaos && s.gameState === 'GAME_OVER' && !game.chaos.winReason) game.chaos.winReason = 'cards'
     const current = engine.currentPlayer(s)
     const me = s.players.find(p => p.id === viewerId) ?? null
     const isChooser = current?.id === viewerId
@@ -525,6 +997,11 @@ export function personalView(
     const pendingWild = game.pendingDrawnWildCardId && isChooser
         ? me?.hand.find(c => c.id === game.pendingDrawnWildCardId) ?? null
         : null
+    const pendingDrawnCard = game.pendingDrawnCardId && isChooser
+        ? me?.hand.find(c => c.id === game.pendingDrawnCardId) ?? null
+        : null
+    const canChallengeDraw4 = s.turnState === 'AWAITING_DRAW4_CHALLENGE'
+        && game.pendingDraw4Challenge?.victimId === viewerId
 
     return {
         status: roomStatus,
@@ -543,8 +1020,12 @@ export function personalView(
         rouletteTargetColor: s.rouletteTargetColor,
         pendingDiscardAllCards: isChooser && s.turnState === 'CHOOSING_DISCARD_ALL_TOP' ? s.pendingDiscardAllCards : null,
         pendingDrawnWildCard: pendingWild,
+        pendingDrawnCard,
+        canChallengeDraw4,
         stackingMode: s.stackingMode,
+        ruleset: s.ruleset ?? 'mercy',
         winnerId: s.winnerId,
+        chaos: game.chaos ? chaosViewFor(game.chaos, viewerId, Date.now()) : undefined,
     }
 }
 

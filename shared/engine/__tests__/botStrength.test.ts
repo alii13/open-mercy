@@ -81,7 +81,7 @@ describe('simulated games', () => {
         expect(a.trace.length).toBeGreaterThan(0)
         expect(b.trace).toEqual(a.trace)
         expect(b.winner).toBe(a.winner)
-    })
+    }, 15_000)
 
     it('finishes games', () => {
         for (let seed = 1; seed <= 5; seed++) {

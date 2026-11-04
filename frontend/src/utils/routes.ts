@@ -6,6 +6,7 @@
  */
 
 import { ref, readonly } from 'vue'
+import { isRoomCode, normalizeRoomCode } from '@roomCode'
 
 /** Which board /leaderboard opens on. Absent means the daily deal. */
 export type LeaderboardTab = 'daily' | 'weekly' | 'alltime'
@@ -14,6 +15,8 @@ const LEADERBOARD_TABS: LeaderboardTab[] = ['daily', 'weekly', 'alltime']
 
 export type Route =
     | { name: 'home' }
+    | { name: 'couch' }
+    | { name: 'couch-join'; roomCode: string }
     | { name: 'leaderboard'; tab?: LeaderboardTab }
     | { name: 'badges' }
     | { name: 'changelog' }
@@ -22,6 +25,11 @@ export type Route =
 const SHARE_CODE = /^[A-Za-z0-9]{4,32}$/
 
 export function parseRoute(pathname: string): Route {
+    if (pathname === '/couch') return { name: 'couch' }
+    if (pathname.startsWith('/join/')) {
+        const roomCode = normalizeRoomCode(pathname.slice('/join/'.length))
+        if (isRoomCode(roomCode)) return { name: 'couch-join', roomCode }
+    }
     if (pathname === '/leaderboard') return { name: 'leaderboard' }
     // /leaderboard/alltime — so a deep link can name the board it means, and
     // so a board is shareable rather than always opening on today's deal.
@@ -39,6 +47,8 @@ export function parseRoute(pathname: string): Route {
 }
 
 export function routePath(route: Route): string {
+    if (route.name === 'couch') return '/couch'
+    if (route.name === 'couch-join') return `/join/${route.roomCode}`
     // 'daily' is the default, so it stays on the bare path.
     if (route.name === 'leaderboard') {
         return route.tab && route.tab !== 'daily' ? `/leaderboard/${route.tab}` : '/leaderboard'

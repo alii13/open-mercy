@@ -22,7 +22,7 @@
       <div class="chap" ref="chap4">
         <div class="chap-label">04</div>
         <h2 class="chap-heading">25 CARDS? <span class="accent-red">ELIMINATED</span></h2>
-        <p class="chap-desc">Hold 25 cards and you're out. The mercy rule ends your suffering.</p>
+        <p class="chap-desc">Hold 25 cards and you're out. The Ruin Rule seals your fate.</p>
       </div>
       <div class="chap" ref="chap5">
         <div class="chap-label">05</div>
@@ -107,7 +107,7 @@
           </div>
           <div class="hud-line" :ref="el => setRef('hud', 6, el)"><span class="hud-prompt accent-green">&gt;</span> play_card(<span class="accent-red">"red-7"</span>)<span class="hud-ok" ref="hudOkEl"> OK</span></div>
         </div>
-        <a class="agent-cta" ref="agentCtaEl" href="https://github.com/alii13/Uno-no-mercy#playing-as-an-ai-agent-webmcp" target="_blank" rel="noopener">
+        <a class="agent-cta" ref="agentCtaEl" href="https://github.com/Craine92/Rune-Riot" target="_blank" rel="noopener">
           <Code :size="16" :stroke-width="2" aria-hidden="true" />
           HOW AGENTS PLAY
         </a>
@@ -146,7 +146,7 @@ import { Code, Heart, HelpCircle, MessageSquare } from 'lucide-vue-next'
 /**
  * Pinned scrollytelling — the whole story is ONE timeline on ONE stage.
  * Five protagonist cards persist across chapters: they stack (+penalties),
- * get skipped, play roulette (recoloring the page), multiply to the mercy
+ * get skipped, play roulette (recoloring the page), multiply to the ruin
  * limit and detonate, watch an agent take a seat, then hand over to the
  * feedback finale. Scrubbing backwards rewinds the story — every beat is a
  * tween (no callbacks mutating state), so reverse is always coherent.

@@ -113,7 +113,7 @@
           class="catch-btn"
           @click="mpStore.catchPlayer(caughtTarget.user_id)"
         >
-          CAUGHT! {{ caughtTarget.name }} forgot MERCY
+          CAUGHT! {{ caughtTarget.name }} forgot RIOT
         </button>
       </Transition>
     </PlayerConsoleBar>
@@ -204,7 +204,7 @@
          the table settles into spectator chrome (or the game-over modal). -->
     <div v-if="showKO" class="ko-overlay" aria-hidden="true">
       <div class="ko-stamp">ELIMINATED</div>
-      <div class="ko-sub">{{ koCards }} CARDS — NO MERCY</div>
+      <div class="ko-sub">{{ koCards }} CARDS — CLAIMED BY RUIN</div>
     </div>
 
     <!-- You're out, but the round plays on — spectate or bail. Non-blocking
@@ -1048,7 +1048,7 @@ async function handleUpgrade() {
   color: #fff;
   padding: 0.4rem 0.95rem;
   border-radius: 999px;
-  font-family: 'Chakra Petch', sans-serif;
+  font-family: var(--font-body);
   font-size: 0.75rem;
   letter-spacing: 0.22em;
   text-transform: uppercase;
@@ -1101,7 +1101,7 @@ async function handleUpgrade() {
 }
 
 .ko-stamp {
-  font-family: 'Black Ops One', 'Impact', sans-serif;
+  font-family: var(--font-display);
   font-size: clamp(3rem, 12vw, 5.5rem);
   letter-spacing: 0.08em;
   color: #ff2a2a;
@@ -1111,7 +1111,7 @@ async function handleUpgrade() {
 }
 
 .ko-sub {
-  font-family: 'Chakra Petch', sans-serif;
+  font-family: var(--font-body);
   font-size: 0.85rem;
   letter-spacing: 0.35em;
   text-transform: uppercase;
@@ -1148,7 +1148,7 @@ async function handleUpgrade() {
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
   z-index: var(--z-toast);
   max-width: calc(100vw - 2rem);
-  font-family: 'Chakra Petch', sans-serif;
+  font-family: var(--font-body);
   text-transform: uppercase;
 }
 
@@ -1174,7 +1174,7 @@ async function handleUpgrade() {
 }
 
 .spectator-hud__leave {
-  font-family: 'Chakra Petch', sans-serif;
+  font-family: var(--font-body);
   font-size: 0.72rem;
   letter-spacing: 0.16em;
   color: rgba(255, 255, 255, 0.85);
