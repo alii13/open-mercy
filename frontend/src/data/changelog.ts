@@ -61,6 +61,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: '2026-11-04',
+        level: 'quiet',
+        tag: 'NEW',
+        title: 'Stop slow turns stalling a table',
+        body: 'Every multiplayer turn now has 2 minutes. If time runs out, your turn is played for you, and 3 in a row takes you out of that game.',
+    },
+    {
         id: '2026-11-02',
         level: 'loud',
         tag: 'NEW',

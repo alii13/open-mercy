@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { startGame, applyIntent, forceEliminate, persistResults } from './game'
-import type { CardColor } from '../../shared/engine'
+import { startGame, applyIntent, forceEliminate, persistResults, timeOutTurn, clearTimeouts, personalView } from './game'
+import type { Card, CardColor } from '../../shared/engine'
+import * as engine from '../../shared/engine'
 
 const twoPlayers = () => startGame(
   [
@@ -142,5 +143,101 @@ describe('drawn Color Roulette', () => {
     expect(game.pendingDrawnWildCardId).toBeNull()
     expect(game.engine.turnState).toBe('CHOOSING_ROULETTE_COLOR')
     expect(game.engine.discardPile.at(-1)?.id).toBe('roulette-182')
+  })
+})
+
+describe('turn clock timeouts', () => {
+  const num = (id: string, color: CardColor, value: number) => ({ id, color, type: 'number', value }) as Card
+  const threePlayers = () => startGame(
+    [
+      { userId: 'u1', name: 'Alice' },
+      { userId: 'u2', name: 'Bob' },
+      { userId: 'u3', name: 'Cara' },
+    ],
+    'official',
+  )
+  // A red 3 on top, nothing pending, seat `seat` on turn holding `hand`.
+  const setTable = (game: ReturnType<typeof startGame>['game'], seat: number, hand: Card[]) => {
+    const s = game.engine
+    s.discardPile.push(num('top', 'red', 3))
+    s.currentColor = 'red'
+    s.drawStack = 0
+    s.turnState = 'WAITING_FOR_ACTION'
+    s.currentPlayerIndex = seat
+    s.players[seat]!.hand = hand
+    return s.players[seat]!
+  }
+
+  it('plays a legal card for a present seat and passes the turn', () => {
+    const { game } = threePlayers()
+    const me = setTable(game, 0, [num('play-me', 'red', 5), num('keep', 'green', 8)])
+
+    const events = timeOutTurn(game, me.id, true)
+
+    expect(events[0]).toEqual({ t: 'TURN_TIMED_OUT', playerId: me.id, timeouts: 1 })
+    expect(events.some((e) => e.t === 'CARD_PLAYED' && e.card.id === 'play-me')).toBe(true)
+    expect(engine.currentPlayer(game.engine)?.id).not.toBe(me.id)
+  })
+
+  it('takes the normal draw for a present seat with nothing playable', () => {
+    const { game } = threePlayers()
+    const me = setTable(game, 0, [num('dead', 'green', 8)])
+
+    const events = timeOutTurn(game, me.id, true)
+
+    expect(events.some((e) => e.t === 'YOU_DREW')).toBe(true)
+    expect(game.engine.gameState === 'GAME_OVER' || engine.currentPlayer(game.engine)?.id !== me.id).toBe(true)
+  })
+
+  it('gives an absent seat the minimal draw, not a play', () => {
+    const { game } = threePlayers()
+    const me = setTable(game, 0, [num('playable', 'red', 5), num('keep', 'green', 8)])
+
+    const events = timeOutTurn(game, me.id, false)
+
+    expect(events.some((e) => e.t === 'CARD_PLAYED')).toBe(false)
+    expect(events.filter((e) => e.t === 'YOU_DREW')).toHaveLength(1)
+    expect(events.some((e) => e.t === 'TURN_AUTO_RESOLVED')).toBe(false)
+    expect(engine.currentPlayer(game.engine)?.id).not.toBe(me.id)
+  })
+
+  it('takes a seat out on its third timeout in a row and keeps a continuing game scored', () => {
+    const { game } = threePlayers()
+    for (const expected of [1, 2]) {
+      setTable(game, 0, [num(`p${expected}`, 'red', 5), num(`k${expected}`, 'green', 8)])
+      expect(timeOutTurn(game, 'u1', true)[0]).toMatchObject({ t: 'TURN_TIMED_OUT', timeouts: expected })
+    }
+    setTable(game, 0, [num('p3', 'red', 5), num('k3', 'green', 8)])
+
+    const events = timeOutTurn(game, 'u1', true)
+
+    expect(events[0]).toEqual({ t: 'TURN_TIMED_OUT', playerId: 'u1', timeouts: 3 })
+    expect(events).toContainEqual({ t: 'ELIMINATED', playerId: 'u1' })
+    expect(events.some((e) => e.t === 'CARD_PLAYED')).toBe(false)
+    expect(game.engine.players[0]!.isEliminated).toBe(true)
+    expect(game.engine.gameState).toBe('PLAYING')
+    expect(engine.currentPlayer(game.engine)?.id).not.toBe('u1')
+    expect(game.hadKick).toBeFalsy()
+    const view = personalView(game, 'playing', 'u2', [], new Set(), null)
+    expect(view.players[0]).toMatchObject({ isEliminated: true, timedOut: true, timeouts: 3 })
+  })
+
+  it('does not score a game that a timeout ends, the same as a leave', () => {
+    const { game } = twoPlayers()
+    game.timeouts = { u1: 2 }
+    setTable(game, 0, [num('p', 'red', 5)])
+
+    const events = timeOutTurn(game, 'u1', true)
+
+    expect(events).toContainEqual({ t: 'GAME_OVER', winnerId: 'u2' })
+    expect(game.hadKick).toBe(true)
+  })
+
+  it('resets the count once the seat moves on its own', () => {
+    const { game } = threePlayers()
+    game.timeouts = { u1: 2 }
+    clearTimeouts(game, 'u1')
+    const view = personalView(game, 'playing', 'u1', [], new Set(), null)
+    expect(view.players[0]).toMatchObject({ timeouts: 0, timedOut: false })
   })
 })

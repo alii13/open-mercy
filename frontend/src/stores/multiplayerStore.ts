@@ -9,6 +9,7 @@ import { getEquippedId } from '../utils/cosmetics'
 import { useAuthStore } from './authStore'
 import { useVoiceStore } from './voiceStore'
 import type { ClientMsg, IntentAction, PersonalView, PresencePlayer, ServerMsg } from '@protocol'
+import { MAX_TURN_TIMEOUTS } from '@protocol'
 import { quickChatPhrase } from '@quickChat'
 
 // The authoritative game server (Cloudflare Worker + one Durable Object per
@@ -117,6 +118,11 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
     let stackEatenN = 0
     let mercyCallN = 0
     const lastAction = ref<{ text: string; n: number } | null>(null)
+    // When the current turn's limit runs out, on this client's clock: the
+    // server sends time left as a duration so skew between clocks can't bend it.
+    const turnDeadline = ref<number | null>(null)
+    // Seats whose ELIMINATED in this batch came from the clock, not the mercy rule.
+    const outOfTime = new Set<string>()
     const lastRemotePlay = ref<{ userId: string; card: Card; n: number } | null>(null)
     // One-shot FX signals from the server: who ate a +N stack, who called Mercy.
     // The monotonic `n` makes the view's watcher fire even on identical repeats.
@@ -239,6 +245,9 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
     const opponent = computed(() => opponents.value[0] ?? null)
     const eliminatedIds = computed(() => new Set((view.value?.players ?? []).filter(p => p.isEliminated).map(p => p.userId)))
     const playersLeft = computed(() => (view.value?.players ?? []).filter(p => !p.isEliminated).length)
+    const timedOutIds = computed(() => new Set((view.value?.players ?? []).filter(p => p.timedOut).map(p => p.userId)))
+    /** Turns in a row this seat ran out the clock on (0 when an older server omits it). */
+    const timeoutsFor = (userId: string | null | undefined) => view.value?.players.find(p => p.userId === userId)?.timeouts ?? 0
     // First knocked out of N places Nth; only meaningful once I'm out.
     const myPlacement = computed(() => {
         const me = myUserId.value
@@ -321,6 +330,7 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
                 if (msg.seq < lastSeq) break
                 lastSeq = msg.seq
                 view.value = msg.game
+                turnDeadline.value = msg.game.turnEndsInMs != null ? Date.now() + msg.game.turnEndsInMs : null
                 stackingMode.value = msg.game.stackingMode
                 pendingIntent = null
                 actionInProgress.value = false
@@ -391,9 +401,23 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
                     case 'STACK_EATEN':
                         lastStackEaten.value = { playerId: ev.playerId, amount: ev.amount, n: ++stackEatenN }
                         break
+                    case 'TURN_TIMED_OUT':
+                        if (ev.timeouts >= MAX_TURN_TIMEOUTS) {
+                            outOfTime.add(ev.playerId)
+                        } else if (ev.playerId === myUserId.value) {
+                            shout(`Time's up: your turn was played for you (${ev.timeouts} of ${MAX_TURN_TIMEOUTS})`)
+                        } else {
+                            shout(`${playerName(ev.playerId)} ran out of time (${ev.timeouts} of ${MAX_TURN_TIMEOUTS})`)
+                        }
+                        break
                     case 'ELIMINATED':
                         if (!eliminationOrder.value.includes(ev.playerId)) eliminationOrder.value.push(ev.playerId)
-                        shout(`${playerName(ev.playerId)} is ELIMINATED`)
+                        if (outOfTime.delete(ev.playerId)) {
+                            const out = ev.playerId === myUserId.value ? 'You are' : `${playerName(ev.playerId)} is`
+                            shout(`${out} OUT: ran out of time ${MAX_TURN_TIMEOUTS} turns in a row`)
+                        } else {
+                            shout(`${playerName(ev.playerId)} is ELIMINATED`)
+                        }
                         if (catchableUserId.value === ev.playerId) catchableUserId.value = null
                         if (ev.playerId === myUserId.value && !selfEliminated.value) {
                             selfEliminated.value = { n: ++koN }
@@ -658,6 +682,7 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
         spectateStartedAt = 0
         spectatedThisGame = false
         lastAction.value = null
+        turnDeadline.value = null
         lastRemotePlay.value = null
         lastStackEaten.value = null
         lastMercyCall.value = null
@@ -952,6 +977,9 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
         opponent,
         opponents,
         eliminatedIds,
+        timedOutIds,
+        timeoutsFor,
+        turnDeadline,
         playersLeft,
         myPlacement,
         selfEliminated,

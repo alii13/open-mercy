@@ -18,6 +18,8 @@
         :is-active="currentGame?.current_player_id === opp.user_id"
         :is-eliminated="mpStore.eliminatedIds.has(opp.user_id)"
         :is-disconnected="isDisconnected(opp.user_id)"
+        :timeouts="mpStore.timeoutsFor(opp.user_id)"
+        :timed-out="mpStore.timedOutIds.has(opp.user_id)"
         :can-kick="mpStore.isHost && !mpStore.eliminatedIds.has(opp.user_id)"
         :in-voice="voiceStore.voiceUserIds.has(opp.user_id)"
         :is-speaking="voiceStore.speakingUserIds.has(opp.user_id)"
@@ -116,6 +118,11 @@
           CAUGHT! {{ caughtTarget.name }} forgot MERCY
         </button>
       </Transition>
+      <span
+        v-if="myTimeouts > 0 && !iAmOut"
+        class="timeout-badge"
+        :title="`You ran out of time ${myTimeouts} of ${MAX_TURN_TIMEOUTS} turns in a row`"
+      >TIMED OUT {{ myTimeouts }}/{{ MAX_TURN_TIMEOUTS }}</span>
     </PlayerConsoleBar>
 
     <!-- Animated Card Layer (for flying cards) -->
@@ -264,6 +271,7 @@
 <script setup lang="ts">
 import { LogOut } from 'lucide-vue-next'
 import { ref, computed, watch, provide, onMounted, onUnmounted } from 'vue'
+import { MAX_TURN_TIMEOUTS, TURN_WARNING_MS } from '@protocol'
 import { music } from '../../composables/useMusic'
 import { useMultiplayerStore } from '../../stores/multiplayerStore'
 import { useAuthStore } from '../../stores/authStore'
@@ -533,7 +541,30 @@ const mustDraw = computed(() => {
   return !myHand.value.some(c => canPlayCard(c, top, currentColor.value, 0, mpStore.stackingMode))
 })
 
+// Turn clock: silent until the last TURN_WARNING_MS, then a live count for
+// everyone. A seat one timeout from out hears its last chance from the start.
+const now = ref(Date.now())
+const clockTick = setInterval(() => { now.value = Date.now() }, 1000)
+const turnSecondsLeft = computed(() => {
+  const deadline = mpStore.turnDeadline
+  if (gameStatus.value !== 'playing' || deadline == null) return null
+  return Math.max(0, Math.ceil((deadline - now.value) / 1000))
+})
+const myTimeouts = computed(() => mpStore.timeoutsFor(mpStore.myPlayer?.user_id))
+const iAmOut = computed(() => !!mpStore.myPlayer && mpStore.eliminatedIds.has(mpStore.myPlayer.user_id))
+const clockMessage = computed(() => {
+  const left = turnSecondsLeft.value
+  const lastChance = isMyTurn.value && myTimeouts.value >= MAX_TURN_TIMEOUTS - 1
+  if (left != null && left * 1000 <= TURN_WARNING_MS) {
+    const count = `${left} SECOND${left === 1 ? '' : 'S'} LEFT`
+    if (!isMyTurn.value) return `${currentPlayerName.value}: ${count}`
+    return lastChance ? `${count} · LAST CHANCE OR YOU'RE OUT` : count
+  }
+  return lastChance ? `LAST CHANCE: PLAY THIS TURN OR YOU'RE OUT` : ''
+})
+
 const statusMessage = computed(() => {
+  if (clockMessage.value) return clockMessage.value
   if (mustDraw.value) return 'NO PLAYABLE CARD — TAP THE DECK TO DRAW'
   if (turnState.value === 'CHOOSING_PLAYER_TO_SWAP' && isMyTurn.value) return 'SELECT PLAYER TO SWAP HANDS'
   if (turnState.value === 'CHOOSING_PLAYER_TO_SWAP' && !isMyTurn.value) return 'OPPONENT IS CHOOSING SWAP TARGET...'
@@ -549,6 +580,7 @@ const statusMessage = computed(() => {
 })
 
 const statusMessageStyle = computed(() => {
+  if (clockMessage.value) return { color: '#ff3333', textShadow: '0 0 10px rgba(255, 51, 51, 0.6)' }
   if (turnState.value === 'ROULETTE_DRAWING') {
     const colorMap: Record<string, string> = {
       red: '#ff5555', blue: '#5555ff', green: '#55ff55', yellow: '#ffff55'
@@ -833,6 +865,7 @@ onUnmounted(() => {
   music.stop()
   killAllFlyingCards()
   if (koTimer) clearTimeout(koTimer)
+  clearInterval(clockTick)
 })
 
 // Music starts when game enters 'playing'; ducks on 'finished'.
