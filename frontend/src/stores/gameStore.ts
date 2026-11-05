@@ -11,7 +11,7 @@ import {
 } from '@engine/bot'
 import { chooseBotCard } from '@engine/botSearch'
 import { seededRng } from '../utils/seededRng'
-import { markDailyDone, loadDailyProgress, saveDailyProgress, clearDailyProgress } from '../utils/dailyChallenge'
+import { markDailyDone, loadDailyProgress, saveDailyProgress, clearDailyProgress, DAILY_PROGRESS_KEY } from '../utils/dailyChallenge'
 import { recordBotWin } from '../utils/botLadder'
 import type { StackingMode } from '@engine'
 import { soundEffects } from '../composables/useSoundEffects'
@@ -425,6 +425,10 @@ export const useGameStore = defineStore('game', () => {
     // Split from openCatchWindow so a resumed daily can re-arm a window with
     // the pounce it already rolled, instead of rolling again.
     let catchWillFire = false
+    // Set while a resumed daily replays a move during which the bot's catch
+    // had already landed: the pounce comes at once, not after a fresh window
+    // the player could now beat by tapping MERCY.
+    let replayCaught = false
     function armCatchWindow(player: Player, willCatch: boolean) {
         closeCatchWindow()
         catchableId.value = player.id
@@ -437,11 +441,15 @@ export const useGameStore = defineStore('game', () => {
         } else {
             // Human is exposed — the UNO button derives from catchableId, and
             // a bot may pounce ~70% of the time before the window closes.
+            const delay = replayCaught && willCatch ? 0 : 1800 + Math.random() * 1600
+            if (willCatch) replayCaught = false
             catchTimer = setTimeout(() => {
                 if (catchableId.value !== player.id) return
-                if (willCatch) penalizeForgottenUno(player.id)
-                else closeCatchWindow()
-            }, 1800 + Math.random() * 1600)
+                if (willCatch) {
+                    penalizeForgottenUno(player.id)
+                    noteDailyCatch()
+                } else closeCatchWindow()
+            }, delay)
         }
     }
 
@@ -889,8 +897,26 @@ export const useGameStore = defineStore('game', () => {
     }
 
     watch([players, turnState, currentPlayerIndex, actionInProgress, catchableId, hasCalledUno, isDealing], () => {
-        if (isSettled()) saveDaily()
+        if (!isSettled()) return
+        replayCaught = false
+        saveDaily()
     }, { deep: true })
+
+    // A pounce that lands mid-move is on no save yet: mark the saved move, so
+    // replaying it brings the pounce back.
+    function noteDailyCatch() {
+        const saved = dailyDate.value ? loadDailyProgress<DailyGame, HumanMove>() : null
+        if (saved?.move) saveDailyProgress({ ...saved, caught: true })
+    }
+
+    // One live copy of the daily: another tab saving it means this copy is
+    // stale, and playing on would let a move be tried in one tab and made
+    // differently in the other.
+    if (typeof window !== 'undefined') {
+        window.addEventListener('storage', (e) => {
+            if (e.key === DAILY_PROGRESS_KEY && dailyDate.value && gameState.value === 'PLAYING') returnToLobby()
+        })
+    }
 
     // What the UI calls for the human's moves. Bot turns and the store's own
     // follow-ups call the plain functions, so only a human move is saved.
@@ -938,6 +964,7 @@ export const useGameStore = defineStore('game', () => {
         lastPlay.value = null
         winnerId.value = null
         gameState.value = 'PLAYING'
+        replayCaught = saved.caught === true
         const exposed = players.value.find(p => p.id === g.catchableId)
         if (exposed) armCatchWindow(exposed, g.catchWillFire)
         if (saved.move) (humanMoves[saved.move.name] as (...args: unknown[]) => void)(...saved.move.args)

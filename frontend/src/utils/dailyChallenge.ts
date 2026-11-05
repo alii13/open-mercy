@@ -89,7 +89,9 @@ export function markDailyDone(rec: DailyRecord): void {
     } catch { /* localStorage disabled or quota */ }
 }
 
-const PROGRESS_KEY = 'uno_daily_game_v1'
+// Bump the version when the saved shape changes: a save from the old shape
+// would otherwise be restored into code that cannot read it.
+export const DAILY_PROGRESS_KEY = 'uno_daily_game_v1'
 
 /**
  * Today's daily while it is still being played. A reload reopens this game
@@ -102,11 +104,13 @@ export interface DailyProgress<G, M> {
     date: string
     game: G
     move?: M
+    /** The bot's MERCY catch landed while `move` was still playing out. */
+    caught?: boolean
 }
 
 export function loadDailyProgress<G, M>(): DailyProgress<G, M> | null {
     try {
-        const raw = localStorage.getItem(PROGRESS_KEY)
+        const raw = localStorage.getItem(DAILY_PROGRESS_KEY)
         if (!raw) return null
         const p = JSON.parse(raw) as DailyProgress<G, M>
         return p.date === localDateString() ? p : null
@@ -117,13 +121,13 @@ export function loadDailyProgress<G, M>(): DailyProgress<G, M> | null {
 
 export function saveDailyProgress<G, M>(p: DailyProgress<G, M>): void {
     try {
-        localStorage.setItem(PROGRESS_KEY, JSON.stringify(p))
+        localStorage.setItem(DAILY_PROGRESS_KEY, JSON.stringify(p))
     } catch { /* localStorage disabled or quota */ }
 }
 
 export function clearDailyProgress(): void {
     try {
-        localStorage.removeItem(PROGRESS_KEY)
+        localStorage.removeItem(DAILY_PROGRESS_KEY)
     } catch { /* localStorage disabled */ }
 }
 

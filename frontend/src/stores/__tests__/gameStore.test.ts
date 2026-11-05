@@ -512,6 +512,7 @@ describe('daily resume after a reload', () => {
 
     afterEach(() => {
         vi.unstubAllGlobals()
+        vi.restoreAllMocks()
     })
 
     async function startDaily() {
@@ -551,6 +552,7 @@ describe('daily resume after a reload', () => {
             top: store.topCard?.id,
             turnState: store.turnState,
             turnLog: [...store.turnLog],
+            stats: JSON.parse(JSON.stringify(store.playerStats)),
         }
     }
 
@@ -596,6 +598,46 @@ describe('daily resume after a reload', () => {
 
         expect(store.gameState).toBe('GAME_OVER')
         expect(reload().resumeDaily()).toBe(false)
+    })
+
+    it('keeps a MERCY catch that landed before the reload', async () => {
+        vi.spyOn(Math, 'random').mockReturnValue(0)
+        const store = await startDaily()
+        const human = store.players.find(p => !p.isBot)!
+        const bot = store.players.find(p => p.isBot)!
+        const plus10: Card = { id: 't-plus10', color: 'wild', type: 'draw10' }
+        human.hand = [plus10, { id: 't-blue-1', color: 'blue', type: 'number', value: 1 }]
+        bot.hand = [1, 2, 3, 4, 5].map(v => ({ id: `t-green-${v}`, color: 'green', type: 'number', value: v }) as Card)
+        await nextTick()
+        // Down to one card without calling MERCY; the bot pounces at 1.8s,
+        // while it is still eating the +10.
+        store.playerActionPlayCard(plus10, 'red')
+        await vi.advanceTimersByTimeAsync(2000)
+        expect(store.playerStats[human.id]!.unoPenalties).toBe(1)
+        expect(store.currentPlayer?.isBot).toBe(true)
+
+        const resumed = reload()
+        expect(resumed.resumeDaily()).toBe(true)
+        await vi.advanceTimersByTimeAsync(10)
+        // Knowing the pounce is coming, tap MERCY straight away.
+        resumed.callUno(human.id)
+        await untilHumanInput(resumed)
+
+        expect(resumed.playerStats[human.id]!.unoPenalties).toBe(1)
+    })
+
+    it('sends this tab back to the lobby when another tab saves the daily', async () => {
+        let onStorage: ((e: { key: string | null }) => void) | undefined
+        vi.stubGlobal('window', {
+            addEventListener: (type: string, fn: typeof onStorage) => { if (type === 'storage') onStorage = fn },
+        })
+        const store = await startDaily()
+
+        onStorage?.({ key: 'some_other_key' })
+        expect(store.gameState).toBe('PLAYING')
+
+        onStorage?.({ key: 'uno_daily_game_v1' })
+        expect(store.gameState).toBe('LOBBY')
     })
 
     it('ignores a saved game from yesterday', async () => {
