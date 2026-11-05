@@ -552,19 +552,31 @@ const turnSecondsLeft = computed(() => {
 })
 const myTimeouts = computed(() => mpStore.timeoutsFor(mpStore.myPlayer?.user_id))
 const iAmOut = computed(() => !!mpStore.myPlayer && mpStore.eliminatedIds.has(mpStore.myPlayer.user_id))
+const lastChance = computed(() => isMyTurn.value && myTimeouts.value >= MAX_TURN_TIMEOUTS - 1)
+const countingDown = computed(() => turnSecondsLeft.value != null && turnSecondsLeft.value * 1000 <= TURN_WARNING_MS)
+// The clock on its own, when nothing else needs saying.
 const clockMessage = computed(() => {
   const left = turnSecondsLeft.value
-  const lastChance = isMyTurn.value && myTimeouts.value >= MAX_TURN_TIMEOUTS - 1
-  if (left != null && left * 1000 <= TURN_WARNING_MS) {
+  if (countingDown.value) {
     const count = `${left} SECOND${left === 1 ? '' : 'S'} LEFT`
     if (!isMyTurn.value) return `${currentPlayerName.value}: ${count}`
-    return lastChance ? `${count} · LAST CHANCE OR YOU'RE OUT` : count
+    return lastChance.value ? `${count} · LAST CHANCE OR YOU'RE OUT` : count
   }
-  return lastChance ? `LAST CHANCE: PLAY THIS TURN OR YOU'RE OUT` : ''
+  return lastChance.value ? `LAST CHANCE: PLAY THIS TURN OR YOU'RE OUT` : ''
 })
+// The clock tacked onto a prompt the player still needs, never replacing it.
+const clockSuffix = computed(() => [
+  countingDown.value ? `${turnSecondsLeft.value}s LEFT` : '',
+  lastChance.value ? 'LAST CHANCE' : '',
+].filter(Boolean).join(' · '))
 
 const statusMessage = computed(() => {
-  if (clockMessage.value) return clockMessage.value
+  const prompt = promptMessage.value
+  if (!prompt) return clockMessage.value
+  return clockSuffix.value ? `${prompt} · ${clockSuffix.value}` : prompt
+})
+
+const promptMessage = computed(() => {
   if (mustDraw.value) return 'NO PLAYABLE CARD — TAP THE DECK TO DRAW'
   if (turnState.value === 'CHOOSING_PLAYER_TO_SWAP' && isMyTurn.value) return 'SELECT PLAYER TO SWAP HANDS'
   if (turnState.value === 'CHOOSING_PLAYER_TO_SWAP' && !isMyTurn.value) return 'OPPONENT IS CHOOSING SWAP TARGET...'

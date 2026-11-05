@@ -222,15 +222,41 @@ describe('turn clock timeouts', () => {
     expect(view.players[0]).toMatchObject({ isEliminated: true, timedOut: true, timeouts: 3 })
   })
 
-  it('does not score a game that a timeout ends, the same as a leave', () => {
+  it('saves the timed-out seat\'s loss but not the win when a timeout ends the game', async () => {
+    const fetchMock = vi.fn(async (_url: string, _init: RequestInit) => new Response(null, { status: 201 }))
+    vi.stubGlobal('fetch', fetchMock)
+    vi.spyOn(console, 'log').mockImplementation(() => {})
     const { game } = twoPlayers()
     game.timeouts = { u1: 2 }
     setTable(game, 0, [num('p', 'red', 5)])
 
     const events = timeOutTurn(game, 'u1', true)
-
     expect(events).toContainEqual({ t: 'GAME_OVER', winnerId: 'u2' })
-    expect(game.hadKick).toBe(true)
+    expect(game.hadKick).toBeFalsy()
+
+    const env = { SUPABASE_URL: 'https://example.invalid', SUPABASE_SERVICE_KEY: 'test-key' }
+    expect(await persistResults(game, 'ABCDEF', env)).toBe(true)
+    const rows = JSON.parse(String(fetchMock.mock.calls[0]![1].body)) as { user_id: string; result: string }[]
+    expect(rows.map((r) => [r.user_id, r.result])).toEqual([['u1', 'eliminated']])
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('finishes a 7 the way the bot would: swaps with the smallest hand instead of skipping', () => {
+    const { game } = threePlayers()
+    const s = game.engine
+    s.currentPlayerIndex = 0
+    s.turnState = 'CHOOSING_PLAYER_TO_SWAP'
+    s.swapInitiatorId = 'u1'
+    s.players[0]!.hand = ['a', 'b', 'c', 'd', 'e'].map((id, i) => num(id, 'red', i))
+    s.players[1]!.hand = [num('x', 'blue', 1), num('y', 'blue', 2)]
+    s.players[2]!.hand = ['f', 'g', 'h', 'i'].map((id, i) => num(id, 'green', i))
+
+    timeOutTurn(game, 'u1', true)
+
+    expect(s.players[0]!.hand.map((c) => c.id)).toEqual(['x', 'y'])
+    expect(s.players[1]!.hand).toHaveLength(5)
+    expect(engine.currentPlayer(s)?.id).not.toBe('u1')
   })
 
   it('resets the count once the seat moves on its own', () => {

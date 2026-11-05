@@ -3,7 +3,7 @@
 import { verifySupabaseToken, type AuthEnv } from './auth'
 import type { ClientMsg, GameEvent, PresencePlayer, ServerMsg } from './protocol'
 import { applyIntent, applyUnoCatch, clearTimeouts, forceEliminate, persistResults, personalView, startGame, timeOutTurn, updateStats, viewEventFor, type GameRecord } from './game'
-import { nextTurnClock } from './turnClock'
+import { dueTimeout, nextTurnClock } from './turnClock'
 import { dirCodes, dirRegister, liveTables, normalizeDir } from './directory'
 import { cleanName, cleanSkin, isStackingMode } from './validate'
 import { newBucket, socketVerdict, type Bucket } from './socketLimit'
@@ -341,12 +341,14 @@ export class GameRoomDO {
         }
     }
 
-    /** Point the turn clock at whoever is on turn; `actor` made the move that led here. */
+    /** Point the turn clock at whoever is on turn; `actor` made the turn move that led here. */
     private async armTurnClock(actor?: string): Promise<void> {
         const t = await this.getTimers()
         const s = this.game?.engine
         const current = s && s.gameState === 'PLAYING' ? s.players[s.currentPlayerIndex] : undefined
-        const next = nextTurnClock({ seat: t.turnSeat, at: t.turnAt }, current && !current.isEliminated ? current.id : null, actor, Date.now())
+        // The seat on turn moved and is back to a fresh action: an extra turn.
+        const newTurn = !!current && actor === current.id && s?.turnState === 'WAITING_FOR_ACTION'
+        const next = nextTurnClock({ seat: t.turnSeat, at: t.turnAt }, current && !current.isEliminated ? current.id : null, newTurn, Date.now())
         if (next.seat === t.turnSeat && next.at === t.turnAt) return
         t.turnSeat = next.seat
         t.turnAt = next.at
@@ -402,8 +404,8 @@ export class GameRoomDO {
 
     /**
      * Send an intent's events (personalized) + a fresh snapshot to every seated
-     * socket. `actor` is whoever's move this was, so the turn clock can tell a
-     * move by the seat on turn from someone else's.
+     * socket. `actor` is set only for a turn move (not a MERCY call or a
+     * catch), so the turn clock can tell a new turn from anything else.
      */
     private async broadcastGame(events: GameEvent[], intentId?: string, actor?: string): Promise<void> {
         this.seq++
@@ -819,8 +821,7 @@ export class GameRoomDO {
                     await this.putTimers(t)
                     const events = applyUnoCatch(game, target)
                     events.push({ t: 'UNO_WINDOW_CLOSED', playerId: target })
-                    clearTimeouts(game, tag.userId)
-                    await this.broadcastGame(events, msg.id, tag.userId)
+                    await this.broadcastGame(events, msg.id)
                     return
                 }
 
@@ -829,8 +830,11 @@ export class GameRoomDO {
                     this.send(ws, { t: 'error', code: 'invalid-intent', intentId: msg.id })
                     return
                 }
-                clearTimeouts(game, tag.userId)
-                await this.broadcastGame(res.events, msg.id, tag.userId)
+                // A MERCY call is allowed on your own turn and repeatable, so
+                // it neither restarts the clock nor counts as playing the turn.
+                const turnMove = msg.action.kind !== 'CALL_UNO'
+                if (turnMove) clearTimeouts(game, tag.userId)
+                await this.broadcastGame(res.events, msg.id, turnMove ? tag.userId : undefined)
                 return
             }
 
@@ -895,17 +899,17 @@ export class GameRoomDO {
             }
         }
 
-        // A seat that is here but let the limit run out. One that dropped is
-        // the grace clock's (above), which acts sooner.
+        // The limit ran out. A seat that dropped is usually the grace clock's
+        // (above, it acts sooner); if the limit lands first it still times out,
+        // as absent, so going offline across the deadline cannot stop the clock.
         if (turnDue && turnSeat) {
             await this.loadGame()
             const s = this.game?.engine
             const connected = new Set(this.roomSockets().map(x => x.userId))
-            if (this.game && s && this.roomStatus() === 'playing'
-                && s.players[s.currentPlayerIndex]?.id === turnSeat
-                && connected.has(turnSeat)) {
-                await this.broadcastGame(timeOutTurn(this.game, turnSeat, true))
-            }
+            const due = this.game && s && this.roomStatus() === 'playing'
+                ? dueTimeout(turnSeat, s.players[s.currentPlayerIndex]?.id ?? null, connected)
+                : null
+            if (this.game && due) await this.broadcastGame(timeOutTurn(this.game, due.seat, due.present))
         }
 
         if (startDue) {
