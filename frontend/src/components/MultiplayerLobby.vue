@@ -122,7 +122,7 @@
           <template v-if="!dailyRecord">
             <p class="daily-desc">The same shuffle for every player in the world. One scored attempt.</p>
             <Button variant="secondary" size="md" block @click="$emit('playDaily')">
-              PLAY
+              {{ dailyInProgress ? 'CONTINUE' : 'PLAY' }}
             </Button>
           </template>
           <template v-else>
@@ -637,7 +637,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { ArrowRight, Bot, Check, ChevronDown, ChevronRight, Clock, Copy, Flame, Hash, HelpCircle, Minus, Pencil, Share2, Skull, Users, Volume1, VolumeX, X, Zap } from 'lucide-vue-next'
 import { useRetentionStore } from '../stores/retentionStore'
 import {
-    getDailyRecord, fetchServerDailyRecord, dailyGridCells, buildDailyShareText,
+    getDailyRecord, fetchServerDailyRecord, dailyGridCells, buildDailyShareText, loadDailyProgress,
 } from '../utils/dailyChallenge'
 import { localDateString } from '../utils/seededRng'
 import { generateDailyShareImage, shareOrDownload } from '../utils/shareImage'
@@ -685,6 +685,7 @@ const retention = useRetentionStore()
 // Re-read on every mount: the lobby unmounts while the daily game plays, so
 // returning from it always shows the fresh done state.
 const dailyRecord = ref(getDailyRecord())
+const dailyInProgress = loadDailyProgress() !== null
 // The local record is per device. When it is missing but the player is signed
 // in, ask the server before offering PLAY — otherwise a phone-then-laptop
 // player starts a run the unique index will refuse to score.

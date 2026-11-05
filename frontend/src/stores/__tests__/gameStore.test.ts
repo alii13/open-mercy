@@ -494,3 +494,156 @@ describe('daily and ladder analytics', () => {
         expect(track).toHaveBeenCalledWith('sp_game_finished', expect.objectContaining({ warm_up: true }))
     })
 })
+
+describe('daily resume after a reload', () => {
+    const today = '2026-08-10'
+    const saved = new Map<string, string>()
+
+    beforeEach(() => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date(`${today}T12:00:00`))
+        saved.clear()
+        vi.stubGlobal('localStorage', {
+            getItem: (k: string) => saved.get(k) ?? null,
+            setItem: (k: string, v: string) => { saved.set(k, v) },
+            removeItem: (k: string) => { saved.delete(k) },
+        })
+    })
+
+    afterEach(() => {
+        vi.unstubAllGlobals()
+        vi.restoreAllMocks()
+    })
+
+    async function startDaily() {
+        const store = useGameStore()
+        store.initializeGame(['You', 'Terminator'], 'official', { dailySeed: today })
+        await store.dealInitialCards(async () => {})
+        await untilHumanInput(store)
+        return store
+    }
+
+    async function untilHumanInput(store: ReturnType<typeof useGameStore>) {
+        for (let i = 0; i < 400; i++) {
+            await nextTick()
+            const p = store.currentPlayer
+            if (store.gameState !== 'PLAYING') return
+            const idle = store.turnState === 'WAITING_FOR_ACTION' ? !store.actionInProgress : store.turnState.startsWith('CHOOSING_')
+            if (p && !p.isBot && idle && !store.catchableId) return
+            await vi.advanceTimersByTimeAsync(250)
+        }
+        throw new Error(`the human was never asked to move: ${store.currentPlayer?.name} ${store.turnState} busy=${store.actionInProgress} catchable=${store.catchableId}`)
+    }
+
+    /** A page reload: every timer dies, and the store comes back empty. */
+    function reload() {
+        // clearAllTimers also rewinds the fake clock; a reload keeps the date.
+        const now = Date.now()
+        vi.clearAllTimers()
+        vi.setSystemTime(now)
+        setActivePinia(createPinia())
+        return useGameStore()
+    }
+
+    function table(store: ReturnType<typeof useGameStore>) {
+        return {
+            hands: store.players.map(p => p.hand.map(c => c.id)),
+            deck: store.deck.map(c => c.id),
+            top: store.topCard?.id,
+            turnState: store.turnState,
+            turnLog: [...store.turnLog],
+            stats: JSON.parse(JSON.stringify(store.playerStats)),
+        }
+    }
+
+    it('reopens the same game at the same turn', async () => {
+        const before = table(await startDaily())
+
+        const store = reload()
+
+        expect(store.resumeDaily()).toBe(true)
+        expect(store.gameState).toBe('PLAYING')
+        expect(store.dailyDate).toBe(today)
+        expect(table(store)).toEqual(before)
+    })
+
+    it('replays a move made just before the reload instead of undoing it', async () => {
+        const played = await startDaily()
+        played.drawCardsForCurrentPlayer()
+        await untilHumanInput(played)
+        const after = table(played)
+
+        saved.clear()
+        const first = reload()
+        first.initializeGame(['You', 'Terminator'], 'official', { dailySeed: today })
+        await first.dealInitialCards(async () => {})
+        await untilHumanInput(first)
+        first.drawCardsForCurrentPlayer()
+        const store = reload()
+
+        expect(store.resumeDaily()).toBe(true)
+        await untilHumanInput(store)
+        expect(table(store)).toEqual(after)
+    })
+
+    it('has nothing to resume once the daily is over', async () => {
+        const store = await startDaily()
+        const human = store.players.find(p => !p.isBot)!
+        const red7: Card = { id: 'c-red-7', color: 'red', type: 'number', value: 7 }
+        human.hand = [red7]
+        store.discardPile = [red5]
+        store.currentColor = 'red'
+        store.playCard(human.id, red7)
+        await nextTick()
+
+        expect(store.gameState).toBe('GAME_OVER')
+        expect(reload().resumeDaily()).toBe(false)
+    })
+
+    it('keeps a MERCY catch that landed before the reload', async () => {
+        vi.spyOn(Math, 'random').mockReturnValue(0)
+        const store = await startDaily()
+        const human = store.players.find(p => !p.isBot)!
+        const bot = store.players.find(p => p.isBot)!
+        const plus10: Card = { id: 't-plus10', color: 'wild', type: 'draw10' }
+        human.hand = [plus10, { id: 't-blue-1', color: 'blue', type: 'number', value: 1 }]
+        bot.hand = [1, 2, 3, 4, 5].map(v => ({ id: `t-green-${v}`, color: 'green', type: 'number', value: v }) as Card)
+        await nextTick()
+        // Down to one card without calling MERCY; the bot pounces at 1.8s,
+        // while it is still eating the +10.
+        store.playerActionPlayCard(plus10, 'red')
+        await vi.advanceTimersByTimeAsync(2000)
+        expect(store.playerStats[human.id]!.unoPenalties).toBe(1)
+        expect(store.currentPlayer?.isBot).toBe(true)
+
+        const resumed = reload()
+        expect(resumed.resumeDaily()).toBe(true)
+        await vi.advanceTimersByTimeAsync(10)
+        // Knowing the pounce is coming, tap MERCY straight away.
+        resumed.callUno(human.id)
+        await untilHumanInput(resumed)
+
+        expect(resumed.playerStats[human.id]!.unoPenalties).toBe(1)
+    })
+
+    it('sends this tab back to the lobby when another tab saves the daily', async () => {
+        let onStorage: ((e: { key: string | null }) => void) | undefined
+        vi.stubGlobal('window', {
+            addEventListener: (type: string, fn: typeof onStorage) => { if (type === 'storage') onStorage = fn },
+        })
+        const store = await startDaily()
+
+        onStorage?.({ key: 'some_other_key' })
+        expect(store.gameState).toBe('PLAYING')
+
+        onStorage?.({ key: 'uno_daily_game_v1' })
+        expect(store.gameState).toBe('LOBBY')
+    })
+
+    it('ignores a saved game from yesterday', async () => {
+        await startDaily()
+        vi.setSystemTime(new Date('2026-08-11T12:00:00'))
+
+        expect(reload().resumeDaily()).toBe(false)
+    })
+})

@@ -89,6 +89,48 @@ export function markDailyDone(rec: DailyRecord): void {
     } catch { /* localStorage disabled or quota */ }
 }
 
+// Bump the version when the saved shape changes: a save from the old shape
+// would otherwise be restored into code that cannot read it.
+export const DAILY_PROGRESS_KEY = 'uno_daily_game_v1'
+
+/**
+ * Today's daily while it is still being played. A reload reopens this game
+ * rather than dealing a fresh one: a fresh deal of the same shuffle let a
+ * player learn the deal, reload, and play it back from memory. `move` is a
+ * move committed after `game` was saved; resuming replays it, so a reload
+ * cannot take a move back once the player has seen what it led to.
+ */
+export interface DailyProgress<G, M> {
+    date: string
+    game: G
+    move?: M
+    /** The bot's MERCY catch landed while `move` was still playing out. */
+    caught?: boolean
+}
+
+export function loadDailyProgress<G, M>(): DailyProgress<G, M> | null {
+    try {
+        const raw = localStorage.getItem(DAILY_PROGRESS_KEY)
+        if (!raw) return null
+        const p = JSON.parse(raw) as DailyProgress<G, M>
+        return p.date === localDateString() ? p : null
+    } catch {
+        return null
+    }
+}
+
+export function saveDailyProgress<G, M>(p: DailyProgress<G, M>): void {
+    try {
+        localStorage.setItem(DAILY_PROGRESS_KEY, JSON.stringify(p))
+    } catch { /* localStorage disabled or quota */ }
+}
+
+export function clearDailyProgress(): void {
+    try {
+        localStorage.removeItem(DAILY_PROGRESS_KEY)
+    } catch { /* localStorage disabled */ }
+}
+
 /**
  * The localStorage gate above is per device, so playing today's deal on a
  * phone and then opening a laptop looks like a fresh day — that is how two

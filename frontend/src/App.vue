@@ -317,6 +317,16 @@ onMounted(async () => {
     const invite = new URLSearchParams(window.location.search).get('join') || ''
     if (isRoomCode(invite)) await attemptGuestSignin()
   }
+
+  // Same for a daily cut short by a reload: dealing it again from the top
+  // would let the player replay a deal they have already seen. Only on a
+  // plain visit to the lobby: the game view sits above every other screen,
+  // so it would cover a restored room, an invite link or the claim screen.
+  // The lobby's CONTINUE resumes it in those cases.
+  const hasInvite = new URLSearchParams(window.location.search).has('join')
+  if (!mpStore.currentGame && !hasInvite && !showAuthView.value && currentRoute.value.name === 'home') {
+    localGameStore.resumeDaily()
+  }
 })
 
 // App remounts (HMR) would otherwise stack PASSWORD_RECOVERY listeners.
@@ -423,6 +433,7 @@ function startLocalGame(mode?: 'official' | 'house' | 'casual') {
 // NOT called `source`: GA4 reads a parameter of that name as a traffic source
 // and rewrites the session's attribution with it.
 function startDailyGame(entry_point: 'lobby' | 'game_over') {
+  if (localGameStore.resumeDaily()) return
   track('daily_started', { entry_point })
   localGameStore.initializeGame(['You', 'Terminator'], 'official', { dailySeed: localDateString() })
 }
