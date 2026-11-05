@@ -11,7 +11,7 @@ import {
 } from '@engine/bot'
 import { chooseBotCard } from '@engine/botSearch'
 import { seededRng } from '../utils/seededRng'
-import { markDailyDone } from '../utils/dailyChallenge'
+import { markDailyDone, loadDailyProgress, saveDailyProgress, clearDailyProgress } from '../utils/dailyChallenge'
 import { recordBotWin } from '../utils/botLadder'
 import type { StackingMode } from '@engine'
 import { soundEffects } from '../composables/useSoundEffects'
@@ -242,6 +242,15 @@ export const useGameStore = defineStore('game', () => {
     // date-seeded PRNG so shuffle, deals, and bot decisions replay
     // identically for every player in the world on the same day.
     let hostRng: () => number = Math.random
+    // Draws taken from the daily's seeded sequence. Saved with the game, so a
+    // resumed daily carries on from the same point in the sequence.
+    let rngCalls = 0
+    function dailyRng(date: string, skip = 0): () => number {
+        const next = seededRng(`uno-daily-${date}`)
+        for (let i = 0; i < skip; i++) next()
+        rngCalls = skip
+        return () => { rngCalls++; return next() }
+    }
     // Ref, not a local: views need to know the game on screen is the daily
     // (the game-over nudge must not offer today's deal after the daily itself).
     const dailyDate = ref<string | null>(null)
@@ -257,7 +266,7 @@ export const useGameStore = defineStore('game', () => {
         opts?: { dailySeed?: string; botIds?: string[]; warmUp?: boolean },
     ) {
         dailyDate.value = opts?.dailySeed ?? null
-        hostRng = dailyDate.value ? seededRng(`uno-daily-${dailyDate.value}`) : Math.random
+        hostRng = dailyDate.value ? dailyRng(dailyDate.value) : Math.random
         dealGeneration++
         closeCatchWindow()
         if (mode) setStackingMode(mode)
@@ -410,8 +419,16 @@ export const useGameStore = defineStore('game', () => {
     // catch window. Bots forget ~30% of the time (existing), so this fires for
     // the human's exposure and for a bot that didn't auto-call.
     function openCatchWindow(player: Player) {
+        armCatchWindow(player, !player.isBot && hostRng() < 0.7)
+    }
+
+    // Split from openCatchWindow so a resumed daily can re-arm a window with
+    // the pounce it already rolled, instead of rolling again.
+    let catchWillFire = false
+    function armCatchWindow(player: Player, willCatch: boolean) {
         closeCatchWindow()
         catchableId.value = player.id
+        catchWillFire = willCatch
         if (player.isBot) {
             // Bot forgot UNO — the human can catch it. Window auto-closes if missed.
             catchTimer = setTimeout(() => {
@@ -420,7 +437,6 @@ export const useGameStore = defineStore('game', () => {
         } else {
             // Human is exposed — the UNO button derives from catchableId, and
             // a bot may pounce ~70% of the time before the window closes.
-            const willCatch = hostRng() < 0.7
             catchTimer = setTimeout(() => {
                 if (catchableId.value !== player.id) return
                 if (willCatch) penalizeForgottenUno(player.id)
@@ -787,6 +803,7 @@ export const useGameStore = defineStore('game', () => {
                     turns: dailyTurns,
                     log: turnLog.value.join(''),
                 })
+                clearDailyProgress()
                 // Separate from sp_game_finished, which cannot distinguish the
                 // daily from a practice game, and cannot see 'eliminated' at all.
                 track('daily_finished', { result: dailyResult, turns: dailyTurns })
@@ -833,6 +850,100 @@ export const useGameStore = defineStore('game', () => {
         })
     }
 
+    // --- Daily resume ---
+    //
+    // A reload used to drop the daily and deal it again from the top, so a
+    // player could learn the deal and replay it from memory. The game is saved
+    // whenever it waits on the human, and each move the human commits is saved
+    // before it runs; resuming restores the game and replays that move.
+
+    // The human is being asked for a move and nothing is in flight.
+    function isSettled(): boolean {
+        if (gameState.value !== 'PLAYING' || isDealing.value || currentPlayer.value?.isBot !== false) return false
+        return turnState.value === 'WAITING_FOR_ACTION' ? !actionInProgress.value : turnState.value.startsWith('CHOOSING_')
+    }
+
+    function dailySnapshot() {
+        return {
+            rngCalls, catchWillFire,
+            players: players.value, deck: deck.value, discardPile: discardPile.value,
+            currentPlayerIndex: currentPlayerIndex.value, direction: direction.value,
+            drawStack: drawStack.value, turnLog: turnLog.value, currentColor: currentColor.value,
+            rouletteTargetColor: rouletteTargetColor.value, pendingDrawnWildCard: pendingDrawnWildCard.value,
+            pendingDiscardAllCards: pendingDiscardAllCards.value, swapInitiatorId: swapInitiatorId.value,
+            hasCalledUno: hasCalledUno.value, catchableId: catchableId.value,
+            actionInProgress: actionInProgress.value, turnState: turnState.value,
+            stackingMode: stackingMode.value, playerStats: playerStats.value, gameStartTime: gameStartTime.value,
+        }
+    }
+    type DailyGame = ReturnType<typeof dailySnapshot>
+
+    const humanMoves = {
+        playerActionPlayCard, drawCardsForCurrentPlayer, swapHands, skipSwap,
+        setRouletteColor, playDrawnWildCard, selectDiscardAllTop,
+    }
+    type HumanMove = { name: keyof typeof humanMoves; args: unknown[] }
+
+    function saveDaily(move?: HumanMove) {
+        if (dailyDate.value) saveDailyProgress({ date: dailyDate.value, game: dailySnapshot(), move })
+    }
+
+    watch([players, turnState, currentPlayerIndex, actionInProgress, catchableId, hasCalledUno, isDealing], () => {
+        if (isSettled()) saveDaily()
+    }, { deep: true })
+
+    // What the UI calls for the human's moves. Bot turns and the store's own
+    // follow-ups call the plain functions, so only a human move is saved.
+    function humanMove<K extends keyof typeof humanMoves>(name: K): (typeof humanMoves)[K] {
+        const run = humanMoves[name] as (...args: unknown[]) => void
+        return ((...args: unknown[]) => {
+            if (isSettled()) saveDaily({ name, args })
+            run(...args)
+        }) as (typeof humanMoves)[K]
+    }
+
+    /** Reopen today's daily where it was left. False when there is none. */
+    function resumeDaily(): boolean {
+        const saved = loadDailyProgress<DailyGame, HumanMove>()
+        if (!saved) return false
+        const g = saved.game
+        dealGeneration++
+        closeCatchWindow()
+        dailyDate.value = saved.date
+        hostRng = dailyRng(saved.date, g.rngCalls)
+        warmGame = false
+        spStartedAt = Date.now()
+        botProfiles.value = Object.fromEntries(g.players.filter(p => p.isBot).map(p => [p.id, dailyBot()]))
+        players.value = g.players
+        deck.value = g.deck
+        discardPile.value = g.discardPile
+        currentPlayerIndex.value = g.currentPlayerIndex
+        direction.value = g.direction
+        drawStack.value = g.drawStack
+        turnLog.value = g.turnLog
+        currentColor.value = g.currentColor
+        rouletteTargetColor.value = g.rouletteTargetColor
+        pendingDrawnWildCard.value = g.pendingDrawnWildCard
+        pendingDiscardAllCards.value = g.pendingDiscardAllCards
+        swapInitiatorId.value = g.swapInitiatorId
+        hasCalledUno.value = g.hasCalledUno
+        actionInProgress.value = g.actionInProgress
+        turnState.value = g.turnState
+        stackingMode.value = g.stackingMode
+        playerStats.value = g.playerStats
+        gameStartTime.value = g.gameStartTime
+        isDealing.value = false
+        pendingDealCard.value = null
+        suppressDiscardSlam.value = false
+        lastPlay.value = null
+        winnerId.value = null
+        gameState.value = 'PLAYING'
+        const exposed = players.value.find(p => p.id === g.catchableId)
+        if (exposed) armCatchWindow(exposed, g.catchWillFire)
+        if (saved.move) (humanMoves[saved.move.name] as (...args: unknown[]) => void)(...saved.move.args)
+        return true
+    }
+
     return {
         gameState,
         turnState,
@@ -868,19 +979,20 @@ export const useGameStore = defineStore('game', () => {
         playCard,
         applyCardEffect,
         rotateHands,
-        drawCardsForCurrentPlayer,
-        swapHands,
-        skipSwap,
-        playerActionPlayCard,
+        drawCardsForCurrentPlayer: humanMove('drawCardsForCurrentPlayer'),
+        swapHands: humanMove('swapHands'),
+        skipSwap: humanMove('skipSwap'),
+        playerActionPlayCard: humanMove('playerActionPlayCard'),
         executeRouletteDraw,
-        setRouletteColor,
-        playDrawnWildCard,
-        selectDiscardAllTop,
+        setRouletteColor: humanMove('setRouletteColor'),
+        playDrawnWildCard: humanMove('playDrawnWildCard'),
+        selectDiscardAllTop: humanMove('selectDiscardAllTop'),
         callUno,
         isDealing,
         pendingDealCard,
         dealInitialCards,
-        returnToLobby
+        returnToLobby,
+        resumeDaily,
     }
 
     function setRouletteColor(color: CardColor) {

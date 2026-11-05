@@ -494,3 +494,114 @@ describe('daily and ladder analytics', () => {
         expect(track).toHaveBeenCalledWith('sp_game_finished', expect.objectContaining({ warm_up: true }))
     })
 })
+
+describe('daily resume after a reload', () => {
+    const today = '2026-08-10'
+    const saved = new Map<string, string>()
+
+    beforeEach(() => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date(`${today}T12:00:00`))
+        saved.clear()
+        vi.stubGlobal('localStorage', {
+            getItem: (k: string) => saved.get(k) ?? null,
+            setItem: (k: string, v: string) => { saved.set(k, v) },
+            removeItem: (k: string) => { saved.delete(k) },
+        })
+    })
+
+    afterEach(() => {
+        vi.unstubAllGlobals()
+    })
+
+    async function startDaily() {
+        const store = useGameStore()
+        store.initializeGame(['You', 'Terminator'], 'official', { dailySeed: today })
+        await store.dealInitialCards(async () => {})
+        await untilHumanInput(store)
+        return store
+    }
+
+    async function untilHumanInput(store: ReturnType<typeof useGameStore>) {
+        for (let i = 0; i < 400; i++) {
+            await nextTick()
+            const p = store.currentPlayer
+            if (store.gameState !== 'PLAYING') return
+            const idle = store.turnState === 'WAITING_FOR_ACTION' ? !store.actionInProgress : store.turnState.startsWith('CHOOSING_')
+            if (p && !p.isBot && idle && !store.catchableId) return
+            await vi.advanceTimersByTimeAsync(250)
+        }
+        throw new Error(`the human was never asked to move: ${store.currentPlayer?.name} ${store.turnState} busy=${store.actionInProgress} catchable=${store.catchableId}`)
+    }
+
+    /** A page reload: every timer dies, and the store comes back empty. */
+    function reload() {
+        // clearAllTimers also rewinds the fake clock; a reload keeps the date.
+        const now = Date.now()
+        vi.clearAllTimers()
+        vi.setSystemTime(now)
+        setActivePinia(createPinia())
+        return useGameStore()
+    }
+
+    function table(store: ReturnType<typeof useGameStore>) {
+        return {
+            hands: store.players.map(p => p.hand.map(c => c.id)),
+            deck: store.deck.map(c => c.id),
+            top: store.topCard?.id,
+            turnState: store.turnState,
+            turnLog: [...store.turnLog],
+        }
+    }
+
+    it('reopens the same game at the same turn', async () => {
+        const before = table(await startDaily())
+
+        const store = reload()
+
+        expect(store.resumeDaily()).toBe(true)
+        expect(store.gameState).toBe('PLAYING')
+        expect(store.dailyDate).toBe(today)
+        expect(table(store)).toEqual(before)
+    })
+
+    it('replays a move made just before the reload instead of undoing it', async () => {
+        const played = await startDaily()
+        played.drawCardsForCurrentPlayer()
+        await untilHumanInput(played)
+        const after = table(played)
+
+        saved.clear()
+        const first = reload()
+        first.initializeGame(['You', 'Terminator'], 'official', { dailySeed: today })
+        await first.dealInitialCards(async () => {})
+        await untilHumanInput(first)
+        first.drawCardsForCurrentPlayer()
+        const store = reload()
+
+        expect(store.resumeDaily()).toBe(true)
+        await untilHumanInput(store)
+        expect(table(store)).toEqual(after)
+    })
+
+    it('has nothing to resume once the daily is over', async () => {
+        const store = await startDaily()
+        const human = store.players.find(p => !p.isBot)!
+        const red7: Card = { id: 'c-red-7', color: 'red', type: 'number', value: 7 }
+        human.hand = [red7]
+        store.discardPile = [red5]
+        store.currentColor = 'red'
+        store.playCard(human.id, red7)
+        await nextTick()
+
+        expect(store.gameState).toBe('GAME_OVER')
+        expect(reload().resumeDaily()).toBe(false)
+    })
+
+    it('ignores a saved game from yesterday', async () => {
+        await startDaily()
+        vi.setSystemTime(new Date('2026-08-11T12:00:00'))
+
+        expect(reload().resumeDaily()).toBe(false)
+    })
+})

@@ -317,6 +317,10 @@ onMounted(async () => {
     const invite = new URLSearchParams(window.location.search).get('join') || ''
     if (isRoomCode(invite)) await attemptGuestSignin()
   }
+
+  // Same for a daily cut short by a reload: dealing it again from the top
+  // would let the player replay a deal they have already seen.
+  if (!inMpMatch.value && currentRoute.value.name === 'home') localGameStore.resumeDaily()
 })
 
 // App remounts (HMR) would otherwise stack PASSWORD_RECOVERY listeners.
@@ -423,6 +427,7 @@ function startLocalGame(mode?: 'official' | 'house' | 'casual') {
 // NOT called `source`: GA4 reads a parameter of that name as a traffic source
 // and rewrites the session's attribution with it.
 function startDailyGame(entry_point: 'lobby' | 'game_over') {
+  if (localGameStore.resumeDaily()) return
   track('daily_started', { entry_point })
   localGameStore.initializeGame(['You', 'Terminator'], 'official', { dailySeed: localDateString() })
 }

@@ -176,8 +176,8 @@
 
     <ConfirmDialog
       :open="showLeaveConfirm"
-      title="Leave the game?"
-      message="This match against the bot will end and you'll return to the lobby."
+      :title="leaveCopy.title"
+      :message="leaveCopy.message"
       confirm-label="LEAVE"
       cancel-label="STAY"
       @confirm="confirmLeave"
@@ -661,6 +661,10 @@ function restart() {
 }
 
 const showLeaveConfirm = ref(false)
+// Leaving the daily keeps it: it resumes from the lobby, never deals again.
+const leaveCopy = computed(() => store.dailyDate && store.gameState === 'PLAYING'
+  ? { title: "Leave today's deal?", message: 'Your game is saved. Continue it from the lobby.' }
+  : { title: 'Leave the game?', message: "This match against the bot will end and you'll return to the lobby." })
 function confirmLeave() {
   showLeaveConfirm.value = false
   store.returnToLobby()
