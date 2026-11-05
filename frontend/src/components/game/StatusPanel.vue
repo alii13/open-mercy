@@ -1,6 +1,6 @@
 <template>
-  <!-- One-line status ticker: persistent turn pill + the current event/action
-       text. Lives in its own arena row so it never overlaps the pit. -->
+  <!-- Status ticker: persistent turn pill with the current event/action text
+       on a line below it. Lives in its own arena row so it never overlaps the pit. -->
   <div class="status-ticker">
     <div
       v-if="turnLabel"
@@ -12,19 +12,23 @@
       <span class="turn-dot"></span>
       {{ turnLabel }}
     </div>
-    <Transition name="ticker-text" mode="out-in">
-      <div
-        v-if="tickerText"
-        :key="tickerText"
-        class="ticker-text"
-        :class="{ alert: !!message }"
-        :style="message ? messageStyle : undefined"
-        role="status"
-        aria-live="polite"
-      >
-        {{ tickerText }}
-      </div>
-    </Transition>
+    <!-- Fixed-height line under the pill, kept even when empty so the pill
+         does not jump as messages come and go. -->
+    <div class="ticker-line">
+      <Transition name="ticker-text" mode="out-in">
+        <div
+          v-if="tickerText"
+          :key="tickerText"
+          class="ticker-text"
+          :class="{ alert: !!message }"
+          :style="message ? messageStyle : undefined"
+          role="status"
+          aria-live="polite"
+        >
+          {{ tickerText }}
+        </div>
+      </Transition>
+    </div>
   </div>
 </template>
 
@@ -52,12 +56,20 @@ const tickerText = computed(() => props.message || props.actionText || '')
 <style scoped>
 .status-ticker {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--spacing-3);
+  gap: var(--spacing-1);
   height: 100%;
   padding: 0 var(--spacing-3);
   overflow: hidden;
+}
+
+.ticker-line {
+  display: flex;
+  justify-content: center;
+  max-width: 100%;
+  height: 1rem;
 }
 
 /* Persistent, calm turn-ownership pill. Green when it's you, muted with a

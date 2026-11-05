@@ -19,7 +19,7 @@
   --hand-band-h: clamp(150px, 22dvh, 210px);
   /* Fixed ticker row so the turn pill / event text appearing or clearing never
      grows the row and reflows the pit below it. */
-  --ticker-h: 2rem;
+  --ticker-h: 2.75rem;
   /* Zoned grid: surveillance bar / status ticker / battle pit (flexes) /
      hand band / action dock. */
   display: grid;
