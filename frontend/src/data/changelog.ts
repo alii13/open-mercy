@@ -61,6 +61,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: '2026-11-05',
+        level: 'loud',
+        tag: 'NEW',
+        title: 'Play your turn within 2 minutes',
+        body: 'So a game never gets stuck waiting on someone who stopped playing, every multiplayer turn now has 2 minutes, with a warning when 30 seconds are left. If time runs out we play a card for you, and if you miss 3 turns in a row you\'re out of that game.',
+    },
+    {
         id: '2026-11-02',
         level: 'loud',
         tag: 'NEW',

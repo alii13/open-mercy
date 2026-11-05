@@ -1,6 +1,7 @@
 import * as engine from '../../shared/engine'
 import type { Card, EngineEvent, EngineState, StackingMode } from '../../shared/engine'
-import type { GameEvent, IntentAction, PersonalView, SnapshotPlayer } from './protocol'
+import { chooseCard, chooseDiscardAllTop, chooseSwapTarget, chooseWildColor, wantsSwap, type BotProfile } from '../../shared/engine/bot'
+import { MAX_TURN_TIMEOUTS, type GameEvent, type IntentAction, type PersonalView, type SnapshotPlayer } from './protocol'
 import { isWildColor } from './validate'
 
 export interface PlayerGameStats {
@@ -35,6 +36,14 @@ export interface GameRecord {
     /** A seat was kicked out of this game. Such games are not scored: a host
      *  could otherwise kick the table and farm wins. */
     hadKick?: boolean
+    /** Turns in a row each seat let the clock run out; any move of its own resets it. */
+    timeouts?: Record<string, number>
+    /** Seats taken out for running out the clock MAX_TURN_TIMEOUTS turns in a row. */
+    timedOut?: string[]
+    /** The last opponent was taken out by the clock. The winner's row is not
+     *  saved, so idling a second account cannot farm a win; the timed-out
+     *  seat's loss still is, so closing the tab cannot erase one. */
+    timeoutWalkover?: boolean
 }
 
 export function statsFor(game: GameRecord, userId: string): PlayerGameStats {
@@ -332,33 +341,108 @@ export function autoResolveAbsentTurn(game: GameRecord, userId: string): GameEve
             continue
         }
 
-        if (s.turnState === 'CHOOSING_DRAWN_WILD_COLOR' && game.pendingDrawnWildCardId) {
-            const res = applyIntent(game, userId, { kind: 'CHOOSE_DRAWN_WILD_COLOR', color: engine.getWildCardColor(hand) })
-            out.push(...res.events)
-            if (!res.ok) break
-            continue
-        }
-        if (s.turnState === 'CHOOSING_PLAYER_TO_SWAP') {
-            const res = applyIntent(game, userId, { kind: 'SKIP_SWAP' })
-            out.push(...res.events)
-            if (!res.ok) break
-            continue
-        }
-        if (s.turnState === 'CHOOSING_DISCARD_ALL_TOP' && s.pendingDiscardAllCards[0]) {
-            const res = applyIntent(game, userId, { kind: 'PICK_DISCARD_ALL_TOP', cardId: s.pendingDiscardAllCards[0].id })
-            out.push(...res.events)
-            if (!res.ok) break
-            continue
-        }
-        if (s.turnState === 'CHOOSING_ROULETTE_COLOR') {
-            const res = applyIntent(game, userId, { kind: 'SET_ROULETTE_COLOR', color: engine.getWildCardColor(hand) })
-            out.push(...res.events)
-            if (!res.ok) break
-            continue
-        }
-        break
+        const choice = obviousChoice(game, hand)
+        if (!choice) break
+        const res = applyIntent(game, userId, choice)
+        out.push(...res.events)
+        if (!res.ok) break
     }
     return out
+}
+
+/** The obvious answer to a pending choice, or null when none is pending. */
+function obviousChoice(game: GameRecord, hand: Card[]): IntentAction | null {
+    const s = game.engine
+    if (s.turnState === 'CHOOSING_DRAWN_WILD_COLOR' && game.pendingDrawnWildCardId) {
+        return { kind: 'CHOOSE_DRAWN_WILD_COLOR', color: engine.getWildCardColor(hand) }
+    }
+    if (s.turnState === 'CHOOSING_PLAYER_TO_SWAP') return { kind: 'SKIP_SWAP' }
+    if (s.turnState === 'CHOOSING_DISCARD_ALL_TOP' && s.pendingDiscardAllCards[0]) {
+        return { kind: 'PICK_DISCARD_ALL_TOP', cardId: s.pendingDiscardAllCards[0].id }
+    }
+    if (s.turnState === 'CHOOSING_ROULETTE_COLOR') return { kind: 'SET_ROULETTE_COLOR', color: engine.getWildCardColor(hand) }
+    return null
+}
+
+// Sharp policy with no lookahead: a strong pick that costs no rollouts. Skill 1
+// never takes the loose branch, so only targeting matters: aim a swap at the
+// smallest hand.
+const AUTOPLAY: BotProfile = { id: 'autoplay', name: 'Autoplay', aggression: 0.5, wildDiscipline: 0.5, catchRate: 0, targeting: 1, skill: 1, search: 0 }
+
+/**
+ * Play the turn of a seat that is here but let the clock run out, the way the
+ * sharp bot would: its card (else the normal draw), its swap and its Discard
+ * All pick. Extra turns it earns are played the same way, and anything the bot
+ * cannot answer gets the obvious answer, so the turn always moves on.
+ */
+function autoPlayTurn(game: GameRecord, userId: string): GameEvent[] {
+    const s = game.engine
+    const out: GameEvent[] = []
+    for (let sanity = 0; sanity < 10; sanity++) {
+        const me = engine.currentPlayer(s)
+        if (s.gameState !== 'PLAYING' || !me || me.id !== userId || me.isEliminated) break
+        const opponents = s.players.filter(p => p.id !== userId && !p.isEliminated)
+        let action: IntentAction | null
+        if (s.turnState === 'WAITING_FOR_ACTION') {
+            const top = engine.topCard(s)
+            const playable = top ? me.hand.filter(c => engine.canPlayCard(c, top, s.currentColor, s.drawStack, s.stackingMode)) : []
+            const card = chooseCard({ playable, drawStack: s.drawStack, opponents, self: me }, AUTOPLAY, Math.random)
+            // Color Roulette's colour is the victim's call, so it carries none.
+            const color = card?.color === 'wild' && card.type !== 'wildColorRoulette'
+                ? chooseWildColor(me.hand.filter(c => c.id !== card.id), AUTOPLAY, Math.random)
+                : undefined
+            action = card ? { kind: 'PLAY_CARD', cardId: card.id, chosenColor: color } : { kind: 'DRAW' }
+        } else if (s.turnState === 'CHOOSING_PLAYER_TO_SWAP') {
+            const target = chooseSwapTarget({ playable: [], drawStack: 0, opponents, self: me }, AUTOPLAY, Math.random)
+            action = target && wantsSwap(me, target, AUTOPLAY, Math.random)
+                ? { kind: 'SWAP_HANDS', targetUserId: target.id }
+                : { kind: 'SKIP_SWAP' }
+        } else if (s.turnState === 'CHOOSING_DISCARD_ALL_TOP' && s.pendingDiscardAllCards.length) {
+            action = { kind: 'PICK_DISCARD_ALL_TOP', cardId: chooseDiscardAllTop(s.pendingDiscardAllCards, AUTOPLAY, Math.random).id }
+        } else {
+            action = obviousChoice(game, me.hand)
+        }
+        if (!action) break
+        let res = applyIntent(game, userId, action)
+        if (!res.ok) {
+            const fallback: IntentAction | null = action.kind === 'PLAY_CARD' ? { kind: 'DRAW' } : obviousChoice(game, me.hand)
+            if (fallback) res = applyIntent(game, userId, fallback)
+        }
+        out.push(...res.events)
+        if (!res.ok) break
+    }
+    return out
+}
+
+/** Any move of the seat's own proves it is playing; its run of timeouts starts over. */
+export function clearTimeouts(game: GameRecord, userId: string): void {
+    if (game.timeouts?.[userId]) delete game.timeouts[userId]
+}
+
+/**
+ * The turn clock ran out on `userId`. Count it. The MAX_TURN_TIMEOUTS-th in a
+ * row takes the seat out of the game; otherwise the turn is played for it,
+ * with the bot's pick if the seat is here (`present`) and the minimal absent
+ * draw if it is not.
+ */
+export function timeOutTurn(game: GameRecord, userId: string, present: boolean): GameEvent[] {
+    const timeouts = (game.timeouts ??= {})
+    const count = (timeouts[userId] ?? 0) + 1
+    timeouts[userId] = count
+    const out: GameEvent[] = [{ t: 'TURN_TIMED_OUT', playerId: userId, timeouts: count }]
+
+    if (count >= MAX_TURN_TIMEOUTS) {
+        const aliveBefore = game.engine.players.filter(p => !p.isEliminated).length
+        const ev: EngineEvent[] = []
+        if (engine.eliminatePlayer(game.engine, userId, ev)) {
+            ;(game.timedOut ??= []).push(userId)
+            if (aliveBefore <= 2) game.timeoutWalkover = true
+        }
+        return [...out, ...translateEngineEvents(ev)]
+    }
+    if (present) return [...out, ...autoPlayTurn(game, userId)]
+    // TURN_TIMED_OUT already says what happened; drop the older away notice.
+    return [...out, ...autoResolveAbsentTurn(game, userId).filter(e => e.t !== 'TURN_AUTO_RESOLVED')]
 }
 
 /**
@@ -378,7 +462,7 @@ export async function persistResults(
 
     const gameId = `do-${roomCode}-${game.startedAt}`
     const duration = Math.max(0, Math.round((Date.now() - game.startedAt) / 1000))
-    const rows = s.players.map(p => {
+    const rows = s.players.filter(p => !(game.timeoutWalkover && p.id === s.winnerId)).map(p => {
         const st = statsFor(game, p.id)
         const result = s.winnerId === p.id ? 'won' : p.isEliminated ? 'eliminated' : 'lost'
         return {
@@ -489,6 +573,7 @@ export function personalView(
                 userId: r.userId, name: r.name, seat,
                 handCount: 0, isEliminated: false,
                 connected: connectedIds.has(r.userId), calledUno: false,
+                timeouts: 0, timedOut: false,
             })),
             you: null,
             currentPlayerId: null,
@@ -520,6 +605,8 @@ export function personalView(
         isEliminated: p.isEliminated,
         connected: connectedIds.has(p.id),
         calledUno: !!s.hasCalledUno[p.id],
+        timeouts: game.timeouts?.[p.id] ?? 0,
+        timedOut: !!game.timedOut?.includes(p.id),
     }))
 
     const pendingWild = game.pendingDrawnWildCardId && isChooser

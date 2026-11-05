@@ -2,7 +2,8 @@
 
 import { verifySupabaseToken, type AuthEnv } from './auth'
 import type { ClientMsg, GameEvent, PresencePlayer, ServerMsg } from './protocol'
-import { applyIntent, applyUnoCatch, autoResolveAbsentTurn, forceEliminate, persistResults, personalView, startGame, updateStats, viewEventFor, type GameRecord } from './game'
+import { applyIntent, applyUnoCatch, clearTimeouts, forceEliminate, persistResults, personalView, startGame, timeOutTurn, updateStats, viewEventFor, type GameRecord } from './game'
+import { dueTimeout, nextTurnClock } from './turnClock'
 import { dirCodes, dirRegister, liveTables, normalizeDir } from './directory'
 import { cleanName, cleanSkin, isStackingMode } from './validate'
 import { newBucket, socketVerdict, type Bucket } from './socketLimit'
@@ -228,11 +229,14 @@ interface RosterEntry {
     skin?: string
 }
 
-// One DO alarm serves four clocks; the earliest due time is armed.
+// One DO alarm serves five clocks; the earliest due time is armed.
 interface RoomTimers {
     gcAt: number
     graceAt?: number
     graceSeat?: string
+    // The turn limit for whoever is on turn (see turnClock.ts).
+    turnAt?: number
+    turnSeat?: string
     catchAt?: number
     catchFor?: string
     // Auto-start for public lobbies (see autoStart.ts for the transitions).
@@ -295,7 +299,7 @@ export class GameRoomDO {
 
     private async putTimers(t: RoomTimers): Promise<void> {
         await this.ctx.storage.put('timers', t)
-        const due = [t.gcAt, t.graceAt, t.catchAt, t.startAt].filter((x): x is number => !!x)
+        const due = [t.gcAt, t.graceAt, t.catchAt, t.startAt, t.turnAt].filter((x): x is number => !!x)
         if (due.length) await this.ctx.storage.setAlarm(Math.min(...due))
     }
 
@@ -337,6 +341,20 @@ export class GameRoomDO {
         }
     }
 
+    /** Point the turn clock at whoever is on turn; `actor` made the turn move that led here. */
+    private async armTurnClock(actor?: string): Promise<void> {
+        const t = await this.getTimers()
+        const s = this.game?.engine
+        const current = s && s.gameState === 'PLAYING' ? s.players[s.currentPlayerIndex] : undefined
+        // The seat on turn moved and is back to a fresh action: an extra turn.
+        const newTurn = !!current && actor === current.id && s?.turnState === 'WAITING_FOR_ACTION'
+        const next = nextTurnClock({ seat: t.turnSeat, at: t.turnAt }, current && !current.isEliminated ? current.id : null, newTurn, Date.now())
+        if (next.seat === t.turnSeat && next.at === t.turnAt) return
+        t.turnSeat = next.seat
+        t.turnAt = next.at
+        await this.putTimers(t)
+    }
+
     /** Open/close UNO catch windows based on this batch's events. */
     private async processCatchWindows(events: GameEvent[]): Promise<void> {
         const t = await this.getTimers()
@@ -367,33 +385,42 @@ export class GameRoomDO {
             .sort((a, b) => a.joinedAt - b.joinedAt)
     }
 
-    private viewFor(userId: string, roster: { userId: string; name: string }[], roomRec: RoomRecord | undefined) {
+    private viewFor(userId: string, roster: { userId: string; name: string }[], roomRec: RoomRecord | undefined, turnAt: number | undefined) {
         const connected = new Set(this.roomSockets().map(s => s.userId))
         // Same id scheme as game_results rows — distinct per dealt game.
         const gameId = this.game && roomRec ? `do-${roomRec.code}-${this.game.startedAt}` : null
         const view = personalView(this.game ?? null, this.roomStatus(), userId, roster, connected, roomRec?.hostUserId ?? null, gameId)
         if (!this.game && roomRec) view.stackingMode = roomRec.stackingMode as StackingMode
+        view.turnEndsInMs = turnAt && this.roomStatus() === 'playing' ? Math.max(0, turnAt - Date.now()) : null
         return view
     }
 
     private async snapshotFor(userId: string): Promise<ServerMsg> {
         const roster = await this.rosterList()
         const roomRec = await this.ctx.storage.get<RoomRecord>('room')
-        return { t: 'snapshot', seq: this.seq, game: this.viewFor(userId, roster, roomRec) }
+        const { turnAt } = await this.getTimers()
+        return { t: 'snapshot', seq: this.seq, game: this.viewFor(userId, roster, roomRec, turnAt) }
     }
 
-    /** Send an intent's events (personalized) + a fresh snapshot to every seated socket. */
-    private async broadcastGame(events: GameEvent[], intentId?: string): Promise<void> {
+    /**
+     * Send an intent's events (personalized) + a fresh snapshot to every seated
+     * socket. `actor` is set only for a turn move (not a MERCY call or a
+     * catch), so the turn clock can tell a new turn from anything else.
+     */
+    private async broadcastGame(events: GameEvent[], intentId?: string, actor?: string): Promise<void> {
         this.seq++
         await this.processCatchWindows(events)
         if (this.game) updateStats(this.game, events)
+        // Before the snapshots, so they carry the new turn's time.
+        await this.armTurnClock(actor)
+        const { turnAt } = await this.getTimers()
         const roster = await this.rosterList()
         const roomRec = await this.ctx.storage.get<RoomRecord>('room')
         for (const { ws, userId } of this.roomSockets()) {
             for (const ev of events) {
                 this.send(ws, { t: 'event', seq: this.seq, ev: viewEventFor(ev, userId), intentId })
             }
-            this.send(ws, { t: 'snapshot', seq: this.seq, game: this.viewFor(userId, roster, roomRec) })
+            this.send(ws, { t: 'snapshot', seq: this.seq, game: this.viewFor(userId, roster, roomRec, turnAt) })
         }
         if (this.game && roomRec && events.some(e => e.t === 'GAME_OVER')) {
             await persistResults(this.game, roomRec.code, this.env)
@@ -803,7 +830,11 @@ export class GameRoomDO {
                     this.send(ws, { t: 'error', code: 'invalid-intent', intentId: msg.id })
                     return
                 }
-                await this.broadcastGame(res.events, msg.id)
+                // A MERCY call is allowed on your own turn and repeatable, so
+                // it neither restarts the clock nor counts as playing the turn.
+                const turnMove = msg.action.kind !== 'CALL_UNO'
+                if (turnMove) clearTimeouts(game, tag.userId)
+                await this.broadcastGame(res.events, msg.id, turnMove ? tag.userId : undefined)
                 return
             }
 
@@ -825,7 +856,8 @@ export class GameRoomDO {
     }
 
     // The single alarm dispatches whichever clocks are due: catch-window
-    // expiry, turn grace for an absent player, and room GC.
+    // expiry, turn grace for an absent player, the turn limit, lobby
+    // auto-start, and room GC.
     async alarm() {
         const now = Date.now()
         const t = await this.getTimers()
@@ -837,6 +869,10 @@ export class GameRoomDO {
         const graceDue = !!t.graceAt && t.graceAt <= now
         const graceSeat = t.graceSeat
         if (graceDue) { delete t.graceAt; delete t.graceSeat }
+
+        const turnDue = !!t.turnAt && t.turnAt <= now
+        const turnSeat = t.turnSeat
+        if (turnDue) { delete t.turnAt; delete t.turnSeat }
 
         const startDue = !!t.startAt && t.startAt <= now
         if (startDue) { delete t.startAt; delete t.startLeftMs; delete t.startSeen; delete t.startBumps }
@@ -859,9 +895,21 @@ export class GameRoomDO {
             if (this.game && s && this.roomStatus() === 'playing'
                 && s.players[s.currentPlayerIndex]?.id === graceSeat
                 && !connected.has(graceSeat)) {
-                const events = autoResolveAbsentTurn(this.game, graceSeat)
-                await this.broadcastGame(events)
+                await this.broadcastGame(timeOutTurn(this.game, graceSeat, false))
             }
+        }
+
+        // The limit ran out. A seat that dropped is usually the grace clock's
+        // (above, it acts sooner); if the limit lands first it still times out,
+        // as absent, so going offline across the deadline cannot stop the clock.
+        if (turnDue && turnSeat) {
+            await this.loadGame()
+            const s = this.game?.engine
+            const connected = new Set(this.roomSockets().map(x => x.userId))
+            const due = this.game && s && this.roomStatus() === 'playing'
+                ? dueTimeout(turnSeat, s.players[s.currentPlayerIndex]?.id ?? null, connected)
+                : null
+            if (this.game && due) await this.broadcastGame(timeOutTurn(this.game, due.seat, due.present))
         }
 
         if (startDue) {

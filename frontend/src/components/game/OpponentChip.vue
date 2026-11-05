@@ -29,8 +29,13 @@
         <span v-if="inVoice" class="voice-dot" :class="{ speaking: isSpeaking }" title="In voice"></span>
       </span>
       <span v-if="isDisconnected && !isEliminated" class="card-count dc-text">DISCONNECTED</span>
-      <span v-else-if="isEliminated" class="card-count eliminated-text">OUT</span>
+      <span v-else-if="isEliminated" class="card-count eliminated-text">{{ timedOut ? 'TIMED OUT' : 'OUT' }}</span>
       <span v-else class="card-count">{{ cardCount }} {{ displayLabel }}</span>
+      <span
+        v-if="timeouts && !isEliminated"
+        class="timeout-pip"
+        :title="`Ran out of time ${timeouts} of ${MAX_TURN_TIMEOUTS} turns in a row`"
+      >TIMED OUT {{ timeouts }}/{{ MAX_TURN_TIMEOUTS }}</span>
     </div>
     <button
       v-if="canVoiceMute"
@@ -57,6 +62,7 @@
 <script setup lang="ts">
 import { Volume1, VolumeX, X } from 'lucide-vue-next'
 import { computed } from 'vue'
+import { MAX_TURN_TIMEOUTS } from '@protocol'
 import Avatar from '../Avatar.vue'
 import type { Badge as BadgeType, Progress } from '../../utils/badges'
 
@@ -78,6 +84,10 @@ const props = defineProps<{
   canVoiceMute?: boolean
   voiceMuted?: boolean
   voiceMuteTitle?: string
+  /** Multiplayer turn clock: turns in a row this seat ran out the clock. */
+  timeouts?: number
+  /** Out for running out the clock rather than by the mercy rule. */
+  timedOut?: boolean
 }>()
 
 defineEmits<{ click: []; kick: []; voiceMute: [] }>()

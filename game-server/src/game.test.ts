@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { startGame, applyIntent, forceEliminate, persistResults } from './game'
-import type { CardColor } from '../../shared/engine'
+import { startGame, applyIntent, forceEliminate, persistResults, timeOutTurn, clearTimeouts, personalView } from './game'
+import type { Card, CardColor } from '../../shared/engine'
+import * as engine from '../../shared/engine'
 
 const twoPlayers = () => startGame(
   [
@@ -142,5 +143,127 @@ describe('drawn Color Roulette', () => {
     expect(game.pendingDrawnWildCardId).toBeNull()
     expect(game.engine.turnState).toBe('CHOOSING_ROULETTE_COLOR')
     expect(game.engine.discardPile.at(-1)?.id).toBe('roulette-182')
+  })
+})
+
+describe('turn clock timeouts', () => {
+  const num = (id: string, color: CardColor, value: number) => ({ id, color, type: 'number', value }) as Card
+  const threePlayers = () => startGame(
+    [
+      { userId: 'u1', name: 'Alice' },
+      { userId: 'u2', name: 'Bob' },
+      { userId: 'u3', name: 'Cara' },
+    ],
+    'official',
+  )
+  // A red 3 on top, nothing pending, seat `seat` on turn holding `hand`.
+  const setTable = (game: ReturnType<typeof startGame>['game'], seat: number, hand: Card[]) => {
+    const s = game.engine
+    s.discardPile.push(num('top', 'red', 3))
+    s.currentColor = 'red'
+    s.drawStack = 0
+    s.turnState = 'WAITING_FOR_ACTION'
+    s.currentPlayerIndex = seat
+    s.players[seat]!.hand = hand
+    return s.players[seat]!
+  }
+
+  it('plays a legal card for a present seat and passes the turn', () => {
+    const { game } = threePlayers()
+    const me = setTable(game, 0, [num('play-me', 'red', 5), num('keep', 'green', 8)])
+
+    const events = timeOutTurn(game, me.id, true)
+
+    expect(events[0]).toEqual({ t: 'TURN_TIMED_OUT', playerId: me.id, timeouts: 1 })
+    expect(events.some((e) => e.t === 'CARD_PLAYED' && e.card.id === 'play-me')).toBe(true)
+    expect(engine.currentPlayer(game.engine)?.id).not.toBe(me.id)
+  })
+
+  it('takes the normal draw for a present seat with nothing playable', () => {
+    const { game } = threePlayers()
+    const me = setTable(game, 0, [num('dead', 'green', 8)])
+
+    const events = timeOutTurn(game, me.id, true)
+
+    expect(events.some((e) => e.t === 'YOU_DREW')).toBe(true)
+    expect(game.engine.gameState === 'GAME_OVER' || engine.currentPlayer(game.engine)?.id !== me.id).toBe(true)
+  })
+
+  it('gives an absent seat the minimal draw, not a play', () => {
+    const { game } = threePlayers()
+    const me = setTable(game, 0, [num('playable', 'red', 5), num('keep', 'green', 8)])
+
+    const events = timeOutTurn(game, me.id, false)
+
+    expect(events.some((e) => e.t === 'CARD_PLAYED')).toBe(false)
+    expect(events.filter((e) => e.t === 'YOU_DREW')).toHaveLength(1)
+    expect(events.some((e) => e.t === 'TURN_AUTO_RESOLVED')).toBe(false)
+    expect(engine.currentPlayer(game.engine)?.id).not.toBe(me.id)
+  })
+
+  it('takes a seat out on its third timeout in a row and keeps a continuing game scored', () => {
+    const { game } = threePlayers()
+    for (const expected of [1, 2]) {
+      setTable(game, 0, [num(`p${expected}`, 'red', 5), num(`k${expected}`, 'green', 8)])
+      expect(timeOutTurn(game, 'u1', true)[0]).toMatchObject({ t: 'TURN_TIMED_OUT', timeouts: expected })
+    }
+    setTable(game, 0, [num('p3', 'red', 5), num('k3', 'green', 8)])
+
+    const events = timeOutTurn(game, 'u1', true)
+
+    expect(events[0]).toEqual({ t: 'TURN_TIMED_OUT', playerId: 'u1', timeouts: 3 })
+    expect(events).toContainEqual({ t: 'ELIMINATED', playerId: 'u1' })
+    expect(events.some((e) => e.t === 'CARD_PLAYED')).toBe(false)
+    expect(game.engine.players[0]!.isEliminated).toBe(true)
+    expect(game.engine.gameState).toBe('PLAYING')
+    expect(engine.currentPlayer(game.engine)?.id).not.toBe('u1')
+    expect(game.hadKick).toBeFalsy()
+    const view = personalView(game, 'playing', 'u2', [], new Set(), null)
+    expect(view.players[0]).toMatchObject({ isEliminated: true, timedOut: true, timeouts: 3 })
+  })
+
+  it('saves the timed-out seat\'s loss but not the win when a timeout ends the game', async () => {
+    const fetchMock = vi.fn(async (_url: string, _init: RequestInit) => new Response(null, { status: 201 }))
+    vi.stubGlobal('fetch', fetchMock)
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    const { game } = twoPlayers()
+    game.timeouts = { u1: 2 }
+    setTable(game, 0, [num('p', 'red', 5)])
+
+    const events = timeOutTurn(game, 'u1', true)
+    expect(events).toContainEqual({ t: 'GAME_OVER', winnerId: 'u2' })
+    expect(game.hadKick).toBeFalsy()
+
+    const env = { SUPABASE_URL: 'https://example.invalid', SUPABASE_SERVICE_KEY: 'test-key' }
+    expect(await persistResults(game, 'ABCDEF', env)).toBe(true)
+    const rows = JSON.parse(String(fetchMock.mock.calls[0]![1].body)) as { user_id: string; result: string }[]
+    expect(rows.map((r) => [r.user_id, r.result])).toEqual([['u1', 'eliminated']])
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('finishes a 7 the way the bot would: swaps with the smallest hand instead of skipping', () => {
+    const { game } = threePlayers()
+    const s = game.engine
+    s.currentPlayerIndex = 0
+    s.turnState = 'CHOOSING_PLAYER_TO_SWAP'
+    s.swapInitiatorId = 'u1'
+    s.players[0]!.hand = ['a', 'b', 'c', 'd', 'e'].map((id, i) => num(id, 'red', i))
+    s.players[1]!.hand = [num('x', 'blue', 1), num('y', 'blue', 2)]
+    s.players[2]!.hand = ['f', 'g', 'h', 'i'].map((id, i) => num(id, 'green', i))
+
+    timeOutTurn(game, 'u1', true)
+
+    expect(s.players[0]!.hand.map((c) => c.id)).toEqual(['x', 'y'])
+    expect(s.players[1]!.hand).toHaveLength(5)
+    expect(engine.currentPlayer(s)?.id).not.toBe('u1')
+  })
+
+  it('resets the count once the seat moves on its own', () => {
+    const { game } = threePlayers()
+    game.timeouts = { u1: 2 }
+    clearTimeouts(game, 'u1')
+    const view = personalView(game, 'playing', 'u1', [], new Set(), null)
+    expect(view.players[0]).toMatchObject({ timeouts: 0, timedOut: false })
   })
 })

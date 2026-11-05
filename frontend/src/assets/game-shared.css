@@ -19,7 +19,7 @@
   --hand-band-h: clamp(150px, 22dvh, 210px);
   /* Fixed ticker row so the turn pill / event text appearing or clearing never
      grows the row and reflows the pit below it. */
-  --ticker-h: 2rem;
+  --ticker-h: 2.75rem;
   /* Zoned grid: surveillance bar / status ticker / battle pit (flexes) /
      hand band / action dock. */
   display: grid;
@@ -462,6 +462,23 @@ body.fx-ko-desat .game-view {
 
 .opponent-card.active .card-count {
   color: var(--color-neon-blue);
+}
+
+/* Multiplayer turn clock: this seat let its turn run out N times in a row. */
+.opponent-card .timeout-pip,
+.timeout-badge {
+  font-family: var(--font-display);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  color: var(--color-alert);
+  border: 1px solid var(--color-alert-dim);
+  padding: 1px 6px;
+  border-radius: 4px;
+  align-self: flex-start;
+  white-space: nowrap;
+}
+.opponent-card .timeout-pip {
+  margin-top: 2px;
 }
 
 .opponent-card .eliminated-text {

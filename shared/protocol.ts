@@ -1,5 +1,13 @@
 import type { Card, CardColor, StackingMode, TurnState } from './engine'
 
+// --- Turn clock: the room plays a turn for anyone who lets it run out ---
+
+export const TURN_LIMIT_MS = 2 * 60 * 1000
+/** Clients start counting down out loud at this much time left. */
+export const TURN_WARNING_MS = 30 * 1000
+/** Turns in a row a seat may run out the clock before it is out of the game. */
+export const MAX_TURN_TIMEOUTS = 3
+
 export interface PresencePlayer {
     userId: string
     name: string
@@ -58,6 +66,9 @@ export type GameEvent =
     | { t: 'UNO_WINDOW_OPEN'; playerId: string }
     | { t: 'UNO_WINDOW_CLOSED'; playerId: string }
     | { t: 'TURN_AUTO_RESOLVED'; playerId: string }
+    // The clock ran out; `timeouts` counts this seat's misses in a row, and
+    // reaching MAX_TURN_TIMEOUTS takes it out (an ELIMINATED follows).
+    | { t: 'TURN_TIMED_OUT'; playerId: string; timeouts: number }
     | { t: 'ROULETTE_ENDED'; playerId: string; outcome: 'match' | 'eliminated' | 'exhausted'; matchCard?: Card }
     | { t: 'GAME_OVER'; winnerId: string }
 
@@ -71,6 +82,10 @@ export interface SnapshotPlayer {
     isEliminated: boolean
     connected: boolean
     calledUno: boolean
+    /** Turns in a row this seat ran out the clock on. Older servers omit it. */
+    timeouts?: number
+    /** Out of the game for running out the clock, not by the mercy rule. */
+    timedOut?: boolean
 }
 
 export interface PersonalView {
@@ -95,6 +110,9 @@ export interface PersonalView {
     pendingDrawnWildCard: Card | null
     stackingMode: StackingMode
     winnerId: string | null
+    /** Time left on the current turn when this snapshot was sent, as a duration
+     *  so client clock skew cannot bend it. Absent or null = no clock running. */
+    turnEndsInMs?: number | null
 }
 
 export type ServerMsg =
