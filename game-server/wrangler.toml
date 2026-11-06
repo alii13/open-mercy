@@ -10,6 +10,20 @@ class_name = "GameRoomDO"
 tag = "v1"
 new_sqlite_classes = ["GameRoomDO"]
 
+# Per-IP ceilings, keyed on CF-Connecting-IP. Generous on purpose: mobile
+# carriers put many players behind one IP (CGNAT). They exist to stop one
+# script from minting rooms or hammering joins, not to pace real players.
+# namespace_id only has to be unique within the Cloudflare account.
+[[ratelimits]]
+name = "CREATE_LIMITER"
+namespace_id = "1001"
+simple = { limit = 20, period = 60 }
+
+[[ratelimits]]
+name = "JOIN_LIMITER"
+namespace_id = "1002"
+simple = { limit = 60, period = 60 }
+
 # Supabase project used for token introspection. This is the publishable key:
 # public by design (it ships in every frontend bundle), and not a secret.
 #
