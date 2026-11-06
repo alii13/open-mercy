@@ -15,6 +15,7 @@ import { canSeat, MAX_PLAYERS } from './seats'
 import { autoStartTick, autoStartBump, autoStartBumpsLeft, AUTO_START_MIN_PLAYERS, type AutoStartState } from './autoStart'
 import { chatAllowed } from './chatLimit'
 import { shortCache } from './shortCache'
+import { rateKey } from './rateKey'
 import { sendRoomInvite } from './invites'
 import { quickChatPhrase } from '../../shared/quickChat'
 import type { StackingMode } from '../../shared/engine'
@@ -124,7 +125,7 @@ export default {
     async fetch(req: Request, env: Env): Promise<Response> {
         const url = new URL(req.url)
         const hint = CONTINENT_HINTS[(req.cf?.continent as string) ?? '']
-        const ip = req.headers.get('CF-Connecting-IP') ?? ''
+        const ip = rateKey(req.headers.get('CF-Connecting-IP') ?? '')
 
         if (req.method === 'OPTIONS') {
             const origin = corsOrigin(req)
