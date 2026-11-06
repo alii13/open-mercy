@@ -14,6 +14,7 @@ import { ROOM_CODE_ALPHABET, isRoomCode, normalizeRoomCode } from '../../shared/
 import { canSeat, MAX_PLAYERS } from './seats'
 import { autoStartTick, autoStartBump, autoStartBumpsLeft, AUTO_START_MIN_PLAYERS, type AutoStartState } from './autoStart'
 import { chatAllowed } from './chatLimit'
+import { shortCache } from './shortCache'
 import { sendRoomInvite } from './invites'
 import { quickChatPhrase } from '../../shared/quickChat'
 import type { StackingMode } from '../../shared/engine'
@@ -22,7 +23,14 @@ interface Env extends AuthEnv, VoiceEnv {
     ROOM: DurableObjectNamespace
     /** Optional wrangler secret; enables server-side game_results persistence. */
     SUPABASE_SERVICE_KEY?: string
+    /** Per-IP ceilings, checked before any Supabase or Durable Object work. */
+    CREATE_LIMITER: RateLimit
+    JOIN_LIMITER: RateLimit
 }
+
+const DIR_CACHE_MS = 1_000
+const publicRoomsCache = shortCache<unknown>(DIR_CACHE_MS)
+const liveTablesCache = shortCache<unknown>(DIR_CACHE_MS)
 
 const CONTINENT_HINTS: Record<string, string> = {
     AS: 'apac',
@@ -116,6 +124,7 @@ export default {
     async fetch(req: Request, env: Env): Promise<Response> {
         const url = new URL(req.url)
         const hint = CONTINENT_HINTS[(req.cf?.continent as string) ?? '']
+        const ip = req.headers.get('CF-Connecting-IP') ?? ''
 
         if (req.method === 'OPTIONS') {
             const origin = corsOrigin(req)
@@ -134,6 +143,9 @@ export default {
         // Create a room: run the placement lottery and activate the winner.
         // Creation is authenticated — the creator becomes the room host.
         if (req.method === 'POST' && url.pathname === '/rooms') {
+            if (!(await env.CREATE_LIMITER.limit({ key: ip })).success) {
+                return withCors(new Response('too many requests', { status: 429 }), req)
+            }
             const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '')
             const creator = await verifySupabaseToken(token, env)
             if (!creator) return withCors(new Response('unauthorized', { status: 401 }), req)
@@ -175,16 +187,18 @@ export default {
         // Open public rooms for quick match. Stays a bare array of codes:
         // deployed clients consume this shape, and the Worker ships ahead of
         // the frontend.
+        // Cached for DIR_CACHE_MS, so quick match can miss a room opened in
+        // that last second and host its own instead.
         if (url.pathname === '/public-rooms') {
-            const res = await directoryStub(env).fetch('https://do/dir-list')
-            return withCors(Response.json(await res.json()), req)
+            const codes = await publicRoomsCache(() => directoryStub(env).fetch('https://do/dir-list').then(r => r.json()))
+            return withCors(Response.json(codes), req)
         }
 
         // Same directory, enough detail to render a table without a round trip
         // per room. Carries no player names by design — see directory.ts.
         if (url.pathname === '/live-tables') {
-            const res = await directoryStub(env).fetch('https://do/dir-tables')
-            return withCors(Response.json(await res.json()), req)
+            const tables = await liveTablesCache(() => directoryStub(env).fetch('https://do/dir-tables').then(r => r.json()))
+            return withCors(Response.json(tables), req)
         }
 
         // Join a room over WebSocket: /room/CODE/ws
@@ -197,6 +211,10 @@ export default {
         if (roomWs) {
             if (req.headers.get('Upgrade') !== 'websocket') {
                 return new Response('expected websocket', { status: 426 })
+            }
+            // Before locateRoom: even a made-up code costs CANDIDATES object probes.
+            if (!(await env.JOIN_LIMITER.limit({ key: ip })).success) {
+                return new Response('too many requests', { status: 429 })
             }
             // A 404 on the upgrade reaches the client as an anonymous 1006 —
             // indistinguishable from a network drop. Accept the socket and
