@@ -142,22 +142,31 @@ function syncPlayers() {
 }
 
 // ---- Ranks. Every card shows its player's badge tier and all-time global
-// rank, read once per player (alltime_ranks, supabase/alltime-ranks.sql).
-// Until that function is installed the cards stay plain card backs.
+// rank, read once per player. Your own comes from alltime_my_rank, which the
+// leaderboard already uses; everyone else's from alltime_ranks
+// (supabase/alltime-ranks.sql), and until that is installed their cards stay
+// plain card backs.
 const { badges: tiers, fetchBadges } = useBadges()
 const globalRanks = new Map<string, number | null>()
 let ranksMissing = false
 
 async function loadRanks(ids: string[]) {
-    const missing = ids.filter((id) => !globalRanks.has(id))
-    if (missing.length && !ranksMissing) {
-        const [{ data, error }] = await Promise.all([supabase.rpc('alltime_ranks', { ids: missing }), fetchBadges(ids)])
-        if (error) { ranksMissing = true; return }
-        const byId = new Map(((data ?? []) as { user_id: string; rank: number }[]).map((r) => [r.user_id, Number(r.rank)]))
-        for (const id of missing) globalRanks.set(id, byId.get(id) ?? null)
-    } else {
-        await fetchBadges(ids)
-    }
+    const me = auth.user?.id
+    const others = ids.filter((id) => id !== me && !globalRanks.has(id))
+    const mine = !!me && ids.includes(me) && !globalRanks.has(me)
+    await Promise.all([
+        fetchBadges(ids),
+        mine && supabase.rpc('alltime_my_rank', { p_country: null }).then(({ data, error }) => {
+            if (error) return
+            const row = (data as { my_rank: number | null }[] | null)?.[0]
+            globalRanks.set(me, row?.my_rank == null ? null : Number(row.my_rank))
+        }),
+        others.length > 0 && !ranksMissing && supabase.rpc('alltime_ranks', { ids: others }).then(({ data, error }) => {
+            if (error) { ranksMissing = true; return }
+            const byId = new Map(((data ?? []) as { user_id: string; rank: number }[]).map((r) => [r.user_id, Number(r.rank)]))
+            for (const id of others) globalRanks.set(id, byId.get(id) ?? null)
+        }),
+    ])
     for (const id of ids) {
         if (!globalRanks.has(id)) continue
         const global = globalRanks.get(id)
