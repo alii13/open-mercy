@@ -12,7 +12,7 @@ import { addParticipant, createMeeting, deactivateMeeting, voiceConfigured, type
 import { gcWindowMs } from './roomGc'
 import { ROOM_CODE_ALPHABET, isRoomCode, normalizeRoomCode } from '../../shared/roomCode'
 import { canSeat, MAX_PLAYERS, PUBLIC_SEATS } from './seats'
-import { autoStartTick } from './autoStart'
+import { autoStartTick, canDeal } from './autoStart'
 import { chatAllowed, loungeAllowed } from './chatLimit'
 import { cleanLoungeAct } from '../../shared/lounge'
 import { sendRoomInvite } from './invites'
@@ -544,13 +544,17 @@ export class GameRoomDO {
                 return
             }
             const roster = (await this.ctx.storage.get<Record<string, RosterEntry>>('roster')) ?? {}
-            if (!canSeat(roster, verified.userId, room.isPublic ? PUBLIC_SEATS : MAX_PLAYERS)) {
-                // A full public lobby hands a closed tab's seat to the next
-                // stranger: otherwise one ghost keeps a seven-seat table from
-                // ever dealing.
+            // A public table counting down is locked: its seven are in, so a
+            // stranger goes to the next table. Someone already seated still
+            // gets back in after a dropped connection.
+            const locked = room.isPublic && !(verified.userId in roster) && (await this.getTimers()).startAt !== undefined
+            if (locked || !canSeat(roster, verified.userId, room.isPublic ? PUBLIC_SEATS : MAX_PLAYERS)) {
+                // A full public lobby that is still filling hands a closed
+                // tab's seat to the next stranger: otherwise one ghost keeps a
+                // seven-seat table from ever dealing.
                 await this.loadGame()
                 const live = new Set(this.roomSockets(ws).map(s => s.userId))
-                const ghost = room.isPublic && this.roomStatus() === 'lobby'
+                const ghost = !locked && room.isPublic && this.roomStatus() === 'lobby'
                     ? Object.keys(roster).find(id => !live.has(id))
                     : undefined
                 if (!ghost) {
@@ -923,18 +927,22 @@ export class GameRoomDO {
         }
 
         if (startDue) {
-            // The lobby countdown hit zero — deal, exactly as a host start
-            // would, if the room still qualifies. If it no longer does, the
-            // next presence change re-arms a fresh clock.
+            // The countdown hit zero: deal to whoever is still connected, as a
+            // host start would. Fewer than two cannot play, so the room reopens
+            // as a filling table and the presence frame clears every clock.
             await this.loadGame()
             const roomRec = await this.ctx.storage.get<RoomRecord>('room')
             const connected = new Set(this.roomSockets().map(x => x.userId))
             const seated = (await this.rosterList()).filter(r => connected.has(r.userId))
-            if (roomRec?.isPublic && this.roomStatus() === 'lobby' && seated.length >= PUBLIC_SEATS) {
-                const { game, events } = startGame(seated, roomRec.stackingMode as StackingMode)
-                this.game = game
-                await this.refreshDirectory(await this.ctx.storage.get<Record<string, RosterEntry>>('roster') ?? {})
-                await this.broadcastGame(events)
+            if (roomRec?.isPublic && this.roomStatus() === 'lobby') {
+                if (canDeal(seated.length)) {
+                    const { game, events } = startGame(seated, roomRec.stackingMode as StackingMode)
+                    this.game = game
+                    await this.refreshDirectory(await this.ctx.storage.get<Record<string, RosterEntry>>('roster') ?? {})
+                    await this.broadcastGame(events)
+                } else {
+                    await this.broadcastPresence()
+                }
             }
         }
 
@@ -1023,6 +1031,8 @@ export class GameRoomDO {
             await this.loadGame()
             const players = Object.keys(roster).length
             const skins = Object.values(roster).map(e => e.skin).filter(Boolean) as string[]
+            // A table counting down is locked, so it has no seat to offer even when someone has left it.
+            const locked = (await this.getTimers()).startAt !== undefined
             await directoryStub(this.env).fetch('https://do/dir-register', {
                 method: 'POST',
                 body: JSON.stringify({
@@ -1031,7 +1041,7 @@ export class GameRoomDO {
                         players,
                         connected,
                         // By who is connected: the door hands a closed tab's seat to the next stranger.
-                        seatsFree: Math.max(0, PUBLIC_SEATS - connected),
+                        seatsFree: locked ? 0 : Math.max(0, PUBLIC_SEATS - connected),
                         // Kept alongside status so a rollback still reads sane entries.
                         inProgress: this.roomStatus() === 'playing',
                         status: this.roomStatus(),

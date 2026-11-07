@@ -29,7 +29,8 @@ const present = (t: LiveTable) => t.connected ?? t.players
 
 export function publicTableView(joinable: LiveTable[], loaded: boolean): PublicTableView {
     const target = joinable
-        .filter((t) => present(t) > 0 && present(t) < PUBLIC_SEATS)
+        // A full table is locked into its countdown, even once someone leaves it.
+        .filter((t) => present(t) > 0 && present(t) < PUBLIC_SEATS && t.seatsFree > 0)
         .reduce<LiveTable | null>((best, t) => (!best || present(t) > present(best) ? t : best), null)
     if (target) {
         const left = PUBLIC_SEATS - present(target)

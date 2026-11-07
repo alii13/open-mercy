@@ -979,3 +979,36 @@ describe('leaving', () => {
         expect(ws.sent.some(s => JSON.parse(s).t === 'leave')).toBe(true)
     })
 })
+
+describe('what a reload brings back', () => {
+    async function join(mp: ReturnType<typeof useMultiplayerStore>, isPublic: boolean) {
+        const joining = mp.joinGame('AB12CD')
+        for (let i = 0; i < 20 && FakeWebSocket.instances.length === 0; i++) await Promise.resolve()
+        const ws = FakeWebSocket.instances[FakeWebSocket.instances.length - 1]!
+        ws.open()
+        ws.receive({ t: 'hello', roomCode: 'AB12CD', userId: 'me', hostUserId: 'me', isPublic })
+        ws.receive({ t: 'presence', players: [{ userId: 'me', name: 'TESTER', connected: true }] })
+        ws.receive({ t: 'snapshot', seq: 0, game: playingView({ status: 'lobby', you: null, currentPlayerId: null, players: [] }) })
+        await joining
+        return ws
+    }
+    const stored = () => JSON.parse(fakeStorage.store['uno_mp_room'] ?? 'null')?.code ?? null
+
+    it('keeps a private room for a reload while it waits', async () => {
+        await join(useMultiplayerStore(), false)
+        expect(stored()).toBe('AB12CD')
+    })
+
+    it('forgets a public table that has not dealt, so a reload goes home', async () => {
+        fakeStorage.store['uno_mp_room'] = JSON.stringify({ code: 'AB12CD', at: Date.now() })
+        await join(useMultiplayerStore(), true)
+        expect(stored()).toBeNull()
+    })
+
+    it('keeps a public table once its game is under way, so a reload goes back in', async () => {
+        const ws = await join(useMultiplayerStore(), true)
+        ws.receive({ t: 'snapshot', seq: 1, game: playingView() })
+        await Promise.resolve()
+        expect(stored()).toBe('AB12CD')
+    })
+})

@@ -37,6 +37,11 @@ describe('public table card', () => {
         expect(view.headline).toBe('OPEN TABLE')
     })
 
+    it('never points at a locked table, even after someone left its countdown', () => {
+        const locked = { ...table('LOCKED', 7), connected: 6, seatsFree: 0 }
+        expect(publicTableView([locked], true).target).toBeNull()
+    })
+
     it("names the rules of the table you would join, not the default", () => {
         expect(publicTableView([table('AAAAAA', 3, 'official')], true).rules).toBe('OFFICIAL RULES')
         expect(publicTableView([], true).rules).toBe('HOUSE RULES')

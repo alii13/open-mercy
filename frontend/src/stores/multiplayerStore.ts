@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import type { Card, CardColor } from '../types/card'
 import { DEFAULT_STACKING_MODE, type StackingMode } from '../utils/gameRules'
 import { getDrawValue } from '../utils/gameRules'
@@ -226,6 +226,10 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
             updated_at: '',
         }
     })
+    watch(
+        () => (isPublicRoom.value && currentGame.value?.status === 'playing' ? roomCodeRef.value : null),
+        (code) => { if (code) storeRoom(code) },
+    )
 
     const gamePlayers = computed<GamePlayerRow[]>(() => {
         const v = view.value
@@ -544,7 +548,14 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
                 const msg = JSON.parse(e.data) as ServerMsg
                 if (msg.t === 'hello') {
                     roomCodeRef.value = code
-                    storeRoom(code)
+                    // A public table is kept for a reload only once its game
+                    // is under way (the watch below): a reload while it fills
+                    // goes home instead of sitting you back down.
+                    if (msg.isPublic) {
+                        try { localStorage.removeItem(STORED_ROOM_KEY) } catch { /* noop */ }
+                    } else {
+                        storeRoom(code)
+                    }
                 }
                 if (msg.t === 'error' && (msg.code === 'unauthorized' || msg.code === 'room-not-found' || msg.code === 'room-full')) {
                     error.value = msg.code === 'room-not-found' ? ROOM_GONE

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { AUTO_START_MS, autoStartTick } from './autoStart'
+import { AUTO_START_MS, autoStartTick, canDeal } from './autoStart'
 
 const NOW = 1_700_000_000_000
 const lobby = { isPublic: true, phase: 'lobby' as const, now: NOW }
@@ -14,20 +14,26 @@ describe('autoStartTick', () => {
         expect(autoStartTick(undefined, { ...lobby, connected: 7 }).at).toBe(NOW + 15_000)
     })
 
-    it('keeps the deadline while the table stays full', () => {
+    it('locks the seven in: someone leaving never stops or moves the countdown', () => {
         const s = autoStartTick(undefined, { ...lobby, connected: 7 })
-        expect(autoStartTick(s, { ...lobby, connected: 7, now: NOW + 9_000 }).at).toBe(NOW + 15_000)
-    })
-
-    it('cancels when someone leaves, and a full table again starts a fresh 15 seconds', () => {
-        const s = autoStartTick(undefined, { ...lobby, connected: 7 })
-        const left = autoStartTick(s, { ...lobby, connected: 6, now: NOW + 9_000 })
-        expect(left).toEqual({})
-        expect(autoStartTick(left, { ...lobby, connected: 7, now: NOW + 20_000 }).at).toBe(NOW + 35_000)
+        expect(autoStartTick(s, { ...lobby, connected: 6, now: NOW + 9_000 }).at).toBe(NOW + 15_000)
+        expect(autoStartTick(s, { ...lobby, connected: 1, now: NOW + 12_000 }).at).toBe(NOW + 15_000)
     })
 
     it('never runs in a private room or outside the lobby', () => {
         expect(autoStartTick(undefined, { ...lobby, connected: 7, isPublic: false })).toEqual({})
         expect(autoStartTick({ at: NOW }, { ...lobby, connected: 7, phase: 'playing' })).toEqual({})
+    })
+})
+
+describe('canDeal', () => {
+    it('deals with whoever is still at the table, down to two', () => {
+        expect(canDeal(7)).toBe(true)
+        expect(canDeal(2)).toBe(true)
+    })
+
+    it('cannot deal a game to one player', () => {
+        expect(canDeal(1)).toBe(false)
+        expect(canDeal(0)).toBe(false)
     })
 })
