@@ -547,54 +547,68 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
   }
 
   // ------------------------------------------------------------ drawing from the deck
-  // Draws play one at a time and none is ever dropped: a device that falls behind plays its backlog faster, so every
-  // screen shows the same draws. Refusing draws made a slow client skip ones the others showed. The room's rate limit
-  // is what bounds the queue.
+  // Draws play one at a time and none is dropped, so every screen shows the same draws: a backlog plays faster, and a
+  // tab back from the background (where nothing animates) lands all but the last few on the pile at once. A draw
+  // keeps its player's name from when it arrived, so it still shows if they leave first. The deal is the one
+  // exception: it takes the deck, so draws still waiting when it starts are dropped.
   const pile = []
   const drawQueue = []
   let drawing = false, drawTl = null
   function draw(id, face) {
-    if (dealing || !players.has(id) || !Object.hasOwn(FACES, face)) return
-    drawQueue.push({ id, face })
+    const p = players.get(id)
+    if (dealing || !p || !Object.hasOwn(FACES, face)) return
+    drawQueue.push({ who: p.you ? 'You' : p.name, face })
     if (!drawing) nextDraw()
+    else drawTl.timeScale(1 + drawQueue.length)
+  }
+  const pileSpot = () => ({ x: PILE_AT.x + rand(-0.06, 0.06), y: 0.004 + (pile.length % 30) * 0.0012, z: PILE_AT.z + rand(-0.06, 0.06) })
+  function toPile(c) {
+    pile.push(c)
+    settle(c)
+    if (pile.length > 14) scene.remove(pile.shift())
+  }
+  function land({ who, face }) {
+    const c = makeCard(faceMats[face])
+    c.position.copy(pileSpot())
+    c.rotation.set(-Math.PI / 2, rand(-0.5, 0.5), 0)
+    scene.add(c)
+    toPile(c)
+    emit('event', { text: `${who} drew ${FACES[face]}` })
   }
   function nextDraw() {
     drawing = false
     if (dealing) { drawQueue.length = 0; return }
+    while (drawQueue.length > 3) land(drawQueue.shift())
     const next = drawQueue.shift()
     if (!next) return
-    const p = players.get(next.id)
-    if (!p) { nextDraw(); return }
     drawing = true
-    const face = next.face
-    const c = makeCard(faceMats[face])
+    const c = makeCard(faceMats[next.face])
     c.position.set(DECK_AT.x, deckTop() + 0.004, DECK_AT.z)
     c.rotation.set(Math.PI / 2, deck.rotation.y, 0)
     scene.add(c)
-    emit('event', { text: `${p.you ? 'You' : p.name} drew ${FACES[face]}` })
+    emit('event', { text: `${next.who} drew ${FACES[next.face]}` })
     const camYaw = Math.atan2(camera.position.x - DECK_AT.x, camera.position.z - DECK_AT.z)
-    const restY = 0.004 + (pile.length % 30) * 0.0012
+    const rest = pileSpot()
     drawTl = gsap.timeline({ onComplete: nextDraw }).timeScale(1 + drawQueue.length)
       .to(c.position, { y: 1.45, x: DECK_AT.x + 0.1, duration: 0.6, ease: 'power3.out' })
       .to(c.rotation, { x: 0, y: camYaw + Math.PI * 2, duration: 0.6, ease: 'power2.out' }, '<')
       .to(c.position, { y: 1.55, duration: 1.3, ease: 'sine.inOut' })
       .to(c.rotation, { z: 0.08, duration: 1.3, ease: 'sine.inOut' }, '<')
-      .to(c.position, { x: PILE_AT.x + rand(-0.06, 0.06), y: restY, z: PILE_AT.z + rand(-0.06, 0.06), duration: 0.42, ease: 'power2.in' })
+      .to(c.position, { ...rest, duration: 0.42, ease: 'power2.in' })
       .to(c.rotation, { x: -Math.PI / 2, y: rand(-0.5, 0.5), z: 0, duration: 0.42, ease: 'power2.in' }, '<')
       .call(() => {
-        pile.push(c)
-        settle(c)
-        if (pile.length > 14) scene.remove(pile.shift())
+        toPile(c)
         shockwave(c.position.x, c.position.z, new THREE.Color('#ffcc00').multiplyScalar(1.6), 2.2)
       })
   }
 
   // ------------------------------------------------------------ the deal
-  let dealing = false, dealTl = null, dealDone = null
+  let dealing = false, dealTl = null, dealDone = null, dealRun = null
   const dealt = []
   const view = { k: 0 }
   function deal() {
-    if (dealing) return Promise.resolve()
+    // A second call while dealing gets the running deal's promise, never an early answer.
+    if (dealing) return dealRun
     dealing = true
     const seats = [...players.values()]
     // Module scope, so reset() and dispose() can stop a deal halfway; a killed timeline's then() would never settle.
@@ -639,7 +653,7 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
     tl.to(view, { k: 1, duration: 1.4, ease: 'power3.inOut' }, '-=0.35')
     emit('event', { text: 'Dealing seven to everyone' })
     // Resolves true when the deal finishes, false when reset() or dispose() cuts it short.
-    return new Promise((res) => { dealDone = res })
+    return (dealRun = new Promise((res) => { dealDone = res }))
   }
 
   // A beat of the countdown: a shockwave from the deck, the lamp flares, the camera jolts.
@@ -744,7 +758,10 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
   // One finger steers: while it drags, other fingers are ignored. Not isPrimary: a finger resting on the screen
   // would make every later touch non-primary and block all input.
   canvas.addEventListener('pointerdown', (e) => {
-    if (dealing || drag) return
+    if (dealing || e.button !== 0) return
+    // A drag whose pointer capture is gone (the canvas moved mid-touch, a context menu took the pointerup) is stale.
+    if (drag && !canvas.hasPointerCapture(drag.id)) drag = null
+    if (drag) return
     const h = pick(e)
     if (h.what === 'you') { drag = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false, sent: 0 }; canvas.setPointerCapture(e.pointerId) }
     else if (h.what === 'player' && me()) {

@@ -72,11 +72,11 @@ Each one ships on its own and is useful on its own.
   
 - Presence drives who is at the table. A player joins: a card rises out of the felt at a free seat. A player leaves: the card slides off the edge.
   
-- Server: one new message, `lounge`, with `kind: 'move' | 'flick' | 'draw' | 'emote'` and a small payload. The DO relays it to the room and stores nothing. No tick, no physics on the server. Every client animates the same event from the same numbers.
+- Server: one new message, `lounge`, with `kind: 'move' | 'flick' | 'draw' | 'emote'` and a small payload. The DO relays it to the room and stores nothing. No tick, no physics on the server. Every client animates the same event from the same numbers; for a flick, those numbers are the path the sender's client worked out (iteration 3).
   
-- Late joiners: when presence changes, each client re-sends its own `move` once with a random delay under half a second. No server state needed. A seven-session test without this step put everyone up to 8.6 m from their real spot on a rejoining player's screen. A relay that keeps each player's last spot and sends it with the roster fixed it too.
+- Late joiners: when presence changes, each client re-sends its own `move` once with a random delay under half a second. No server state needed. Why it matters, from a one-off seven-session test through a local relay (not in the repo): with no catch-up at all, a rejoining player saw everyone up to 8.6 m from their real spot. That relay fixed it by keeping each player's last spot; this re-send is the stateless way to the same result and has not been tested yet.
   
-- A client sends no lounge message until the room confirms its join. In the same test, a draw sent in the same second as the join reached only the sender.
+- A client sends no lounge message until the room confirms its join, and the room delivers a player's join to every socket before any lounge frame from them: clients ignore frames from a player they have not seen join. In the same test, a draw sent in the same second as the join reached only the sender.
   
 - Photo: add a `photo` URL to the auth message and the presence player record. It changes only on join, so it is safe on presence.
   
@@ -99,9 +99,9 @@ Each one ships on its own and is useful on its own.
 - Size: two to three days.
   
 ### 3. Toys
-- `flick`: the sender's client runs the skid and sends the outcome with the direction and speed: where the card stops and whose card it hits. Other clients replay that path instead of simulating it. In the seven-session test, independent skids put one flick into three different players on three screens.
+- `flick`: the sender's client runs the skid and sends its path: the points where the card bounces and stops, whose card it hits, and which way that card wobbles. Other clients replay the path instead of simulating it. In the seven-session test, independent skids put one flick into three different players on three screens.
   
-- `draw`: payload is a card id from the deck art set. The top card lifts, flips and shows the face for two seconds, with the caption. A slow client never drops a draw: it plays its backlog faster. Before that change, a client that fell behind in the test skipped two draws the others showed.
+- `draw`: payload is a card id from the deck art set. The top card lifts, flips and shows the face for two seconds, with the caption. A slow client never drops a draw: it plays a backlog faster, a tab back from the background lands all but the last few on the pile at once, and a draw keeps its player's name in case they leave before it plays. In the test, before that change, a client that fell behind skipped two draws the others showed.
   
 - Emote bubbles grow to a radial picker on your own card.
   

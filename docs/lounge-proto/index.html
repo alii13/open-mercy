@@ -125,7 +125,8 @@ body.shake #world, body.shake #labels { animation: shake .45s cubic-bezier(.36, 
 .ask-yes { background: var(--hazard); color: #0a0a0b; border: 0; }
 @media (max-height: 480px) and (min-width: 721px) {
   .hud { padding-top: max(12px, env(safe-area-inset-top)); padding-bottom: max(12px, env(safe-area-inset-bottom)); }
-  .brand, .hint { display: none; }
+  .brand { display: none; }
+  .hint { font-size: 10px; letter-spacing: 0.14em; }
   .count { font-size: 22px; line-height: 26px; }
   .time { font-size: 34px; line-height: 38px; }
   .center { bottom: max(12px, env(safe-area-inset-bottom)); }
@@ -153,7 +154,9 @@ body.shake #world, body.shake #labels { animation: shake .45s cubic-bezier(.36, 
   .time.wait { font-size: 14px; line-height: 20px; white-space: nowrap; }
   .center { bottom: max(16px, env(safe-area-inset-bottom)); width: calc(100% - 32px); }
   .tray { max-width: 100%; overflow-x: auto; }
-  .hint, .leave { display: none; }
+  .hint { font-size: 9px; line-height: 13px; letter-spacing: 0.12em; white-space: normal; text-align: center; }
+  /* The tray fills the bottom row on a phone, so LEAVE sits under the player count. */
+  .leave { position: fixed; top: calc(max(16px, env(safe-area-inset-top)) + 58px); left: max(16px, env(safe-area-inset-left)); height: 32px; padding: 0 12px; font-size: 11px; }
   .count3 { font-size: 160px; }
   .t1 { font-size: 30px; } .t2 { font-size: 84px; } .t3 { font-size: 12px; letter-spacing: 0.24em; }
   .tape { height: 46px; } .tape-run span { font-size: 17px; }
@@ -197,6 +200,11 @@ body.shake #world, body.shake #labels { animation: shake .45s cubic-bezier(.36, 
   <div class="ask-title">Turn on the table music?</div>
   <div class="ask-sub">Your browser needs one tap before it plays sound.</div>
   <div class="ask-row"><button class="pill ask-yes" id="askYes">SOUND ON</button><button class="pill" id="askNo">NOT NOW</button></div>
+</div>
+<div class="ask" id="left" hidden>
+  <div class="ask-title">You left the table</div>
+  <div class="ask-sub">In the game this takes you back to the lobby.</div>
+  <div class="ask-row"><button class="pill ask-yes" id="rejoin">SIT BACK DOWN</button></div>
 </div>
 <div class="count3" id="count3"></div>
 <div class="showtime" id="showtime">
@@ -267,7 +275,7 @@ const BOTS = [
   { id: 'b6', name: 'Mochi_77', skin: 'gold', rank: { tier: 5, global: 6415 }, at: 19 },
 ]
 const seated = new Set(['you'])
-let clock = null, dealing = false
+let clock = null, dealing = false, left = false
 
 lounge.join({ id: 'you', name: 'NightOwl', skin: 'ember', rank: { tier: 6, global: 1284 }, you: true })
 const fillTable = () => { for (const b of BOTS) setTimeout(() => { lounge.join(b); seated.add(b.id); onJoin() }, b.at * 1000) }
@@ -282,7 +290,7 @@ function onJoin() {
 
 function render() {
   const t = $('time')
-  if (clock === null) { t.textContent = `WAITING FOR ${SEATS - lounge.players.size} MORE`; t.classList.add('wait'); return }
+  if (clock === null) { t.textContent = `WAITING FOR ${SEATS - lounge.players.size} MORE`; t.classList.add('wait'); t.classList.remove('urgent'); return }
   t.classList.remove('wait')
   const s = Math.max(0, Math.ceil(clock))
   t.classList.toggle('urgent', s < 10)
@@ -343,6 +351,7 @@ function resetTable() {
 
 let lastTick = performance.now()
 setInterval(async () => {
+  if (left) return
   const now = performance.now(), dt = (now - lastTick) / 1000
   lastTick = now
   if (clock !== null && !dealing) {
@@ -371,7 +380,7 @@ setInterval(async () => {
 }, 250)
 
 function botTurn(b) {
-  if (!seated.has(b.id) || dealing) return
+  if (!seated.has(b.id) || dealing || left) return
   const me = lounge.players.get(b.id)
   const others = [...lounge.players.values()].filter((p) => p.id !== b.id)
   const r = Math.random()
@@ -404,7 +413,7 @@ function fadeTrack(to) {
   gsap.to(track, { volume: to, duration: to ? 2 : 1.2, ease: 'sine.inOut', overwrite: true, onComplete: () => { if (!to) track.pause() } })
 }
 function startTrack() {
-  if (!soundOn || dealing || document.hidden) return
+  if (!soundOn || dealing || document.hidden || left) return
   gsap.killTweensOf(track)
   track.volume = VOLUME
   track.play().catch(() => { $('ask').hidden = false })
@@ -445,6 +454,20 @@ $('sound').onclick = () => {
   else { gsap.killTweensOf(track); track.pause() }
   syncIcon()
 }
+
+// LEAVE: your card slides off the table, the music stops and the table stops for you.
+document.querySelector('.leave').onclick = () => {
+  if (left) return
+  left = true
+  lounge.leave('you')
+  seated.delete('you')
+  gsap.killTweensOf(track)
+  track.pause()
+  endCoach()
+  $('ask').hidden = true
+  $('left').hidden = false
+}
+$('rejoin').onclick = () => location.reload()
 </script>
 </body>
 </html>
