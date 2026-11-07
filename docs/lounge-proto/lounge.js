@@ -47,8 +47,11 @@ const rand = (a, b) => a + Math.random() * (b - a)
 export async function createLounge({ canvas, overlay, artBase, badgeBase, reducedMotion = false }) {
   await Promise.all([document.fonts.load('64px "Black Ops One"'), document.fonts.load('600 16px "Chakra Petch"')])
 
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' })
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75))
+  // Phones and small screens get a lighter frame: fewer pixels, smaller shadow and felt maps, half the dust, no MSAA.
+  const lite = matchMedia('(pointer: coarse)').matches || Math.min(innerWidth, innerHeight) < 720
+  // antialias stays off: the composer renders into its own target, which carries the MSAA instead.
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' })
+  renderer.setPixelRatio(Math.min(devicePixelRatio, lite ? 1.5 : 1.75))
   renderer.outputColorSpace = THREE.SRGBColorSpace
   renderer.toneMapping = THREE.ACESFilmicToneMapping
   renderer.toneMappingExposure = 1.0
@@ -68,7 +71,7 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
   const labels = new CSS2DRenderer({ element: overlay })
 
   // ------------------------------------------------------------ textures
-  const maxAniso = renderer.capabilities.getMaxAnisotropy()
+  const maxAniso = Math.min(renderer.capabilities.getMaxAnisotropy(), lite ? 4 : 8)
   function canvasTex(w, h, draw) {
     const c = document.createElement('canvas')
     c.width = w; c.height = h
@@ -133,7 +136,7 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
     })
   }
 
-  const S = 2048
+  const S = lite ? 1024 : 2048
   const feltTex = canvasTex(S, S, (g) => {
     g.fillStyle = '#3a3b45'; g.fillRect(0, 0, S, S)
     const img = g.getImageData(0, 0, S, S), d = img.data
@@ -240,7 +243,7 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
   const spot = new THREE.SpotLight(0xffd6a0, 95, 0, 1.02, 0.7, 2)
   spot.position.y = 0.08
   spot.castShadow = true
-  spot.shadow.mapSize.set(2048, 2048)
+  spot.shadow.mapSize.setScalar(lite ? 1024 : 2048)
   spot.shadow.camera.near = 0.5
   spot.shadow.camera.far = 8
   spot.shadow.bias = -0.0004
@@ -279,7 +282,7 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
   cone.position.y = CONE_H / 2
   scene.add(cone)
 
-  const DUST = 520
+  const DUST = lite ? 260 : 520
   const dust = { theta: new Float32Array(DUST), frac: new Float32Array(DUST), y: new Float32Array(DUST), phase: new Float32Array(DUST) }
   const dustPos = new Float32Array(DUST * 3)
   for (let i = 0; i < DUST; i++) {
@@ -336,6 +339,10 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
 
   // ------------------------------------------------------------ players
   const players = new Map()
+  let youP = null
+  // An invisible box a little wider than the card: what a tap aims at, so a small card on a phone is still easy to hit.
+  const hitGeo = new THREE.BoxGeometry(CARD.w * (lite ? 1.6 : 1.25), CARD.h * 1.25, 0.5).translate(0, CARD.h / 2, 0)
+  const hitMat = new THREE.MeshBasicMaterial()
   const listeners = { intent: [], event: [] }
   const emit = (type, payload) => listeners[type].forEach((fn) => fn(payload))
 
@@ -354,9 +361,12 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
     const sk = SKINS[skin] ?? SKINS.ember
     const faceTex = playerFaceTex(sk, rank)
     const card = makeCard(new THREE.MeshStandardMaterial({ map: faceTex, roughness: 0.5, emissive: 0xffffff, emissiveMap: faceTex, emissiveIntensity: 0.2 }))
-    const baseY = (CARD.h / 2) * Math.cos(TILT) + 0.01
+    // Portrait phones see the table from far back, so seated cards stand a little larger there.
+    const sc = portrait ? 1.3 : 1
+    const baseY = (CARD.h / 2) * Math.cos(TILT) * sc + 0.01
     card.rotation.x = -TILT
     card.position.y = baseY
+    card.scale.setScalar(sc)
     g.add(card)
 
     const ring = new THREE.Mesh(new THREE.RingGeometry(0.3, 0.335, 64).rotateX(-Math.PI / 2),
@@ -365,28 +375,32 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
     const glow = new THREE.Mesh(new THREE.CircleGeometry(0.62, 48).rotateX(-Math.PI / 2),
       new THREE.MeshBasicMaterial({ map: dotTex, color: you ? 0xffcc00 : 0x00f3ff, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false }))
     glow.position.y = 0.004
-    g.add(ring, glow)
+    const hit = new THREE.Mesh(hitGeo, hitMat)
+    hit.visible = false
+    hit.scale.setScalar(sc)
+    g.add(ring, glow, hit)
 
     const tagEl = document.createElement('div')
     tagEl.innerHTML = `<div class="tag${you ? ' you' : ''}" style="--c:${sk.accent}">${you ? '<b>YOU</b>' : '<i></i>'}<span></span></div>`
     tagEl.querySelector('span').textContent = name
     const tag = new CSS2DObject(tagEl)
     tag.center.set(0.5, 1)
-    tag.position.y = CARD.h + 0.14
+    tag.position.y = CARD.h * sc + 0.14
     const bubbleEl = document.createElement('div')
     bubbleEl.innerHTML = '<div class="bubble"></div>'
     const bubble = new CSS2DObject(bubbleEl)
     bubble.center.set(0.5, 1)
-    bubble.position.y = CARD.h + 0.42
+    bubble.position.y = CARD.h * sc + 0.42
     g.add(tag, bubble)
     for (const el of [tagEl, bubbleEl]) el.style.pointerEvents = 'none'
 
     const spot0 = x === undefined ? freeSpot(you) : { x, z }
     g.position.set(spot0.x, 0, spot0.z)
     scene.add(g)
-    const p = { id, name, you, g, card, ring, glow, tagEl, bubbleEl, tag, bubble, baseY, tx: spot0.x, tz: spot0.z, k: 3.2,
+    const p = { id, name, you, g, card, ring, glow, hit, tagEl, bubbleEl, tag, bubble, baseY, tx: spot0.x, tz: spot0.z, k: 3.2,
       speed: 0, phase: rand(0, 10), w: 0, wv: 0, lift: -1.1, bubbleTimer: null }
     players.set(id, p)
+    if (you) youP = p
 
     ring.scale.setScalar(0.01)
     gsap.to(p, { lift: 0, duration: 0.9, ease: 'back.out(1.5)' })
@@ -400,10 +414,17 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
     const p = players.get(id)
     if (!p) return
     players.delete(id)
+    if (p === youP) youP = null
     emit('event', { text: `${p.name} left the table` })
     p.tagEl.style.transition = 'opacity .3s'; p.tagEl.style.opacity = '0'
     gsap.to(p.ring.scale, { x: 0.01, y: 0.01, z: 0.01, duration: 0.4 })
-    gsap.to(p, { lift: -1.2, duration: 0.6, ease: 'back.in(1.6)', onComplete: () => { p.tagEl.remove(); p.bubbleEl.remove(); scene.remove(p.g) } })
+    gsap.to(p, { lift: -1.2, duration: 0.6, ease: 'back.in(1.6)', onComplete: () => {
+      p.tagEl.remove(); p.bubbleEl.remove(); scene.remove(p.g)
+      // Each seat owns its face texture and ring meshes; the table loops forever, so free them or GPU memory climbs.
+      const face = p.card.children[0].material
+      face.map.dispose(); face.dispose()
+      for (const m of [p.ring, p.glow]) { m.geometry.dispose(); m.material.dispose() }
+    } })
   }
 
   function clampToSeats(x, z) {
@@ -415,7 +436,7 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
   }
 
   function freeSpot(you) {
-    if (you) return clampToSeats(rand(0.9, 1.3), SEAT.rz * 0.92)
+    if (you) return portrait ? clampToSeats(SEAT.rx * 0.92, rand(-0.4, 0.4)) : clampToSeats(rand(0.9, 1.3), SEAT.rz * 0.92)
     let best = null, bestD = -1
     for (let i = 0; i < 40; i++) {
       const a = rand(0, Math.PI * 2), f = rand(0.55, 1)
@@ -555,9 +576,9 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
         const last = r === 6
         tl.to({ t: 0 }, {
           t: 1, duration: 0.5, ease: 'power2.out',
-          onStart() { this.from = { x: DECK_AT.x, y: deckTop(), z: DECK_AT.z } },
           onUpdate() {
-            const t = this.targets()[0].t, f = this.from
+            // Read the deck height on the first update, not in onStart: a slow frame can update a tween that never started.
+            const t = this.targets()[0].t, f = (this.from ??= { x: DECK_AT.x, y: deckTop(), z: DECK_AT.z })
             c.position.set(lerp(f.x, tx, t), lerp(f.y, ty, t) + Math.sin(Math.PI * t) * 0.9, lerp(f.z, tz, t))
             c.rotation.x = Math.PI / 2 + Math.PI * 2 * t
             c.rotation.y = lerp(0, heading + Math.PI * 2, t)
@@ -595,13 +616,13 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
 
   // ------------------------------------------------------------ camera framing
   const base = { pos: new THREE.Vector3(), look: new THREE.Vector3() }
-  let baseFov = 40
+  let baseFov = 40, portrait = false
   function frame() {
     const w = innerWidth, h = innerHeight, a = w / h
     renderer.setSize(w, h, false)
     composer.setSize(w, h)
     labels.setSize(w, h)
-    const portrait = a < 0.9
+    portrait = a < 0.9
     camera.fov = baseFov = portrait ? 58 : 40
     camera.aspect = a
     camera.updateProjectionMatrix()
@@ -623,7 +644,7 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
     camPos.x += (Math.sin(t * 0.07) * 0.35 + pointer.x * 0.3) * drift
     camPos.y += (Math.sin(t * 0.05) * 0.12 + pointer.y * 0.15) * drift
     camLook.copy(base.look)
-    const you = [...players.values()].find((p) => p.you)
+    const you = youP
     if (view.k > 0 && you) {
       const yx = you.g.position.x, yz = you.g.position.z
       seatPos.set(yx * 1.6, 2.5, yz * 1.6 + 0.4)
@@ -649,18 +670,18 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
     ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1)
     raycaster.setFromCamera(ndc, camera)
     const targets = [deck]
-    for (const p of players.values()) targets.push(...p.card.children)
+    for (const p of players.values()) targets.push(p.hit)
     const hits = raycaster.intersectObjects(targets, false)
     const felt = raycaster.ray.intersectPlane(ground, hitPoint) ? { x: hitPoint.x, z: hitPoint.z } : null
     const onFelt = felt && (felt.x / (TABLE.rx - 0.15)) ** 2 + (felt.z / (TABLE.rz - 0.15)) ** 2 <= 1
     if (hits.length) {
       if (hits[0].object === deck) return { what: 'deck', felt }
-      const p = [...players.values()].find((q) => q.card.children.includes(hits[0].object))
+      const p = [...players.values()].find((q) => q.hit === hits[0].object)
       return { what: p.you ? 'you' : 'player', p, felt }
     }
     return { what: onFelt ? 'felt' : 'none', felt }
   }
-  const me = () => [...players.values()].find((p) => p.you)
+  const me = () => youP
 
   // Drag your card to move it, tap the felt to walk there, tap someone to flick a card at them,
   // tap the deck to draw, tap yourself to wave.
@@ -704,7 +725,8 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
   canvas.addEventListener('pointercancel', endDrag)
 
   // ------------------------------------------------------------ loop
-  const composer = new EffectComposer(renderer)
+  const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: lite ? 0 : 4 }))
+  composer.setPixelRatio(renderer.getPixelRatio())
   composer.addPass(new RenderPass(scene, camera))
   composer.addPass(new UnrealBloomPass(new THREE.Vector2(512, 512), 0.6, 0.55, 1.6))
   composer.addPass(new OutputPass())
@@ -771,5 +793,6 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
     onIntent: (fn) => listeners.intent.push(fn),
     onEvent: (fn) => listeners.event.push(fn),
     get busy() { return drawing || dealing },
+    stats: () => ({ ...renderer.info.memory }),
   }
 }
