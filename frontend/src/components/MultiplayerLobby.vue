@@ -8,7 +8,7 @@
       </a>
 
       <div class="top-bar-cta">
-        <WhatsNew />
+        <WhatsNew ref="whatsNewRef" class="bar-whatsnew" />
         <div v-if="editingName && editTarget === 'bar'" class="name-edit">
           <input
             v-model="nameInput"
@@ -42,6 +42,19 @@
              to need its own header slot; nesting it here costs no width, which
              matters most on a phone. -->
         <div v-else class="account" ref="accountRef">
+          <!-- Phones: one burger holds everything about "you", so the bar
+               never wraps to a second row. The dot is What's new, unread. -->
+          <button
+            class="menu-burger"
+            aria-haspopup="menu"
+            :aria-expanded="accountOpen"
+            :aria-label="whatsNewUnread ? `Menu, ${whatsNewUnread} new` : 'Menu'"
+            @click="accountOpen = !accountOpen"
+          >
+            <X v-if="accountOpen" :size="20" :stroke-width="2" aria-hidden="true" />
+            <MenuIcon v-else :size="20" :stroke-width="2" aria-hidden="true" />
+            <span v-if="whatsNewUnread && !accountOpen" class="burger-dot" aria-hidden="true" />
+          </button>
           <button
             class="username-chip username-chip-editable"
             aria-haspopup="menu"
@@ -53,7 +66,24 @@
             <span v-if="social.incoming.length" class="chip-badge" :title="`${social.incoming.length} friend request${social.incoming.length > 1 ? 's' : ''}`">{{ social.incoming.length }}</span>
             <ChevronDown class="chip-edit-icon" :stroke-width="2" aria-hidden="true" />
           </button>
+          <div v-if="accountOpen" class="menu-scrim" aria-hidden="true" />
           <div v-if="accountOpen" class="account-menu" role="menu">
+            <div class="menu-phone menu-who">
+              <Avatar :uid="authStore.user?.id" :name="authStore.username" :size="36" />
+              <span class="menu-who-text">
+                <span class="menu-who-name">{{ authStore.username }}</span>
+                <span class="menu-who-kind">{{ authStore.isAnonymous ? 'Guest · progress lives on this device' : 'Signed in' }}</span>
+              </span>
+            </div>
+            <button v-if="authStore.isAnonymous" class="menu-phone menu-claim" role="menuitem" @click="claimFromMenu">
+              {{ authStore.claimPending ? 'CONFIRM YOUR EMAIL' : 'CLAIM ACCOUNT' }}
+            </button>
+            <!-- .stop: What's new closes on any window click outside itself,
+                 and this tap would otherwise close it as it opens. -->
+            <button class="menu-phone account-item account-item--first" role="menuitem" @click.stop="openWhatsNewFromMenu">
+              What's new
+              <span v-if="whatsNewUnread" class="menu-new">{{ whatsNewUnread }} NEW</span>
+            </button>
             <button v-if="authStore.profile?.share_code" class="account-item" role="menuitem" @click="viewProfile">View profile</button>
             <button v-if="!social.unavailable" class="account-item" role="menuitem" @click="openFriends">
               Friends
@@ -86,8 +116,8 @@
           <Button variant="primary" size="md" block :disabled="mpStore.loading" @click="handleCreateGame">
             {{ mpStore.loading ? 'CREATING...' : 'CREATE A NEW ROOM' }}
           </Button>
-          <Button variant="secondary" size="md" block :disabled="mpStore.loading" @click="handleQuickMatch">
-            QUICK MATCH
+          <Button variant="secondary" size="md" block :disabled="mpStore.loading" @click="handleTakeSeat">
+            JOIN A PUBLIC TABLE
           </Button>
         </div>
       </div>
@@ -206,70 +236,47 @@
           <button class="lb-link" @click="openLeaderboard">Full leaderboard <ArrowRight :size="14" :stroke-width="2" aria-hidden="true" /></button>
         </div>
 
-        <!-- Primary action: create a room. The rules choice only applies to
-             created games, so it lives inside the same card, above the button
-             that consumes it. -->
+        <!-- Play with friends: a private room with a code. The rules choice
+             lives inside the same card, above the button that consumes it.
+             Flat children on purpose: a phone stacks them in this order, a
+             wide screen moves the picker up beside the eyebrow. -->
         <div class="create-card">
-          <div class="mode-row">
-            <span class="mode-label">Rules</span>
-            <div class="mode-pills">
-              <button
-                v-for="m in stackingModes"
-                :key="m.value"
-                class="mode-pill"
-                :class="{ active: selectedStackingMode === m.value }"
-                @click="selectedStackingMode = m.value"
-              >
-                {{ m.label }}
-              </button>
-            </div>
+          <span class="create-eyebrow">PLAY WITH FRIENDS</span>
+          <p class="create-note">A private room with a code to share. It starts when you say.</p>
+          <div class="mode-pills">
+            <button
+              v-for="m in stackingModes"
+              :key="m.value"
+              class="mode-pill"
+              :class="{ active: selectedStackingMode === m.value }"
+              @click="selectedStackingMode = m.value"
+            >
+              {{ m.label }}
+            </button>
           </div>
           <p class="mode-desc">{{ currentModeDesc }}</p>
           <Button
             variant="primary"
-            size="lg"
+            size="md"
             block
+            class="create-btn"
             :disabled="mpStore.loading"
             @click="handleCreateGame"
           >
-            {{ mpStore.loading ? 'CREATING...' : 'CREATE GAME' }}
+            {{ mpStore.loading ? 'CREATING...' : 'CREATE A ROOM' }}
           </Button>
         </div>
 
-        <!-- Other ways in: icon-led list rows, one identity color per mode -->
+        <PublicTableCard
+          class="public-table"
+          :view="tableView"
+          :online="{ show: online.show.value, count: online.count.value }"
+          :loading="mpStore.loading"
+          @take-seat="handleTakeSeat"
+        />
+
+        <!-- Other ways in: a friend's code, or the bot ladder. -->
         <div class="mode-list" role="group" aria-label="Other ways to play">
-          <div class="mode-overline-row">
-            <span class="mode-overline">Or jump in</span>
-            <!-- Hidden below a floor on purpose: a true small number reads as
-                 an empty game and sends the reader away. See useOnlineCount. -->
-            <span v-if="online.show.value" class="mode-online">
-              <span class="live-dot" aria-hidden="true" />{{ online.count.value }} ONLINE
-            </span>
-          </div>
-          <!-- Only rendered when a public room with a free seat actually
-               exists. An empty "live games" row advertises that nobody is
-               playing, which is worse than no row at all. -->
-          <button
-            v-if="live.joinable.value.length"
-            class="mode-item mode-item--live"
-            :disabled="mpStore.loading"
-            @click="handleJoinLive"
-          >
-            <span class="mode-glyph mode-glyph--live"><Users :size="16" :stroke-width="2" aria-hidden="true" /></span>
-            <span class="mode-text">
-              <span class="mode-name"><span class="live-dot" aria-hidden="true" />{{ liveHeadline }}</span>
-              <span class="mode-hint">{{ liveHint }}</span>
-            </span>
-            <ChevronRight class="mode-chev" :size="16" aria-hidden="true" />
-          </button>
-          <button class="mode-item" :disabled="mpStore.loading" @click="handleQuickMatch">
-            <span class="mode-glyph mode-glyph--cyan"><Zap :size="16" :stroke-width="2" aria-hidden="true" /></span>
-            <span class="mode-text">
-              <span class="mode-name">{{ mpStore.loading ? 'Matching…' : 'Quick match' }}</span>
-              <span class="mode-hint">Join a public room - the game starts itself</span>
-            </span>
-            <ChevronRight class="mode-chev" :size="16" aria-hidden="true" />
-          </button>
           <button class="mode-item" @click="showJoinModal = true">
             <span class="mode-glyph mode-glyph--cyan"><Hash :size="16" :stroke-width="2" aria-hidden="true" /></span>
             <span class="mode-text">
@@ -298,7 +305,6 @@
                 </span>
               </span>
             </span>
-            <ChevronRight class="mode-chev" :size="16" aria-hidden="true" />
           </button>
         </div>
 
@@ -634,7 +640,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { ArrowRight, Bot, Check, ChevronDown, ChevronRight, Clock, Copy, Flame, Hash, HelpCircle, Minus, Pencil, Share2, Skull, Users, Volume1, VolumeX, X, Zap } from 'lucide-vue-next'
+import { ArrowRight, Bot, Check, ChevronDown, ChevronRight, Clock, Copy, Flame, Hash, HelpCircle, Menu as MenuIcon, Minus, Pencil, Share2, Skull, Users, Volume1, VolumeX, X } from 'lucide-vue-next'
 import { useRetentionStore } from '../stores/retentionStore'
 import {
     getDailyRecord, fetchServerDailyRecord, dailyGridCells, buildDailyShareText, loadDailyProgress,
@@ -649,6 +655,9 @@ import { useSocialStore } from '../stores/socialStore'
 import { usePresence } from '../composables/usePresence'
 import InviteFriends from './InviteFriends.vue'
 import WhatsNew from './WhatsNew.vue'
+import PublicTableCard from './PublicTableCard.vue'
+import { publicTableView, PUBLIC_TABLE_RULES } from '../utils/publicTable'
+import { useWhatsNew } from '../composables/useWhatsNew'
 import { nextBot, ladderProgress, isLadderComplete } from '../utils/botLadder'
 import { navigate } from '../utils/routes'
 import { track } from '../utils/analytics'
@@ -970,33 +979,18 @@ function openFriends() {
 }
 onMounted(() => live.start())
 
-const liveHeadline = computed(() => {
-    const n = live.waitingPlayers.value
-    return n === 1 ? 'Someone is waiting' : `${n} players waiting`
-})
+const tableView = computed(() => publicTableView(live.joinable.value, live.inProgressCount.value, live.loaded.value))
 
-const liveHint = computed(() => {
-    const rooms = live.joinable.value.length
-    const roomText = rooms === 1 ? '1 open room' : `${rooms} open rooms`
-    const running = live.inProgressCount.value
-    if (!running) return `${roomText} - sit down now`
-    return `${roomText}, ${running} game${running === 1 ? '' : 's'} in progress`
-})
-
-// Fullest room first: joining the busiest table is more likely to start a
-// game than padding out a room with one bored person in it.
-async function handleJoinLive() {
-    const target = [...live.joinable.value].sort((a, b) => b.players - a.players)[0]
-    if (!target || mpStore.loading) return
+// The card's own table first, so its count is the table you land at. When it
+// filled or started between poll and tap, or there is none, quick match finds
+// another open room or opens a new House table.
+async function handleTakeSeat() {
+    if (mpStore.loading) return
     roomEnded.value = false
-    const joined = await mpStore.joinGame(target.code, 'live')
-    // The room may have filled or started between poll and click.
-    if (!joined) await live.refresh()
-}
-
-async function handleQuickMatch() {
-  roomEnded.value = false
-  await mpStore.quickMatch(selectedStackingMode.value)
+    const target = tableView.value.target
+    if (target && (await mpStore.joinGame(target.code, 'live'))) return
+    if (target) void live.refresh()
+    await mpStore.quickMatch(PUBLIC_TABLE_RULES)
 }
 
 async function joinGame() {
@@ -1104,6 +1098,19 @@ const accountOpen = ref(false)
 const accountRef = ref<HTMLElement | null>(null)
 
 function closeAccount() { accountOpen.value = false }
+
+const whatsNewRef = ref<InstanceType<typeof WhatsNew> | null>(null)
+const { unread: whatsNewUnread } = useWhatsNew()
+
+function openWhatsNewFromMenu() {
+    closeAccount()
+    whatsNewRef.value?.openPanel()
+}
+
+function claimFromMenu() {
+    closeAccount()
+    upgradeAccount()
+}
 
 function onDocPointer(e: PointerEvent) {
     if (!accountOpen.value) return
@@ -1453,11 +1460,11 @@ function copyLink() {
 }
 
 .upgrade-link {
-  color: var(--color-neon-blue);
+  color: var(--color-hazard);
 }
 
 .upgrade-link:hover {
-  color: var(--color-hazard);
+  color: var(--text-primary);
 }
 
 /* CONTENT */
@@ -1866,6 +1873,7 @@ function copyLink() {
 /* Today's board reads as a footnote on a phone, not a headline: on narrow
    screens it drops below the ways to play. Inert on the desktop grid, where
    every card is placed explicitly. */
+.public-table { order: 1; }
 .board-card { order: 2; }
 .streak-keep-link { order: 3; }
 
@@ -1902,9 +1910,14 @@ function copyLink() {
   }
   .daily-card       { grid-column: 1; grid-row: 2; }
   .create-card      { grid-column: 2; grid-row: 2; }
-  .board-card       { grid-column: 1; grid-row: 3; }
-  .mode-list        { grid-column: 2; grid-row: 3; }
-  .streak-keep-link { grid-column: 1 / -1; grid-row: 4; }
+  .board-card       { grid-column: 1; grid-row: 3 / span 2; }
+  .public-table     { grid-column: 2; grid-row: 3; }
+  .mode-list        { grid-column: 2; grid-row: 4; }
+  /* Side by side here. .lobby-entry > outranks the base .mode-list, which
+     comes later in this file. */
+  .lobby-entry > .mode-list { flex-direction: row; }
+  .mode-list > .mode-item { flex: 1; min-width: 0; }
+  .streak-keep-link { grid-column: 1 / -1; grid-row: 5; }
 
   /* Whichever card is shorter gets stretched to its row, so pin the board's
      link to the bottom — the slack then lands in the list, where more entries
@@ -1927,10 +1940,32 @@ function copyLink() {
   padding: var(--spacing-4);
 }
 
-.mode-row {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-3);
+.create-eyebrow {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: var(--color-alert);
+}
+
+.create-note {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+@media (min-width: 601px) {
+  .create-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+  .create-card > * { grid-column: 1 / -1; }
+  .create-card > .create-eyebrow { grid-column: 1; grid-row: 1; }
+  .create-card > .mode-pills { grid-column: 2; grid-row: 1; }
+  .create-card > .create-btn { justify-self: start; width: min(300px, 100%); }
 }
 
 .mode-desc {
@@ -1939,13 +1974,6 @@ function copyLink() {
   font-size: var(--text-xs);
   color: var(--text-muted);
   line-height: 1.5;
-}
-
-.mode-label {
-  font-family: var(--font-body);
-  font-size: var(--text-xs);
-  color: var(--text-muted);
-  flex-shrink: 0;
 }
 
 /* One hairline container holds all three options, so the group reads as a
@@ -1991,24 +2019,7 @@ function copyLink() {
 .mode-list {
   display: flex;
   flex-direction: column;
-  background: rgba(255, 255, 255, 0.025);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: var(--radius-md);
-  padding: var(--spacing-2);
-}
-
-.mode-overline-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--spacing-2);
-}
-
-.mode-overline {
-  font-family: var(--font-body);
-  font-size: var(--text-xs);
-  color: var(--text-muted);
-  padding: var(--spacing-1) var(--spacing-2) var(--spacing-2);
+  gap: var(--spacing-3);
 }
 
 .chip-badge,
@@ -2032,33 +2043,18 @@ function copyLink() {
   margin-left: auto;
 }
 
-.mode-online {
-  display: inline-flex;
-  align-items: center;
-  padding: var(--spacing-1) var(--spacing-2) var(--spacing-2);
-  font-family: var(--font-mono);
-  font-size: 0.62rem;
-  letter-spacing: 0.12em;
-  color: var(--color-neon-green);
-  white-space: nowrap;
-}
-
 .mode-item {
   display: flex;
   align-items: center;
   gap: var(--spacing-3);
   min-height: 60px;
-  padding: var(--spacing-3);
-  background: none;
-  border: none;
-  border-radius: var(--radius-sm);
+  padding: var(--spacing-3) var(--spacing-4);
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: var(--radius-md);
   text-align: left;
   cursor: pointer;
   transition: background var(--duration-snap) var(--ease-snap);
-}
-
-.mode-item + .mode-item {
-  box-shadow: 0 -1px 0 rgba(255, 255, 255, 0.055);
 }
 
 .mode-item:hover:not(:disabled) {
@@ -2132,6 +2128,135 @@ function copyLink() {
 .account-item:hover {
   background: rgba(255, 255, 255, 0.06);
   color: #fff;
+}
+
+/* Phones only: the burger replaces What's new, the name chip and the claim
+   link, and the menu grows the rows they used to be. Same 640px as the
+   What's new sheet, so the panel the menu opens is always the sheet. */
+.menu-burger,
+.menu-phone {
+  display: none;
+}
+
+.menu-burger {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+/* Phones only: dims the page under the open menu; a tap on it closes the
+   menu through the same outside-pointer handler as everywhere else. */
+.menu-scrim {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.burger-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-alert);
+  box-shadow: 0 0 0 2px var(--bg-concrete);
+}
+
+.menu-who {
+  align-items: center;
+  gap: var(--spacing-3);
+  padding: var(--spacing-3);
+}
+
+.menu-who-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.menu-who-name {
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menu-who-kind {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.menu-claim {
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  margin: 0 var(--spacing-3) var(--spacing-3);
+  background: rgba(255, 204, 0, 0.06);
+  border: 1px solid rgba(255, 204, 0, 0.4);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: var(--color-hazard);
+  cursor: pointer;
+}
+
+.account-item--first {
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0;
+}
+
+.menu-new {
+  font-family: var(--font-body);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: var(--color-alert);
+}
+
+@media (max-width: 640px) {
+  .menu-burger,
+  .menu-phone {
+    display: flex;
+  }
+
+  .menu-scrim {
+    display: block;
+  }
+
+  /* Above the scrim, so the X that closes the menu stays lit. */
+  .menu-burger {
+    z-index: 61;
+  }
+
+  /* .top-bar-cta > raises specificity over WhatsNew's own scoped display. */
+  .username-chip,
+  .upgrade-link,
+  .top-bar-cta > .bar-whatsnew {
+    display: none;
+  }
+
+  .account-menu {
+    min-width: 17rem;
+  }
 }
 
 .account-item--out {
@@ -2212,42 +2337,6 @@ function copyLink() {
 
 @media (prefers-reduced-motion: reduce) {
   .mode-tip { transition: none; }
-}
-
-.mode-glyph--live {
-  color: var(--color-neon-green);
-}
-
-/* Slightly lifted from the neighbouring rows: this one is only on screen when
-   there is genuinely someone to play against, so it should read as the live
-   option rather than another menu item. */
-.mode-item--live {
-  border-color: rgba(0, 255, 102, 0.22);
-  background: rgba(0, 255, 102, 0.04);
-}
-
-.mode-item--live:hover:not(:disabled) {
-  border-color: rgba(0, 255, 102, 0.45);
-}
-
-.live-dot {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  margin-right: var(--spacing-2);
-  border-radius: 50%;
-  background: var(--color-neon-green);
-  vertical-align: middle;
-  animation: live-pulse 2s ease-in-out infinite;
-}
-
-@keyframes live-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.35; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .live-dot { animation: none; }
 }
 
 .mode-glyph--dim {
@@ -2593,6 +2682,7 @@ function copyLink() {
 .entry-heading {
   font-family: var(--font-display);
   font-size: 1.9rem;
+  text-wrap: balance;
   letter-spacing: 0.08em;
   color: var(--text-primary);
   text-align: center;
@@ -2963,14 +3053,8 @@ function copyLink() {
     gap: var(--spacing-4);
   }
 
-  .mode-row {
-    flex-direction: column;
-    align-items: stretch;
-    gap: var(--spacing-2);
-  }
-
-  /* Label stacks above the control here, so the control spans the column
-     rather than right-anchoring away from its own label. */
+  /* The picker sits under the eyebrow and note here, so it spans the column
+     rather than right-anchoring away from its label. */
   .mode-pills {
     width: 100%;
     margin-left: 0;

@@ -156,6 +156,9 @@ onUnmounted(() => {
     window.removeEventListener('click', onClickAway)
     sheetMql?.removeEventListener('change', onSheetChange)
 })
+
+// The lobby's phone menu opens the panel from its own row.
+defineExpose({ openPanel })
 </script>
 
 <style scoped>

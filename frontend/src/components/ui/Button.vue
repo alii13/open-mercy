@@ -3,7 +3,7 @@ import { vFocusRing } from '@/directives/focusRing'
 
 withDefaults(
   defineProps<{
-    variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'hazard'
+    variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'hazard' | 'amber'
     size?: 'sm' | 'md' | 'lg'
     type?: 'button' | 'submit' | 'reset'
     disabled?: boolean
@@ -145,5 +145,16 @@ withDefaults(
 .btn--hazard:hover:not(:disabled) {
   transform: translateY(-2px);
   box-shadow: var(--shadow-glow-yellow);
+}
+
+/* amber — solid lamp amber, the public table's seat button */
+.btn--amber {
+  background: var(--color-lamp);
+  border-color: var(--color-lamp);
+  color: var(--bg-concrete);
+}
+.btn--amber:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-glow-lamp);
 }
 </style>

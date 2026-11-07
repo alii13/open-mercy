@@ -61,6 +61,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: '2026-11-07',
+        level: 'loud',
+        tag: 'NEW',
+        title: 'Take a seat at a public table',
+        body: 'The home screen shows the public table and who is at it. Tap TAKE A SEAT to play strangers, no room code. House rules are now the default.',
+    },
+    {
         id: '2026-11-05',
         level: 'loud',
         tag: 'NEW',

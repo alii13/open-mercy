@@ -3,7 +3,7 @@ import { ref, computed, watch, toRaw } from 'vue'
 import type { Card, Player, GameState, TurnState, CardColor } from '../types/card'
 import * as engine from '@engine'
 import type { EngineEvent, EngineState } from '@engine'
-import { canPlayCard, getDrawValue, generateFullDeck, shuffleDeck, DEFAULT_STACKING_MODE } from '@engine'
+import { canPlayCard, getDrawValue, generateFullDeck, shuffleDeck } from '@engine'
 import {
     BOT_LADDER, botById, dailyBot, warmUp, chooseSwapTarget, chooseWildColor, chooseDiscardAllTop,
     chooseRouletteColor, wantsSwap, willCatchMercy,
@@ -106,7 +106,9 @@ export const useGameStore = defineStore('game', () => {
             const v = localStorage.getItem('uno_stacking_mode')
             if (v === 'official' || v === 'house' || v === 'casual') return v
         } catch { /* localStorage unavailable */ }
-        return DEFAULT_STACKING_MODE
+        // House until a player picks: the lobby's default for rooms and public tables.
+        // The engine's own default stays Official, since the server leans on it.
+        return 'house'
     }
     const stackingMode = ref<StackingMode>(loadStackingMode())
     function setStackingMode(m: StackingMode) {

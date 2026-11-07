@@ -95,6 +95,30 @@ describe('draw until playable at the mercy limit', () => {
     })
 })
 
+describe('rules a player starts on', () => {
+    const stored = new Map<string, string>()
+    beforeEach(() => {
+        stored.clear()
+        vi.stubGlobal('localStorage', {
+            getItem: (k: string) => stored.get(k) ?? null,
+            setItem: (k: string, v: string) => { stored.set(k, v) },
+            removeItem: (k: string) => { stored.delete(k) },
+        })
+    })
+    afterEach(() => vi.unstubAllGlobals())
+
+    it('is House for a player who has never picked', () => {
+        setActivePinia(createPinia())
+        expect(useGameStore().stackingMode).toBe('house')
+    })
+
+    it("keeps a player's own pick", () => {
+        stored.set('uno_stacking_mode', 'official')
+        setActivePinia(createPinia())
+        expect(useGameStore().stackingMode).toBe('official')
+    })
+})
+
 describe('initializeGame', () => {
     it('clears in-flight flags leaked from the previous game', () => {
         const store = useGameStore()
