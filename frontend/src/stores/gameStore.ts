@@ -814,6 +814,7 @@ export const useGameStore = defineStore('game', () => {
                     log: turnLog.value.join(''),
                 })
                 clearDailyProgress()
+                markDailyOpen(false)
                 // Separate from sp_game_finished, which cannot distinguish the
                 // daily from a practice game, and cannot see 'eliminated' at all.
                 track('daily_finished', { result: dailyResult, turns: dailyTurns })
@@ -974,9 +975,17 @@ export const useGameStore = defineStore('game', () => {
         return true
     }
 
-    /** On page load: reopen the daily only if this tab was still in it. */
-    function resumeDailyAfterReload(): boolean {
-        return isDailyOpen() && resumeDaily()
+    /**
+     * On page load: reopen the daily only if this tab was still in it. The flag is used up either way, so a boot
+     * that cannot reopen it (`blocked`: an invite link, a restored room, another page) leaves nothing set for a
+     * later reload to find. resumeDaily() sets it again when the daily does reopen.
+     */
+    function resumeDailyAfterReload(blocked: boolean): boolean {
+        // CONTINUE was tapped while the page was still loading: the daily is already on screen.
+        if (gameState.value !== 'LOBBY') return false
+        const open = isDailyOpen()
+        markDailyOpen(false)
+        return open && !blocked && resumeDaily()
     }
 
     return {

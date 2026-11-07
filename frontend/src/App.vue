@@ -324,10 +324,11 @@ onMounted(async () => {
   // so it would cover a restored room, an invite link or the claim screen.
   // Only if this tab was still in the game, too: a player who left for the
   // lobby stays there. The lobby's CONTINUE resumes it in all these cases.
+  // Called on every boot, blocked or not, so the tab's flag is always used up.
   const hasInvite = new URLSearchParams(window.location.search).has('join')
-  if (!mpStore.currentGame && !hasInvite && !showAuthView.value && currentRoute.value.name === 'home') {
-    localGameStore.resumeDailyAfterReload()
-  }
+  localGameStore.resumeDailyAfterReload(
+    !!mpStore.currentGame || hasInvite || showAuthView.value || currentRoute.value.name !== 'home',
+  )
 })
 
 // App remounts (HMR) would otherwise stack PASSWORD_RECOVERY listeners.

@@ -133,6 +133,8 @@ export function clearDailyProgress(): void {
 
 // Per tab, so it survives a reload of this tab but not leaving the game: a
 // player who went back to the lobby stays there after a reload, with CONTINUE.
+// Known limit: it means "this tab was in the daily", not "nobody left it since",
+// so a tab discarded mid-daily reopens it even if the daily was left in another tab.
 const DAILY_OPEN_KEY = 'uno_daily_open'
 
 export function markDailyOpen(open: boolean): void {
