@@ -52,7 +52,7 @@ const finite = (...v) => v.every(Number.isFinite)
 export async function createLounge({ canvas, overlay, artUrl, badgeUrl, reducedMotion = false }) {
   await Promise.all([document.fonts.load('64px "Black Ops One"'), document.fonts.load('600 16px "Chakra Petch"')])
 
-  // Phones and small screens get a lighter frame: fewer pixels, smaller shadow and felt maps, half the dust, no MSAA.
+  // Phones and small screens get a lighter frame: fewer pixels, smaller shadow and felt maps, half the dust.
   const lite = matchMedia('(pointer: coarse)').matches || Math.min(innerWidth, innerHeight) < 720
   // antialias stays off: the composer renders into its own target, which carries the MSAA instead.
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' })
@@ -68,7 +68,8 @@ export async function createLounge({ canvas, overlay, artUrl, badgeUrl, reducedM
   const BG = 0x040405
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(BG)
-  scene.fog = new THREE.FogExp2(BG, 0.055)
+  const FOG = 0.055
+  scene.fog = new THREE.FogExp2(BG, FOG)
   const pmrem = new THREE.PMREMGenerator(renderer)
   scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
   scene.environmentIntensity = 0.22
@@ -308,14 +309,18 @@ export async function createLounge({ canvas, overlay, artUrl, badgeUrl, reducedM
   pivot.add(cone)
 
   // A tall screen has empty height above the table, so the lamp hangs higher there and its beam fills it.
-  // The spot widens and strengthens with the drop, so the felt is lit the same from any height.
+  // The spot's angle and power follow the height, so the felt is lit the same from any height.
   let lampY = LAMP_Y, spotPower = 95
   function hang(y) {
+    // Dust rises to the bulb and restarts at the felt: a new height spreads it over the whole beam again.
+    if (y !== lampY) for (let i = 0; i < DUST; i++) dust.y[i] = rand(0.1, y - 0.2)
     lampY = y
-    pivot.position.y = y + 7
+    pivot.position.y = y - lamp.position.y
     cone.scale.y = (y + 0.05) / CONE_H
     cone.position.y = (y + 0.05) / 2 - pivot.position.y
     spot.angle = Math.atan(TABLE.rx / y)
+    // A pulse in flight would land on the old power.
+    gsap.killTweensOf(spot, 'intensity')
     spot.intensity = spotPower = 95 * (y / LAMP_Y) ** 2
     spot.shadow.camera.far = y + 5
     spot.shadow.camera.updateProjectionMatrix()
@@ -772,6 +777,9 @@ export async function createLounge({ canvas, overlay, artUrl, badgeUrl, reducedM
     const d = Math.max(7.6, (portrait ? TABLE.rx - 0.3 : TABLE.rx + 0.05) / Math.tan(hf))
     base.look.set(0, portrait ? 1.6 : 0.2, 0.1)
     base.pos.copy(base.look).addScaledVector(dir, d)
+    // The fog is tuned for the desktop camera, about 8.5 from the felt. A portrait camera stands further back,
+    // so its fog thins to match and the felt and cards read as bright as on desktop.
+    scene.fog.density = portrait ? (FOG * 8.5) / d : FOG
     for (const p of players.values()) sizeSeat(p)
   }
 
@@ -874,7 +882,10 @@ export async function createLounge({ canvas, overlay, artUrl, badgeUrl, reducedM
   canvas.addEventListener('lostpointercapture', dropDrag, { signal })
 
   // ------------------------------------------------------------ loop
-  const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 }))
+  // A GPU may render half-float targets without multisampling them, so ask before asking for 4x.
+  const gl = renderer.getContext()
+  const samples = Math.min(4, Math.max(0, ...gl.getInternalformatParameter(gl.RENDERBUFFER, gl.RGBA16F, gl.SAMPLES)))
+  const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples }))
   composer.setPixelRatio(renderer.getPixelRatio())
   composer.addPass(new RenderPass(scene, camera))
   const bloom = new UnrealBloomPass(new THREE.Vector2(512, 512), 0.6, 0.55, 1.6)
