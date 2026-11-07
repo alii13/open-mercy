@@ -103,7 +103,7 @@
 
     <!-- Playing multiplayer game -->
     <MultiplayerGameView
-      v-else-if="mpStore.currentGame && (mpStore.currentGame.status === 'playing' || mpStore.currentGame.status === 'finished')"
+      v-else-if="mpStore.currentGame && (mpStore.currentGame.status === 'playing' || mpStore.currentGame.status === 'finished') && !mpStore.loungeShow"
       @claim-account="handleShowAuth('claim')"
     />
 

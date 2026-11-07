@@ -27,7 +27,8 @@ export interface Lounge {
     pulse(strength?: number): void
     readonly players: Map<string, unknown>
     onIntent(fn: (i: LoungeIntent) => void): void
-    onEvent(fn: (e: { text: string }) => void): void
+    /** `kind` marks the moments that make a sound: a card leaving the deck, a flick landing. */
+    onEvent(fn: (e: { text: string; kind?: 'draw' | 'hit' }) => void): void
     readonly busy: boolean
     stats(): { geometries: number; textures: number }
     dispose(): void

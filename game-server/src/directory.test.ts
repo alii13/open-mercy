@@ -79,6 +79,14 @@ describe('dirCodes', () => {
         expect(dirCodes(dir)).toEqual([])
     })
 
+    it('never offers a full table, so the next player starts a new one', () => {
+        const dir = {
+            FULL: { at: NOW, players: 7, connected: 7, seatsFree: 0, status: 'lobby' },
+            NEXT: { at: NOW + 10, players: 1, connected: 1, seatsFree: 6, status: 'lobby' },
+        }
+        expect(dirCodes(dir)).toEqual(['NEXT'])
+    })
+
     it('treats a legacy entry with no flag as joinable', () => {
         expect(dirCodes({ OLD: NOW })).toEqual(['OLD'])
     })

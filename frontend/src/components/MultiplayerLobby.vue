@@ -325,7 +325,7 @@
       <!-- A public room waits at the 3D table; private rooms, and any browser
            that cannot draw it, keep the list below. -->
       <PublicTableLounge
-        v-else-if="mpStore.gameStatus === 'waiting' && mpStore.isPublicRoom && !loungeFailed"
+        v-else-if="(mpStore.gameStatus === 'waiting' || mpStore.loungeShow) && mpStore.isPublicRoom && !loungeFailed"
         @fallback="loungeFailed = true"
         @leave="showLeaveConfirm = true"
       />
@@ -482,27 +482,13 @@
             </template>
           </div>
 
-          <!-- Public rooms deal themselves once two players are seated; the
-               server owns the clock, this only renders it. -->
+          <!-- A public table deals itself 15 s after its seventh player sits;
+               the server owns the clock, this only renders it. -->
           <AutoStartRing
             v-if="mpStore.autoStart"
             class="table-ring"
             :deadline="mpStore.autoStart.deadline"
-            :paused="mpStore.autoStart.paused"
           />
-
-          <!-- Waiting for a friend who is nearly here: the room can hold the
-               door open one extra minute, once, and then it deals. -->
-          <button
-            v-if="mpStore.autoStart && !mpStore.autoStart.paused && mpStore.autoStart.bumpsLeft > 0"
-            class="hold-row"
-            type="button"
-            title="Hold the room open one more minute"
-            @click="mpStore.extendAutoStart()"
-          >
-            <Clock class="hold-glyph" :size="14" :stroke-width="2" aria-hidden="true" />
-            WAIT LONGER
-          </button>
 
           <!-- The wait teaches the game; the tip lives with the table. -->
           <Transition name="tip-fade" mode="out-in">
@@ -650,7 +636,7 @@
 
 <script setup lang="ts">
 import { ref, computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, watch } from 'vue'
-import { ArrowRight, Bot, Check, ChevronDown, ChevronRight, Clock, Copy, Flame, Hash, HelpCircle, Menu as MenuIcon, Minus, Pencil, Share2, Skull, Users, Volume1, VolumeX, X } from 'lucide-vue-next'
+import { ArrowRight, Bot, Check, ChevronDown, ChevronRight, Copy, Flame, Hash, HelpCircle, Menu as MenuIcon, Minus, Pencil, Share2, Skull, Users, Volume1, VolumeX, X } from 'lucide-vue-next'
 import { useRetentionStore } from '../stores/retentionStore'
 import {
     getDailyRecord, fetchServerDailyRecord, dailyGridCells, buildDailyShareText, loadDailyProgress,
@@ -995,7 +981,7 @@ function openFriends() {
 }
 onMounted(() => live.start())
 
-const tableView = computed(() => publicTableView(live.joinable.value, live.inProgressCount.value, live.loaded.value))
+const tableView = computed(() => publicTableView(live.joinable.value, live.loaded.value))
 
 // Quick match picks the same table the card describes, the fullest open room by
 // connected players, and refuses one that dealt between poll and tap. With none
@@ -2572,31 +2558,6 @@ function copyLink() {
   align-self: center;
   padding-top: var(--spacing-2);
 }
-
-.hold-row {
-  align-self: center;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--spacing-2);
-  padding: var(--spacing-1) var(--spacing-3);
-  background: transparent;
-  border: 1px solid rgba(0, 243, 255, 0.22);
-  border-radius: var(--radius-sm);
-  color: var(--text-secondary);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  letter-spacing: 0.14em;
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s, color 0.15s;
-}
-
-.hold-row:hover {
-  background: rgba(0, 243, 255, 0.08);
-  border-color: rgba(0, 243, 255, 0.45);
-  color: var(--text-primary);
-}
-
-.hold-glyph { color: var(--color-neon-blue); flex-shrink: 0; }
 
 .players-list {
   display: flex;

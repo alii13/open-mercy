@@ -37,9 +37,6 @@ export type ClientMsg =
     | { t: 'rename'; name: string }
     | { t: 'kick'; userId: string }
     | { t: 'start'; stackingMode?: StackingMode }
-    // Hold the public lobby open a minute longer. Anyone at the table may
-    // press it; the allowance is the room's, not the player's.
-    | { t: 'extend-start' }
     // Ask a player to this room. It rides the room socket rather than going
     // to Supabase from the client, because only the room can confirm the
     // sender is in it - see game-server/src/invites.ts.
@@ -123,12 +120,10 @@ export type ServerMsg =
     // isPublic: a quick-match room, which the client shows as the 3D table.
     // Older servers omit it, and the client keeps the list view.
     | { t: 'hello'; roomCode: string; userId: string; hostUserId: string | null; isPublic?: boolean }
-    // autoStartInMs: countdown remaining for a public lobby, sent as a
-    // duration so client clock skew cannot bend it; absent = no countdown.
-    // autoStartPaused: the room dipped below the minimum and the clock froze.
-    // autoStartBumpsLeft: extensions the room can still buy; 0 hides the button.
+    // autoStartInMs: countdown remaining once a public table is full, sent as
+    // a duration so client clock skew cannot bend it; absent = no countdown.
     // spots: each seated player's last spot on the 3D table, for a late joiner.
-    | { t: 'presence'; players: PresencePlayer[]; autoStartInMs?: number; autoStartPaused?: boolean; autoStartBumpsLeft?: number; spots?: Record<string, [number, number]> }
+    | { t: 'presence'; players: PresencePlayer[]; autoStartInMs?: number; spots?: Record<string, [number, number]> }
     | { t: 'pong'; now: number }
     | { t: 'snapshot'; seq: number; game: PersonalView }
     | { t: 'event'; seq: number; ev: GameEvent; intentId?: string }

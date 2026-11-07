@@ -8,6 +8,9 @@
  * the deck at the origin.
  */
 
+/** A public table seats seven; the next stranger starts a new table. */
+export const PUBLIC_SEATS = 7
+
 export const LOUNGE_TABLE = { rx: 4.9, rz: 3.05 } as const
 
 /** Card art the deck can show, by file name in frontend/src/assets/cards-webp. */

@@ -27,7 +27,7 @@ const props = defineProps<{
   /** Local-clock epoch ms when the room deals itself. */
   deadline: number
   /** Below the minimum — the clock is frozen at its remainder. */
-  paused: boolean
+  paused?: boolean
 }>()
 
 const motion = useMotion()

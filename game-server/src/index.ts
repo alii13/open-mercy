@@ -11,8 +11,8 @@ import { createAllowed } from './createLimit'
 import { addParticipant, createMeeting, deactivateMeeting, voiceConfigured, type VoiceEnv } from './voice'
 import { gcWindowMs } from './roomGc'
 import { ROOM_CODE_ALPHABET, isRoomCode, normalizeRoomCode } from '../../shared/roomCode'
-import { canSeat, MAX_PLAYERS } from './seats'
-import { autoStartTick, autoStartBump, autoStartBumpsLeft, AUTO_START_MIN_PLAYERS, type AutoStartState } from './autoStart'
+import { canSeat, MAX_PLAYERS, PUBLIC_SEATS } from './seats'
+import { autoStartTick } from './autoStart'
 import { chatAllowed, loungeAllowed } from './chatLimit'
 import { cleanLoungeAct } from '../../shared/lounge'
 import { sendRoomInvite } from './invites'
@@ -242,12 +242,6 @@ interface RoomTimers {
     catchFor?: string
     // Auto-start for public lobbies (see autoStart.ts for the transitions).
     startAt?: number
-    startLeftMs?: number
-    // User ids counted into the clock. Rooms that armed a clock under the
-    // build that stored a count hold a number here - readers must tolerate it.
-    startSeen?: string[] | number
-    /** Extensions the room has already bought. */
-    startBumps?: number
 }
 
 type SocketTag = { userId: string } | null
@@ -550,10 +544,22 @@ export class GameRoomDO {
                 return
             }
             const roster = (await this.ctx.storage.get<Record<string, RosterEntry>>('roster')) ?? {}
-            if (!canSeat(roster, verified.userId)) {
-                this.send(ws, { t: 'error', code: 'room-full' })
-                ws.close(1008, 'room full')
-                return
+            if (!canSeat(roster, verified.userId, room.isPublic ? PUBLIC_SEATS : MAX_PLAYERS)) {
+                // A full public lobby hands a closed tab's seat to the next
+                // stranger: otherwise one ghost keeps a seven-seat table from
+                // ever dealing.
+                await this.loadGame()
+                const live = new Set(this.roomSockets(ws).map(s => s.userId))
+                const ghost = room.isPublic && this.roomStatus() === 'lobby'
+                    ? Object.keys(roster).find(id => !live.has(id))
+                    : undefined
+                if (!ghost) {
+                    this.send(ws, { t: 'error', code: 'room-full' })
+                    ws.close(1008, 'room full')
+                    return
+                }
+                delete roster[ghost]
+                this.loungeSpots.delete(ghost)
             }
             const entry = roster[verified.userId]
             const name = cleanName(msg.name)
@@ -763,11 +769,8 @@ export class GameRoomDO {
                     // A manual start beats the countdown to the punch —
                     // disarm it so the alarm doesn't fire into a running game.
                     const t = await this.getTimers()
-                    if (t.startAt !== undefined || t.startLeftMs !== undefined) {
+                    if (t.startAt !== undefined) {
                         delete t.startAt
-                        delete t.startLeftMs
-                        delete t.startSeen
-                        delete t.startBumps
                         await this.putTimers(t)
                     }
                 }
@@ -778,26 +781,6 @@ export class GameRoomDO {
                     await this.refreshDirectory(await this.ctx.storage.get<Record<string, RosterEntry>>('roster') ?? {})
                 }
                 await this.broadcastGame(events)
-                return
-            }
-
-            case 'extend-start': {
-                // Anyone at the table can hold the lobby open; the allowance
-                // is the room's, so the second press is refused for everyone.
-                await this.loadGame()
-                if (this.roomStatus() !== 'lobby') return
-                const t = await this.getTimers()
-                // A private room never arms this clock, so the bump is a
-                // no-op there and needs no visibility check of its own.
-                const prev: AutoStartState = { at: t.startAt, bumps: t.startBumps }
-                const next = autoStartBump(prev, Date.now())
-                if (next.at === prev.at) return
-                t.startAt = next.at
-                t.startBumps = next.bumps
-                await this.putTimers(t)
-                await this.touchGc()
-                // One ring, one deadline: everybody's clock moves together.
-                await this.broadcastPresence()
                 return
             }
 
@@ -902,7 +885,7 @@ export class GameRoomDO {
         if (turnDue) { delete t.turnAt; delete t.turnSeat }
 
         const startDue = !!t.startAt && t.startAt <= now
-        if (startDue) { delete t.startAt; delete t.startLeftMs; delete t.startSeen; delete t.startBumps }
+        if (startDue) delete t.startAt
 
         const gcDue = !!t.gcAt && t.gcAt <= now
         if (gcDue) t.gcAt = now + gcWindowMs(await this.isRoomPublic())
@@ -947,7 +930,7 @@ export class GameRoomDO {
             const roomRec = await this.ctx.storage.get<RoomRecord>('room')
             const connected = new Set(this.roomSockets().map(x => x.userId))
             const seated = (await this.rosterList()).filter(r => connected.has(r.userId))
-            if (roomRec?.isPublic && this.roomStatus() === 'lobby' && seated.length >= AUTO_START_MIN_PLAYERS) {
+            if (roomRec?.isPublic && this.roomStatus() === 'lobby' && seated.length >= PUBLIC_SEATS) {
                 const { game, events } = startGame(seated, roomRec.stackingMode as StackingMode)
                 this.game = game
                 await this.refreshDirectory(await this.ctx.storage.get<Record<string, RosterEntry>>('roster') ?? {})
@@ -994,7 +977,7 @@ export class GameRoomDO {
             .map(([userId, entry]) => ({ userId, name: entry.name, connected: connectedIds.has(userId), skin: entry.skin }))
         // Presence changes are exactly when the auto-start clock moves, so the
         // frame carries it and the clients never need to poll.
-        const auto = await this.tickAutoStart([...connectedIds], Object.keys(roster).length)
+        const auto = await this.tickAutoStart(connectedIds.size)
         const spots = Object.fromEntries([...this.loungeSpots].filter(([id]) => id in roster))
         const frame: ServerMsg = { t: 'presence', players, ...auto, ...(Object.keys(spots).length ? { spots } : {}) }
         for (const { ws } of sockets) {
@@ -1006,39 +989,17 @@ export class GameRoomDO {
     }
 
     /** Advance the auto-start clock; returns the presence-frame fields. */
-    private async tickAutoStart(connectedIds: string[], seated: number): Promise<{ autoStartInMs?: number; autoStartPaused?: boolean; autoStartBumpsLeft?: number }> {
+    private async tickAutoStart(connected: number): Promise<{ autoStartInMs?: number }> {
         if (!(await this.isRoomPublic())) return {}
         await this.loadGame()
         const t = await this.getTimers()
-        const prev: AutoStartState = {
-            at: t.startAt,
-            leftMs: t.startLeftMs,
-            // A clock armed by the count-storing build holds a number - drop
-            // it and let identity tracking rebuild from this tick.
-            seen: Array.isArray(t.startSeen) ? t.startSeen : undefined,
-            bumps: t.startBumps,
-        }
         const now = Date.now()
-        const next = autoStartTick(prev, {
-            isPublic: true,
-            phase: this.roomStatus(),
-            connectedIds,
-            seatsFree: Math.max(0, MAX_PLAYERS - seated),
-            now,
-        })
-        const seenChanged = (next.seen ?? []).join(',') !== (prev.seen ?? []).join(',')
-        if (next.at !== prev.at || next.leftMs !== prev.leftMs || next.bumps !== prev.bumps || seenChanged || typeof t.startSeen === 'number') {
+        const next = autoStartTick({ at: t.startAt }, { isPublic: true, phase: this.roomStatus(), connected, now })
+        if (next.at !== t.startAt) {
             if (next.at === undefined) delete t.startAt; else t.startAt = next.at
-            if (next.leftMs === undefined) delete t.startLeftMs; else t.startLeftMs = next.leftMs
-            if (next.seen === undefined) delete t.startSeen; else t.startSeen = next.seen
-            if (next.bumps === undefined) delete t.startBumps; else t.startBumps = next.bumps
             await this.putTimers(t)
         }
-        if (next.at !== undefined) {
-            return { autoStartInMs: Math.max(0, next.at - now), autoStartBumpsLeft: autoStartBumpsLeft(next) }
-        }
-        if (next.leftMs !== undefined) return { autoStartInMs: next.leftMs, autoStartPaused: true }
-        return {}
+        return next.at === undefined ? {} : { autoStartInMs: Math.max(0, next.at - now) }
     }
 
     /**
@@ -1069,7 +1030,8 @@ export class GameRoomDO {
                     snapshot: {
                         players,
                         connected,
-                        seatsFree: Math.max(0, MAX_PLAYERS - players),
+                        // By who is connected: the door hands a closed tab's seat to the next stranger.
+                        seatsFree: Math.max(0, PUBLIC_SEATS - connected),
                         // Kept alongside status so a rollback still reads sane entries.
                         inProgress: this.roomStatus() === 'playing',
                         status: this.roomStatus(),

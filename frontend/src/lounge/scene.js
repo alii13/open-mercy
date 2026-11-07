@@ -573,7 +573,7 @@ export async function createLounge({ canvas, overlay, artUrl, badgeUrl, reducedM
           const q = players.get(hit)
           if (q) {
             q.wv += path.length % 2 ? 6 : -6
-            emit('event', { text: `${p.name} hit ${q.you ? 'you' : q.name}` })
+            emit('event', { text: `${p.name} hit ${q.you ? 'you' : q.name}`, kind: 'hit' })
           }
         }
       },
@@ -628,7 +628,7 @@ export async function createLounge({ canvas, overlay, artUrl, badgeUrl, reducedM
     c.position.set(DECK_AT.x, deckTop() + 0.004, DECK_AT.z)
     c.rotation.set(Math.PI / 2, deck.rotation.y, 0)
     scene.add(c)
-    emit('event', { text: `${next.who} drew ${FACES[next.face]}` })
+    emit('event', { text: `${next.who} drew ${FACES[next.face]}`, kind: 'draw' })
     const camYaw = Math.atan2(camera.position.x - DECK_AT.x, camera.position.z - DECK_AT.z)
     const rest = pileSpot()
     drawTl = gsap.timeline({ onComplete: nextDraw }).timeScale(1 + drawQueue.length)

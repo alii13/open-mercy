@@ -134,9 +134,11 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
     // Public-lobby auto-start countdown, mirrored from presence frames. The
     // server sends a duration; anchoring it to the local clock here makes the
     // deadline immune to client clock skew.
-    // bumpsLeft is the room's remaining allowance to hold the lobby open; an
-    // older worker sends none, so the button simply never shows.
-    const autoStart = ref<{ deadline: number; paused: boolean; bumpsLeft: number } | null>(null)
+    const autoStart = ref<{ deadline: number } | null>(null)
+    // The 3D table's 3-2-1 and deal outlast the room's own start by a few
+    // seconds; while this is set the lobby keeps the table up and the game
+    // view waits.
+    const loungeShow = ref(false)
     // Quick chat: newest frame (drives bubbles) + a capped per-match log.
     // Mutes are client-side and room-scoped — a muted sender's frames are
     // dropped at receive, instantly and without a server round trip.
@@ -301,11 +303,7 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
                 presence.value = msg.players
                 loungeSpots.value = msg.spots ?? {}
                 autoStart.value = typeof msg.autoStartInMs === 'number'
-                    ? {
-                        deadline: Date.now() + msg.autoStartInMs,
-                        paused: !!msg.autoStartPaused,
-                        bumpsLeft: msg.autoStartBumpsLeft ?? 0,
-                    }
+                    ? { deadline: Date.now() + msg.autoStartInMs }
                     : null
                 break
 
@@ -657,18 +655,6 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
         })
     }
 
-    /** Ask the room to wait a minute longer before it deals itself. */
-    function extendAutoStart() {
-        if (!autoStart.value?.bumpsLeft) return
-        sendMsg({ t: 'extend-start' })
-        // Spend the allowance locally too. It belongs to the room, so a
-        // second press can only ever be refused - and the server refuses it
-        // silently, which used to leave a live-looking button on screen until
-        // some other presence change happened to arrive. Two players pressing
-        // together is exactly when that bites.
-        autoStart.value = { ...autoStart.value, bumpsLeft: 0 }
-    }
-
     function toggleChatMute(userId: string) {
         const next = new Set(mutedChatIds.value)
         if (next.has(userId)) next.delete(userId)
@@ -711,6 +697,7 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
         lastStackEaten.value = null
         lastMercyCall.value = null
         autoStart.value = null
+        loungeShow.value = false
         lastChat.value = null
         isPublicRoom.value = false
         loungeSpots.value = {}
@@ -1031,7 +1018,7 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
         lastMercyCall,
         lastBadgeUp,
         autoStart,
-        extendAutoStart,
+        loungeShow,
         sendInvite,
         lastChat,
         isPublicRoom,

@@ -96,6 +96,8 @@ export function dirCodes(raw: Record<string, DirEntry | number> | undefined): st
     const dir = normalizeDir(raw)
     return Object.entries(dir)
         .filter(([, e]) => entryStatus(e) === 'lobby')
+        // A full table is counting down: the next player starts a new one.
+        .filter(([, e]) => (e.seatsFree ?? 1) > 0)
         .sort((a, b) => filling(b[1]) - filling(a[1]) || a[1].at - b[1].at)
         .map(([code]) => code)
 }

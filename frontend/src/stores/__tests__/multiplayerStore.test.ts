@@ -863,15 +863,11 @@ describe('lobby auto-start countdown', () => {
         const mp = useMultiplayerStore()
         const ws = await joinRoom(mp)
 
-        ws.receive({ t: 'presence', players: seats, autoStartInMs: 60_000, autoStartBumpsLeft: 1 })
-        expect(mp.autoStart?.paused).toBe(false)
+        ws.receive({ t: 'presence', players: seats, autoStartInMs: 15_000 })
         // Sent as a duration; the store anchors it to its own clock.
-        expect(mp.autoStart!.deadline).toBeGreaterThan(Date.now() + 59_000)
+        expect(mp.autoStart!.deadline).toBeGreaterThan(Date.now() + 14_000)
 
-        ws.receive({ t: 'presence', players: seats.slice(0, 1), autoStartInMs: 12_000, autoStartPaused: true })
-        expect(mp.autoStart?.paused).toBe(true)
-
-        // A frame with no countdown clears it (old worker, private room).
+        // A frame with no countdown clears it (someone left, private room).
         ws.receive({ t: 'presence', players: seats })
         expect(mp.autoStart).toBeNull()
     })
@@ -883,27 +879,6 @@ describe('lobby auto-start countdown', () => {
 
         ws.receive({ t: 'event', seq: 1, ev: { t: 'STARTED' } })
         expect(mp.autoStart).toBeNull()
-    })
-
-    it('asks for more time only while the room still has an extension', async () => {
-        const mp = useMultiplayerStore()
-        const ws = await joinRoom(mp)
-
-        ws.receive({ t: 'presence', players: seats, autoStartInMs: 60_000, autoStartBumpsLeft: 1 })
-        mp.extendAutoStart()
-        expect(ws.lastSent()).toEqual({ t: 'extend-start' })
-
-        // The button goes as the press lands, not when the next frame does:
-        // the allowance is the room's, so a second press could only be
-        // refused, and the server refuses it without a word.
-        expect(mp.autoStart?.bumpsLeft).toBe(0)
-        const sentBefore = ws.sent.length
-        mp.extendAutoStart()
-        expect(ws.sent.length).toBe(sentBefore)
-
-        // The server's own count agrees on the next frame.
-        ws.receive({ t: 'presence', players: seats, autoStartInMs: 118_000, autoStartBumpsLeft: 0 })
-        expect(mp.autoStart?.bumpsLeft).toBe(0)
     })
 
     it('sends an invite on the room socket and waits for the room to answer', async () => {
@@ -932,14 +907,6 @@ describe('lobby auto-start countdown', () => {
         ws.receive({ t: 'invite-result', userId: 'someone-else', result: 'sent' })
         ws.receive({ t: 'invite-result', userId: 'friend-1', result: 'sent' })
         expect(await pending).toBe('sent')
-    })
-
-    it('reads an old worker frame as no extension on offer', async () => {
-        const mp = useMultiplayerStore()
-        const ws = await joinRoom(mp)
-
-        ws.receive({ t: 'presence', players: seats, autoStartInMs: 30_000 })
-        expect(mp.autoStart?.bumpsLeft).toBe(0)
     })
 })
 

@@ -3,10 +3,11 @@
  *
  * The card describes the table quick match will seat you at: the fullest open
  * public room by connected players, the same measure the directory sorts on.
- * With nothing open, a tap opens a new House table. The wording follows today's server: a public room
- * deals itself on a clock that starts once two players are in.
+ * A table seats seven and deals itself once all seven are in, so a full one is
+ * never shown: the next player starts a new House table.
  */
 
+import { PUBLIC_SEATS } from '@lounge'
 import type { LiveTable } from '../composables/useLiveTables'
 
 /** Rules a new public table opens with. */
@@ -26,29 +27,28 @@ const SIT_DOWN = 'Play people from anywhere, right now. No code to share, and th
 /** People actually at the table: a closed tab keeps its seat but not its socket. */
 const present = (t: LiveTable) => t.connected ?? t.players
 
-export function publicTableView(joinable: LiveTable[], inProgress: number, loaded: boolean): PublicTableView {
+export function publicTableView(joinable: LiveTable[], loaded: boolean): PublicTableView {
     const target = joinable
-        .filter((t) => present(t) > 0)
+        .filter((t) => present(t) > 0 && present(t) < PUBLIC_SEATS)
         .reduce<LiveTable | null>((best, t) => (!best || present(t) > present(best) ? t : best), null)
     if (target) {
+        const left = PUBLIC_SEATS - present(target)
         return {
             target,
             headline: `${present(target)} AT THE TABLE`,
-            status: present(target) >= 2 ? '' : 'STARTS ITSELF ONCE 2 ARE IN',
+            status: `${left} SEAT${left === 1 ? '' : 'S'} LEFT`,
             body: SIT_DOWN,
             rules: `${(target.mode || PUBLIC_TABLE_RULES).toUpperCase()} RULES`,
         }
     }
     const rules = `${PUBLIC_TABLE_RULES.toUpperCase()} RULES`
     // Before the first fetch lands, say nothing about who is or is not waiting.
-    if (!loaded) return { target: null, headline: 'OPEN TABLE', status: 'STARTS ITSELF ONCE 2 ARE IN', body: SIT_DOWN, rules }
+    if (!loaded) return { target: null, headline: 'OPEN TABLE', status: '', body: SIT_DOWN, rules }
     return {
         target: null,
         headline: 'OPEN TABLE',
-        status: inProgress > 0
-            ? `${inProgress} GAME${inProgress === 1 ? '' : 'S'} IN PROGRESS · START THE NEXT`
-            : '',
-        body: 'Take a seat. The game starts when someone joins.',
+        status: '',
+        body: `Take a seat. It deals itself when all ${PUBLIC_SEATS} are in.`,
         rules,
     }
 }
