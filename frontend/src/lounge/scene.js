@@ -303,8 +303,9 @@ export async function createLounge({ canvas, overlay, artUrl, badgeUrl, reducedM
     // Additive with no depth writes, so one pass of both faces looks the same as three's default back-then-front pair.
     transparent: true, depthWrite: false, side: THREE.DoubleSide, forceSinglePass: true, blending: THREE.AdditiveBlending,
   }))
-  cone.position.y = CONE_H / 2
-  scene.add(cone)
+  // Hung from the lamp's swing, so the beam sways with the shade.
+  cone.position.y = CONE_H / 2 - pivot.position.y
+  pivot.add(cone)
 
   // A tall screen has empty height above the table, so the lamp hangs higher there and its beam fills it.
   // The spot widens and strengthens with the drop, so the felt is lit the same from any height.
@@ -313,7 +314,7 @@ export async function createLounge({ canvas, overlay, artUrl, badgeUrl, reducedM
     lampY = y
     pivot.position.y = y + 7
     cone.scale.y = (y + 0.05) / CONE_H
-    cone.position.y = (y + 0.05) / 2
+    cone.position.y = (y + 0.05) / 2 - pivot.position.y
     spot.angle = Math.atan(TABLE.rx / y)
     spot.intensity = spotPower = 95 * (y / LAMP_Y) ** 2
     spot.shadow.camera.far = y + 5
