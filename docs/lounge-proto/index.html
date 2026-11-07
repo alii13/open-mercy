@@ -134,6 +134,10 @@ body.shake #world, body.shake #labels { animation: shake .45s cubic-bezier(.36, 
   .tape { height: 44px; } .tape-run span { font-size: 16px; }
   .tape-a { top: calc(50% - 130px); } .tape-b { top: calc(50% + 90px); }
 }
+@media (pointer: coarse), (max-width: 720px) {
+  /* Blurs over a canvas that redraws every frame are costly on phones. */
+  .tag, .pill, .icon-btn, .toast, .tray, .ask { backdrop-filter: none; }
+}
 .fallback { position: fixed; inset: 0; display: none; place-items: center; text-align: center; padding: 24px; color: var(--muted); }
 
 @media (max-width: 720px) {
@@ -290,10 +294,9 @@ addEventListener('keydown', (e) => { if (e.key === 'd') clock = Math.min(clock ?
 const wait = (ms) => new Promise((r) => setTimeout(r, ms))
 let lastBeat = null, ac = null
 // ponytail: synthesised thuds; a recorded sting can replace tone() later
+// Only on a running context: a suspended one keeps currentTime at 0, so queued stings would all fire on the first tap.
 function tone(freq, to, dur, gain, type = 'sine') {
-  if (!soundOn) return
-  ac ??= new AudioContext()
-  if (ac.state === 'suspended') ac.resume()
+  if (!soundOn || ac?.state !== 'running') return
   const t = ac.currentTime, o = ac.createOscillator(), g = ac.createGain()
   o.type = type
   o.frequency.setValueAtTime(freq, t)
@@ -331,7 +334,7 @@ setInterval(async () => {
     clock -= dt
     const n = Math.ceil(clock)
     if (n >= 1 && n <= 3 && n !== lastBeat) { lastBeat = n; beat(n) }
-    if (clock <= 0) {
+    if (clock <= 0) try {
       dealing = true
       lastBeat = null
       fadeTrack(0)
@@ -355,6 +358,9 @@ setInterval(async () => {
       fillTable()
       track.currentTime = 0
       startTrack()
+    } finally {
+      // An error mid-sequence must not leave the table frozen in the dealing state.
+      if (dealing) { dealing = false; clock = null }
     }
   }
   render()
@@ -386,7 +392,8 @@ for (const b of BOTS) {
 
 // ---------------------------------------------------------------- the lounge track
 // Fetched when you land on the table, never with the app; it gives way to the game when the deck deals.
-const VOLUME = 0.45
+// The level is baked into the file: iOS ignores audio.volume, so 1 here keeps every platform equal.
+const VOLUME = 1
 const track = Object.assign(new Audio('./division.mp3'), { loop: true, volume: VOLUME })
 let soundOn = true
 function fadeTrack(to) {
@@ -403,7 +410,8 @@ startTrack()
 for (const e of ['pointerdown', 'click', 'touchend', 'keydown']) {
   addEventListener(e, (ev) => {
     // iOS only lets an AudioContext start inside a tap, so the stings unlock here with the track.
-    if (soundOn) { ac ??= new AudioContext(); if (ac.state === 'suspended') ac.resume() }
+    // ('interrupted' is iOS after a lock or a call, so resume on anything but 'running'.)
+    if (soundOn) { ac ??= new AudioContext(); if (ac.state !== 'running') ac.resume() }
     if (!ev.target.closest?.('#sound, #ask') && track.paused) startTrack()
   }, { passive: true })
 }
@@ -423,7 +431,7 @@ syncIcon()
 $('sound').onclick = () => {
   soundOn = !audible()
   if (soundOn) startTrack()
-  else fadeTrack(0)
+  else { gsap.killTweensOf(track); track.pause() }
   syncIcon()
 }
 </script>

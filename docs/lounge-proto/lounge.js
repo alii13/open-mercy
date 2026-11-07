@@ -52,6 +52,8 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
   // antialias stays off: the composer renders into its own target, which carries the MSAA instead.
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' })
   renderer.setPixelRatio(Math.min(devicePixelRatio, lite ? 1.5 : 1.75))
+  // One signal removes every listener this module adds; dispose() aborts it.
+  const off = new AbortController(), { signal } = off
   renderer.outputColorSpace = THREE.SRGBColorSpace
   renderer.toneMapping = THREE.ACESFilmicToneMapping
   renderer.toneMappingExposure = 1.0
@@ -320,10 +322,14 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
     front.position.z = 0.003
     back.position.z = -0.003
     back.rotation.y = Math.PI
-    for (const m of [front, back]) { m.castShadow = true; m.receiveShadow = true }
+    // Only the front casts: the back would cast the same shadow again.
+    front.castShadow = true
+    for (const m of [front, back]) m.receiveShadow = true
     g.add(front, back)
     return g
   }
+  // A card lying flat sits a few millimetres up; its shadow is invisible, so stop drawing it into the shadow map.
+  const settle = (c) => { c.children[0].castShadow = false }
   const randomFace = () => { const k = Object.keys(FACES); return k[(Math.random() * k.length) | 0] }
 
   const DECK_H = 0.17
@@ -361,12 +367,7 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
     const sk = SKINS[skin] ?? SKINS.ember
     const faceTex = playerFaceTex(sk, rank)
     const card = makeCard(new THREE.MeshStandardMaterial({ map: faceTex, roughness: 0.5, emissive: 0xffffff, emissiveMap: faceTex, emissiveIntensity: 0.2 }))
-    // Portrait phones see the table from far back, so seated cards stand a little larger there.
-    const sc = portrait ? 1.3 : 1
-    const baseY = (CARD.h / 2) * Math.cos(TILT) * sc + 0.01
     card.rotation.x = -TILT
-    card.position.y = baseY
-    card.scale.setScalar(sc)
     g.add(card)
 
     const ring = new THREE.Mesh(new THREE.RingGeometry(0.3, 0.335, 64).rotateX(-Math.PI / 2),
@@ -377,7 +378,6 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
     glow.position.y = 0.004
     const hit = new THREE.Mesh(hitGeo, hitMat)
     hit.visible = false
-    hit.scale.setScalar(sc)
     g.add(ring, glow, hit)
 
     const tagEl = document.createElement('div')
@@ -385,20 +385,19 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
     tagEl.querySelector('span').textContent = name
     const tag = new CSS2DObject(tagEl)
     tag.center.set(0.5, 1)
-    tag.position.y = CARD.h * sc + 0.14
     const bubbleEl = document.createElement('div')
     bubbleEl.innerHTML = '<div class="bubble"></div>'
     const bubble = new CSS2DObject(bubbleEl)
     bubble.center.set(0.5, 1)
-    bubble.position.y = CARD.h * sc + 0.42
     g.add(tag, bubble)
     for (const el of [tagEl, bubbleEl]) el.style.pointerEvents = 'none'
 
     const spot0 = x === undefined ? freeSpot(you) : { x, z }
     g.position.set(spot0.x, 0, spot0.z)
     scene.add(g)
-    const p = { id, name, you, g, card, ring, glow, hit, tagEl, bubbleEl, tag, bubble, baseY, tx: spot0.x, tz: spot0.z, k: 3.2,
+    const p = { id, name, you, g, card, ring, glow, hit, tagEl, bubbleEl, tag, bubble, baseY: 0, tx: spot0.x, tz: spot0.z, k: 3.2,
       speed: 0, phase: rand(0, 10), w: 0, wv: 0, lift: -1.1, bubbleTimer: null }
+    sizeSeat(p)
     players.set(id, p)
     if (you) youP = p
 
@@ -408,6 +407,16 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
     shockwave(spot0.x, spot0.z, you ? RING.you : RING.other)
     emit('event', { text: you ? 'You joined' : `${name} joined` })
     return p
+  }
+
+  // Portrait phones see the table from far back, so seated cards stand larger there; frame() re-runs this on rotation.
+  function sizeSeat(p) {
+    const sc = portrait ? 1.3 : 1
+    p.baseY = (CARD.h / 2) * Math.cos(TILT) * sc + 0.01
+    p.card.scale.setScalar(sc)
+    p.hit.scale.setScalar(sc)
+    p.tag.position.y = CARD.h * sc + 0.14
+    p.bubble.position.y = CARD.h * sc + 0.42
   }
 
   function leave(id) {
@@ -515,7 +524,7 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
         p.wv += clamp(vn * 2.2, 2, 9) * (Math.random() < 0.5 ? -1 : 1)
         if (!f.hit) { f.hit = true; emit('event', { text: `${f.owner.name} hit ${p.you ? 'you' : p.name}` }) }
       }
-      if (Math.hypot(f.vx, f.vz) < 0.04) f.moving = false
+      if (Math.hypot(f.vx, f.vz) < 0.04) { f.moving = false; settle(f.c) }
     }
   }
 
@@ -542,6 +551,7 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
       .to(c.rotation, { x: -Math.PI / 2, y: rand(-0.5, 0.5), z: 0, duration: 0.42, ease: 'power2.in' }, '<')
       .call(() => {
         pile.push(c)
+        settle(c)
         if (pile.length > 14) scene.remove(pile.shift())
         shockwave(c.position.x, c.position.z, new THREE.Color('#ffcc00').multiplyScalar(1.6), 2.2)
       })
@@ -585,6 +595,7 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
           },
           onComplete() {
             gsap.fromTo(p.ring.scale, { x: 1.45, z: 1.45 }, { x: 1, z: 1, duration: 0.35, ease: 'power2.out' })
+            settle(c)
             if (last) shockwave(px, pz, p.you ? RING.you : RING.other, 2.6)
           },
         }, START + i * STAGGER)
@@ -634,6 +645,7 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
     base.look.set(portrait ? 0.4 : 0, portrait ? 0 : 0.2, portrait ? 0 : 0.1)
     base.pos.copy(base.look).addScaledVector(dir, d)
     pivot.visible = !portrait
+    for (const p of players.values()) sizeSeat(p)
   }
 
   const pointer = new THREE.Vector2()
@@ -696,7 +708,7 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
     }
     else if (h.what === 'deck') emit('intent', { kind: 'draw', face: randomFace() })
     else if (h.what === 'felt') emit('intent', { kind: 'move', x: h.felt.x, z: h.felt.z })
-  })
+  }, { signal })
   canvas.addEventListener('pointermove', (e) => {
     const r = canvas.getBoundingClientRect()
     pointer.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1)
@@ -711,7 +723,7 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
     if (!drag.moved || !h.felt || performance.now() - drag.sent < 100) return
     drag.sent = performance.now()
     emit('intent', { kind: 'move', x: h.felt.x, z: h.felt.z, drag: true })
-  })
+  }, { signal })
   const endDrag = (e) => {
     if (!drag || e.pointerId !== drag.id) return
     if (!drag.moved) emit('intent', { kind: 'emote', text: 'Hi!' })
@@ -721,17 +733,18 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
     }
     drag = null
   }
-  canvas.addEventListener('pointerup', endDrag)
-  canvas.addEventListener('pointercancel', endDrag)
+  canvas.addEventListener('pointerup', endDrag, { signal })
+  canvas.addEventListener('pointercancel', () => { drag = null }, { signal })
 
   // ------------------------------------------------------------ loop
   const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: lite ? 0 : 4 }))
   composer.setPixelRatio(renderer.getPixelRatio())
   composer.addPass(new RenderPass(scene, camera))
-  composer.addPass(new UnrealBloomPass(new THREE.Vector2(512, 512), 0.6, 0.55, 1.6))
+  const bloom = new UnrealBloomPass(new THREE.Vector2(512, 512), 0.6, 0.55, 1.6)
+  composer.addPass(bloom)
   composer.addPass(new OutputPass())
   frame()
-  addEventListener('resize', frame)
+  addEventListener('resize', frame, { signal })
 
   let t = 0, last = performance.now()
   function tick(now) {
@@ -786,7 +799,7 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
   document.addEventListener('visibilitychange', () => {
     last = performance.now()
     renderer.setAnimationLoop(document.hidden ? null : tick)
-  })
+  }, { signal })
 
   return {
     join, leave, move, flick, draw, emote, deal, reset, pulse, players,
@@ -794,5 +807,22 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
     onEvent: (fn) => listeners.event.push(fn),
     get busy() { return drawing || dealing },
     stats: () => ({ ...renderer.info.memory }),
+    // For a host that unmounts the lounge (the Vue port): stop the loop, drop listeners, free the GPU.
+    // ponytail: running gsap tweens are left to finish; they only touch plain objects now detached from the scene.
+    dispose() {
+      off.abort()
+      renderer.setAnimationLoop(null)
+      overlay.replaceChildren()
+      scene.traverse((o) => {
+        o.geometry?.dispose()
+        for (const m of [].concat(o.material ?? [])) { m.map?.dispose(); m.emissiveMap?.dispose(); m.dispose() }
+      })
+      for (const m of Object.values(faceMats)) { m.map.dispose(); m.dispose() }
+      for (const x of [backMat, edgeMat, hitMat, cardGeo, hitGeo, backTex, feltTex, dotTex, edgeTex, scene.environment]) x.dispose()
+      bloom.dispose()
+      composer.dispose()
+      renderer.dispose()
+      renderer.forceContextLoss()
+    },
   }
 }
