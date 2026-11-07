@@ -322,11 +322,13 @@ onMounted(async () => {
   // would let the player replay a deal they have already seen. Only on a
   // plain visit to the lobby: the game view sits above every other screen,
   // so it would cover a restored room, an invite link or the claim screen.
-  // The lobby's CONTINUE resumes it in those cases.
+  // Only if this tab was still in the game, too: a player who left for the
+  // lobby stays there. The lobby's CONTINUE resumes it in all these cases.
+  // Called on every boot, blocked or not, so the tab's flag is always used up.
   const hasInvite = new URLSearchParams(window.location.search).has('join')
-  if (!mpStore.currentGame && !hasInvite && !showAuthView.value && currentRoute.value.name === 'home') {
-    localGameStore.resumeDaily()
-  }
+  localGameStore.resumeDailyAfterReload(
+    !!mpStore.currentGame || hasInvite || showAuthView.value || currentRoute.value.name !== 'home',
+  )
 })
 
 // App remounts (HMR) would otherwise stack PASSWORD_RECOVERY listeners.

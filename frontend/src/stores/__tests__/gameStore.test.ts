@@ -498,15 +498,22 @@ describe('daily and ladder analytics', () => {
 describe('daily resume after a reload', () => {
     const today = '2026-08-10'
     const saved = new Map<string, string>()
+    const tab = new Map<string, string>()
 
     beforeEach(() => {
         vi.useFakeTimers()
         vi.setSystemTime(new Date(`${today}T12:00:00`))
         saved.clear()
+        tab.clear()
         vi.stubGlobal('localStorage', {
             getItem: (k: string) => saved.get(k) ?? null,
             setItem: (k: string, v: string) => { saved.set(k, v) },
             removeItem: (k: string) => { saved.delete(k) },
+        })
+        vi.stubGlobal('sessionStorage', {
+            getItem: (k: string) => tab.get(k) ?? null,
+            setItem: (k: string, v: string) => { tab.set(k, v) },
+            removeItem: (k: string) => { tab.delete(k) },
         })
     })
 
@@ -567,6 +574,50 @@ describe('daily resume after a reload', () => {
         expect(table(store)).toEqual(before)
     })
 
+    it('drops a player who reloads mid-game straight back in', async () => {
+        const before = table(await startDaily())
+
+        const store = reload()
+
+        expect(store.resumeDailyAfterReload(false)).toBe(true)
+        expect(table(store)).toEqual(before)
+    })
+
+    it('keeps a player who left for the lobby there after a reload, with CONTINUE still working', async () => {
+        const before = table(await startDaily())
+        useGameStore().returnToLobby()
+
+        const store = reload()
+
+        expect(store.resumeDailyAfterReload(false)).toBe(false)
+        expect(store.gameState).toBe('LOBBY')
+        expect(store.resumeDaily()).toBe(true)
+        expect(table(store)).toEqual(before)
+    })
+
+    it('uses the flag up on a boot that cannot reopen the daily, so a later reload stays in the lobby', async () => {
+        const before = table(await startDaily())
+
+        // An invite link or a restored room: the boot is blocked.
+        expect(reload().resumeDailyAfterReload(true)).toBe(false)
+        const store = reload()
+
+        expect(store.resumeDailyAfterReload(false)).toBe(false)
+        expect(store.gameState).toBe('LOBBY')
+        expect(store.resumeDaily()).toBe(true)
+        expect(table(store)).toEqual(before)
+    })
+
+    it('does not undo a CONTINUE tapped while the page was still loading', async () => {
+        await startDaily()
+        const store = reload()
+        store.resumeDaily()
+
+        expect(store.resumeDailyAfterReload(false)).toBe(false)
+        expect(store.gameState).toBe('PLAYING')
+        expect(reload().resumeDailyAfterReload(false)).toBe(true)
+    })
+
     it('replays a move made just before the reload instead of undoing it', async () => {
         const played = await startDaily()
         played.drawCardsForCurrentPlayer()
@@ -598,6 +649,23 @@ describe('daily resume after a reload', () => {
 
         expect(store.gameState).toBe('GAME_OVER')
         expect(reload().resumeDaily()).toBe(false)
+    })
+
+    it('clears the flag at game over, so a save from another tab does not reopen here', async () => {
+        const store = await startDaily()
+        const otherTabSave = saved.get('uno_daily_game_v1')!
+        const human = store.players.find(p => !p.isBot)!
+        const red7: Card = { id: 'c-red-7', color: 'red', type: 'number', value: 7 }
+        human.hand = [red7]
+        store.discardPile = [red5]
+        store.currentColor = 'red'
+        store.playCard(human.id, red7)
+        await nextTick()
+        expect(store.gameState).toBe('GAME_OVER')
+
+        saved.set('uno_daily_game_v1', otherTabSave)
+
+        expect(reload().resumeDailyAfterReload(false)).toBe(false)
     })
 
     it('keeps a MERCY catch that landed before the reload', async () => {

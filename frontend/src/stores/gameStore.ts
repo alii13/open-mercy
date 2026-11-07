@@ -11,7 +11,7 @@ import {
 } from '@engine/bot'
 import { chooseBotCard } from '@engine/botSearch'
 import { seededRng } from '../utils/seededRng'
-import { markDailyDone, loadDailyProgress, saveDailyProgress, clearDailyProgress, DAILY_PROGRESS_KEY } from '../utils/dailyChallenge'
+import { markDailyDone, loadDailyProgress, saveDailyProgress, clearDailyProgress, DAILY_PROGRESS_KEY, markDailyOpen, isDailyOpen } from '../utils/dailyChallenge'
 import { recordBotWin } from '../utils/botLadder'
 import type { StackingMode } from '@engine'
 import { soundEffects } from '../composables/useSoundEffects'
@@ -266,6 +266,7 @@ export const useGameStore = defineStore('game', () => {
         opts?: { dailySeed?: string; botIds?: string[]; warmUp?: boolean },
     ) {
         dailyDate.value = opts?.dailySeed ?? null
+        markDailyOpen(dailyDate.value !== null)
         hostRng = dailyDate.value ? dailyRng(dailyDate.value) : Math.random
         dealGeneration++
         closeCatchWindow()
@@ -667,6 +668,7 @@ export const useGameStore = defineStore('game', () => {
     }
 
     function returnToLobby() {
+        markDailyOpen(false)
         dealGeneration++
         closeCatchWindow()
         gameState.value = 'LOBBY'
@@ -812,6 +814,7 @@ export const useGameStore = defineStore('game', () => {
                     log: turnLog.value.join(''),
                 })
                 clearDailyProgress()
+                markDailyOpen(false)
                 // Separate from sp_game_finished, which cannot distinguish the
                 // daily from a practice game, and cannot see 'eliminated' at all.
                 track('daily_finished', { result: dailyResult, turns: dailyTurns })
@@ -935,6 +938,7 @@ export const useGameStore = defineStore('game', () => {
         const g = saved.game
         dealGeneration++
         closeCatchWindow()
+        markDailyOpen(true)
         dailyDate.value = saved.date
         hostRng = dailyRng(saved.date, g.rngCalls)
         warmGame = false
@@ -969,6 +973,19 @@ export const useGameStore = defineStore('game', () => {
         if (exposed) armCatchWindow(exposed, g.catchWillFire)
         if (saved.move) (humanMoves[saved.move.name] as (...args: unknown[]) => void)(...saved.move.args)
         return true
+    }
+
+    /**
+     * On page load: reopen the daily only if this tab was still in it. The flag is used up either way, so a boot
+     * that cannot reopen it (`blocked`: an invite link, a restored room, another page) leaves nothing set for a
+     * later reload to find. resumeDaily() sets it again when the daily does reopen.
+     */
+    function resumeDailyAfterReload(blocked: boolean): boolean {
+        // CONTINUE was tapped while the page was still loading: the daily is already on screen.
+        if (gameState.value !== 'LOBBY') return false
+        const open = isDailyOpen()
+        markDailyOpen(false)
+        return open && !blocked && resumeDaily()
     }
 
     return {
@@ -1020,6 +1037,7 @@ export const useGameStore = defineStore('game', () => {
         dealInitialCards,
         returnToLobby,
         resumeDaily,
+        resumeDailyAfterReload,
     }
 
     function setRouletteColor(color: CardColor) {
