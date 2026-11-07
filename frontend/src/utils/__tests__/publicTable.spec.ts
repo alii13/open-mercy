@@ -12,7 +12,8 @@ describe('public table card', () => {
 
         expect(view.target?.code).toBe('BBBBBB')
         expect(view.headline).toBe('4 AT THE TABLE')
-        expect(view.status).toBe('CLOCK IS RUNNING · DEALS ITSELF')
+        expect(view.status).toBe('')
+        expect(view.body).toBe('Play people from anywhere, right now. No code to share, and the game starts on its own.')
     })
 
     it('picks and counts by who is connected when the server says, not by seats a closed tab holds', () => {

@@ -1923,8 +1923,8 @@ function copyLink() {
   .daily-card       { grid-column: 1; grid-row: 2; }
   .create-card      { grid-column: 2; grid-row: 2; }
   .board-card       { grid-column: 1; grid-row: 3 / span 2; }
-  .public-table     { grid-column: 2; grid-row: 3; }
-  .mode-list        { grid-column: 2; grid-row: 4; }
+  .mode-list        { grid-column: 2; grid-row: 3; }
+  .public-table     { grid-column: 2; grid-row: 4; }
   /* Side by side here. .lobby-entry > outranks the base .mode-list, which
      comes later in this file. */
   .lobby-entry > .mode-list { flex-direction: row; }
@@ -1957,7 +1957,7 @@ function copyLink() {
   font-size: var(--text-xs);
   font-weight: 600;
   letter-spacing: 0.16em;
-  color: var(--color-alert);
+  color: var(--text-primary);
 }
 
 .create-note {

@@ -21,7 +21,7 @@ export interface PublicTableView {
     rules: string
 }
 
-const SIT_DOWN = 'Strangers, no room code. Sit down and it deals itself.'
+const SIT_DOWN = 'Play people from anywhere, right now. No code to share, and the game starts on its own.'
 
 /** People actually at the table: a closed tab keeps its seat but not its socket. */
 const present = (t: LiveTable) => t.connected ?? t.players
@@ -34,7 +34,7 @@ export function publicTableView(joinable: LiveTable[], inProgress: number, loade
         return {
             target,
             headline: `${present(target)} AT THE TABLE`,
-            status: present(target) >= 2 ? 'CLOCK IS RUNNING · DEALS ITSELF' : 'STARTS ITSELF ONCE 2 ARE IN',
+            status: present(target) >= 2 ? '' : 'STARTS ITSELF ONCE 2 ARE IN',
             body: SIT_DOWN,
             rules: `${(target.mode || PUBLIC_TABLE_RULES).toUpperCase()} RULES`,
         }
@@ -48,7 +48,7 @@ export function publicTableView(joinable: LiveTable[], inProgress: number, loade
         status: inProgress > 0
             ? `${inProgress} GAME${inProgress === 1 ? '' : 'S'} IN PROGRESS · START THE NEXT`
             : 'BE THE FIRST SEAT',
-        body: 'Nobody is waiting yet. Sit down and it deals itself once a second player joins.',
+        body: 'Nobody is waiting yet. Take a seat and the game starts once a second player joins.',
         rules,
     }
 }

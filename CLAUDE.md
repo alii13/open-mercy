@@ -8,7 +8,7 @@ Guidance for working in this repo. Hard-won - read before changing CSS, raising 
 - **Never hand-roll an icon as inline `<svg>`, and never stand one in as a text glyph or HTML entity** (`&rarr;`, `&times;`, `✕`, `✓`). Import the Lucide component. Hand-drawn duplicates of Lucide shapes and entity arrows were the whole of the 2026-08 icon cleanup.
 - **Icon scale is fixed: `:size="14"` inline-with-text, `16` buttons and chrome, `20` icon-only buttons and section headers, and `:stroke-width="2"` always.** Only large display/empty-state icons may sit outside it (currently two at 40). Deviating is what made the UI read as sloppy - there were six sizes and five stroke widths.
 - Legitimate inline `<svg>` is limited to: brand marks Lucide does not carry (Google, GitHub, X, WhatsApp - prefer `simple-icons` paths), custom artwork (`CardBack`, `AutoStartRing`, the landing strike line), and genuinely two-tone icons Lucide cannot express (the `VoiceMicCluster` mic, whose slash is styled `--color-alert` separately).
-- Concerns are color-zoned with the deck palette: hazard yellow = daily/streak loop (and CLAIM ACCOUNT), alert red = primary create action, neon cyan = multiplayer, lamp amber (`--color-lamp`) = the public table, neutral = practice/meta.
+- Concerns are color-zoned with the deck palette: hazard yellow = daily/streak loop (and CLAIM ACCOUNT, and the public table), alert red = primary create action, neon cyan = multiplayer, neutral = practice/meta.
 
 ## CSS tokens
 

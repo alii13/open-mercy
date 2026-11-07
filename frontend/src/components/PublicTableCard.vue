@@ -14,7 +14,7 @@ defineEmits<{ takeSeat: [] }>()
 
 <template>
   <!-- Strangers, no code: the table a tap sits you at, with the 3D table it
-       opens onto. Lamp amber is this card's colour, from the lamp in the render. -->
+       opens onto. Hazard yellow is this card's colour. -->
   <section id="public-table" class="pt-card" aria-labelledby="pt-eyebrow pt-headline">
     <div class="pt-render">
       <img :src="tableRender" alt="" width="440" height="216" loading="lazy" decoding="async" />
@@ -23,9 +23,9 @@ defineEmits<{ takeSeat: [] }>()
     <div class="pt-body">
       <p id="pt-eyebrow" class="pt-eyebrow">PUBLIC TABLE<span class="pt-rules"> · {{ view.rules }}</span></p>
       <h2 id="pt-headline" class="pt-headline">{{ view.headline }}</h2>
-      <p class="pt-status">{{ view.status }}</p>
+      <p v-if="view.status" class="pt-status">{{ view.status }}</p>
       <p class="pt-desc">{{ view.body }}</p>
-      <Button variant="amber" size="md" block class="pt-cta" :disabled="loading" @click="$emit('takeSeat')">
+      <Button variant="hazard" size="md" block class="pt-cta" :disabled="loading" @click="$emit('takeSeat')">
         {{ loading ? 'FINDING A SEAT...' : 'TAKE A SEAT' }}
       </Button>
     </div>
@@ -92,7 +92,7 @@ defineEmits<{ takeSeat: [] }>()
   font-size: var(--text-xs);
   font-weight: 600;
   letter-spacing: 0.16em;
-  color: var(--color-lamp);
+  color: var(--color-hazard);
 }
 
 .pt-rules {

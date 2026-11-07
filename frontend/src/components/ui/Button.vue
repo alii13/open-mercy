@@ -3,7 +3,7 @@ import { vFocusRing } from '@/directives/focusRing'
 
 withDefaults(
   defineProps<{
-    variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'hazard' | 'amber'
+    variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'hazard'
     size?: 'sm' | 'md' | 'lg'
     type?: 'button' | 'submit' | 'reset'
     disabled?: boolean
@@ -136,7 +136,7 @@ withDefaults(
   box-shadow: var(--shadow-glow-red);
 }
 
-/* hazard — solid yellow, for answering someone (accept) rather than playing */
+/* hazard — solid yellow, for answering someone (accept) and the public table's seat button */
 .btn--hazard {
   background: var(--color-hazard);
   border-color: var(--color-hazard);
@@ -145,16 +145,5 @@ withDefaults(
 .btn--hazard:hover:not(:disabled) {
   transform: translateY(-2px);
   box-shadow: var(--shadow-glow-yellow);
-}
-
-/* amber — solid lamp amber, the public table's seat button */
-.btn--amber {
-  background: var(--color-lamp);
-  border-color: var(--color-lamp);
-  color: var(--bg-concrete);
-}
-.btn--amber:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-glow-lamp);
 }
 </style>

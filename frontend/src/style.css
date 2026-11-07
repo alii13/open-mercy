@@ -75,7 +75,6 @@
   --shadow-glow-cyan: 0 0 24px rgba(0, 243, 255, 0.4);
   --shadow-glow-lime: 0 0 24px rgba(0, 255, 102, 0.4);
   --shadow-glow-magenta: 0 0 24px rgba(255, 102, 221, 0.4);
-  --shadow-glow-lamp: 0 0 24px rgba(255, 159, 67, 0.4);
 
   /* Motion duration + easing — these mirror useMotion.ts presets */
   --duration-snap: 180ms;
