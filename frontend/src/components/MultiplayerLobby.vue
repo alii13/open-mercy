@@ -1,7 +1,7 @@
 <template>
   <div class="lobby-container">
     <!-- Top bar — slim, brand left, identity + auth controls right. No scan-line. -->
-    <header class="lobby-top-bar" :class="{ 'menu-open': accountOpen }">
+    <header v-if="!(atTable && loungeLoaded)" class="lobby-top-bar" :class="{ 'menu-open': accountOpen }">
       <a class="brand-mark" href="#" @click.prevent>
         <span class="brand-mark-uno">OPEN</span>
         <span class="brand-mark-nomercy">MERCY</span>
@@ -325,7 +325,7 @@
       <!-- A public room waits at the 3D table; private rooms, and any browser
            that cannot draw it, keep the list below. -->
       <PublicTableLounge
-        v-else-if="(mpStore.gameStatus === 'waiting' || mpStore.loungeShow) && mpStore.isPublicRoom && !loungeFailed"
+        v-else-if="atTable"
         @fallback="loungeFailed = true"
         @leave="showLeaveConfirm = true"
       />
@@ -656,7 +656,7 @@ import PublicTableCard from './PublicTableCard.vue'
 // A chunk that fails to load (a deploy since page load, a dropped connection)
 // falls back to the list, the same as a browser that cannot draw the table.
 const PublicTableLounge = defineAsyncComponent({
-  loader: () => import('./PublicTableLounge.vue'),
+  loader: () => import('./PublicTableLounge.vue').then((m) => { loungeLoaded.value = true; return m }),
   onError: (_err, _retry, fail) => { loungeFailed.value = true; fail() },
 })
 import { publicTableView, PUBLIC_TABLE_RULES } from '../utils/publicTable'
@@ -832,6 +832,10 @@ const roomEnded = ref(false)
 const showLeaveConfirm = ref(false)
 /** The 3D table could not start (no WebGL, an asset failed): use the list. */
 const loungeFailed = ref(false)
+// The table takes the whole screen, top bar included: LEAVE is the way out. The bar stays
+// until the table's code has arrived, so a slow download never leaves a blank page.
+const loungeLoaded = ref(false)
+const atTable = computed(() => !!mpStore.currentGame && (mpStore.gameStatus === 'waiting' || mpStore.loungeShow) && mpStore.isPublicRoom && !loungeFailed.value)
 const showSignOutConfirm = ref(false)
 const editingName = ref(false)
 const editTarget = ref<'bar' | 'room' | null>(null)
