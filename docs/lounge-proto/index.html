@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Public table lounge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Chakra+Petch:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script type="importmap">{"imports":{
+  "three": "/frontend/node_modules/three/build/three.module.min.js",
+  "three/addons/": "/frontend/node_modules/three/examples/jsm/",
+  "gsap": "/frontend/node_modules/gsap/index.js"
+}}</script>
+<style>
+:root {
+  --bg: #040405; --text: #e6e6e6; --muted: #8a8a93; --hazard: #ffcc00; --alert: #ff2a2a; --cyan: #00f3ff;
+  --glass: rgba(9, 9, 10, 0.72); --line: rgba(255, 255, 255, 0.13);
+  --display: 'Black Ops One', system-ui, sans-serif; --body: 'Chakra Petch', system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: var(--body); overflow: hidden;
+  overscroll-behavior: none; -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; }
+#world { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+#labels { position: fixed; inset: 0; pointer-events: none; }
+.vignette { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(ellipse 75% 70% at 50% 58%, transparent 52%, rgba(0,0,0,0.7) 100%); }
+
+.tag { display: flex; align-items: center; gap: 7px; padding: 4px 11px 4px 6px; border-radius: 999px; background: var(--glass);
+  border: 1px solid var(--line); font: 500 13px/16px var(--body); color: var(--text); white-space: nowrap; backdrop-filter: blur(6px); }
+.tag i { width: 8px; height: 8px; border-radius: 50%; background: var(--c); box-shadow: 0 0 10px var(--c); margin-left: 3px; }
+.tag.you { border-color: var(--hazard); }
+.tag b { font: 400 10px/14px var(--display); letter-spacing: 0.1em; color: #0a0a0b; background: var(--hazard); border-radius: 3px; padding: 1px 5px; }
+.bubble { padding: 7px 13px; border-radius: 12px 12px 12px 3px; background: #f4f4f2; color: #0a0a0b; font: 600 15px/18px var(--body);
+  white-space: nowrap; opacity: 0; transform: translateY(8px) scale(0.6); transform-origin: 0% 100%;
+  transition: opacity .18s ease, transform .18s ease; box-shadow: 0 10px 24px rgba(0,0,0,.5); }
+.bubble.on { opacity: 1; transform: none; transition: opacity .12s ease, transform .35s cubic-bezier(.2, 1.6, .4, 1); }
+.bubble.mercy { background: var(--hazard); font: 400 17px/20px var(--display); letter-spacing: 0.06em; }
+
+.hud { position: fixed; left: 0; right: 0; display: flex; justify-content: space-between; align-items: flex-start; pointer-events: none;
+  padding: max(26px, env(safe-area-inset-top)) max(34px, env(safe-area-inset-right)) max(26px, env(safe-area-inset-bottom)) max(34px, env(safe-area-inset-left)); }
+.hud > * { pointer-events: auto; }
+.top { top: 0; }
+.bottom { bottom: 0; align-items: flex-end; }
+.eyebrow { font: 600 12px/16px var(--body); letter-spacing: 0.26em; color: var(--cyan); }
+.brand { font: 400 15px/18px var(--display); letter-spacing: 0.06em; margin-bottom: 14px; }
+.brand span { color: var(--alert); font-size: 11px; letter-spacing: 0.14em; margin-left: 4px; }
+.count { font: 400 30px/36px var(--display); letter-spacing: 0.03em; margin-top: 4px; }
+.count b { color: var(--hazard); font-weight: 400; }
+.count small { font: 500 14px var(--body); color: var(--muted); letter-spacing: 0.08em; }
+.clock { text-align: right; }
+.clock .eyebrow { color: #a1a1aa; }
+.time { font: 400 52px/56px var(--display); color: var(--hazard); letter-spacing: 0.04em; text-shadow: 0 0 28px rgba(255,204,0,.35); font-variant-numeric: tabular-nums; }
+.time.wait { font-size: 20px; line-height: 28px; color: var(--text); text-shadow: none; letter-spacing: 0.08em; }
+.pill { height: 40px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--line); background: var(--glass); color: var(--text);
+  font: 600 12px var(--body); letter-spacing: 0.16em; cursor: pointer; backdrop-filter: blur(6px); }
+.pill:hover { border-color: rgba(255,255,255,.3); }
+.pill:disabled { opacity: .4; cursor: default; }
+.icon-btn { width: 40px; height: 40px; margin-top: 8px; border-radius: 50%; display: inline-grid; place-items: center; cursor: pointer;
+  border: 1px solid var(--line); background: var(--glass); color: var(--text); backdrop-filter: blur(6px); }
+.icon-btn:hover { border-color: rgba(255,255,255,.3); }
+.icon-btn .off, .icon-btn.muted .on { display: none; }
+.icon-btn.muted .off { display: inline; }
+.icon-btn.muted { color: var(--muted); }
+.time.urgent { color: var(--alert); text-shadow: 0 0 28px rgba(255, 42, 42, 0.45); }
+.feed { position: fixed; top: 26px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; }
+.toast { padding: 6px 12px; border-radius: 6px; background: var(--glass); border: 1px solid var(--line); font: 500 12px/16px var(--body);
+  letter-spacing: 0.12em; text-transform: uppercase; white-space: nowrap; animation: toast 3.2s ease forwards; backdrop-filter: blur(6px); }
+@keyframes toast { 0% { opacity: 0; transform: translateY(-6px); } 8%, 80% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+.tray { display: flex; gap: 6px; padding: 6px; border-radius: 999px; background: var(--glass); border: 1px solid var(--line); backdrop-filter: blur(8px); }
+.tray button { flex-shrink: 0; white-space: nowrap; height: 40px; min-width: 40px; padding: 0 14px; border: 0; border-radius: 999px; background: rgba(255,255,255,.06); color: var(--text); font: 600 14px var(--body); cursor: pointer; }
+.tray button:hover { background: rgba(255,255,255,.12); }
+.tray .mercy { background: var(--hazard); color: #0a0a0b; font: 400 13px var(--display); letter-spacing: 0.08em; }
+.center { position: absolute; left: 50%; bottom: max(26px, env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.hint { font: 500 11px var(--body); letter-spacing: 0.18em; color: var(--muted); text-transform: uppercase; white-space: nowrap; }
+.hint em { font-style: normal; color: var(--text); }
+.curtain { position: fixed; inset: 0; display: grid; place-items: center; background: #000; opacity: 0; pointer-events: none; transition: opacity .6s ease; }
+.curtain.on { opacity: 1; }
+.count3 { position: fixed; inset: 0; display: grid; place-items: center; pointer-events: none; opacity: 0;
+  font: 400 240px/1 var(--display); color: var(--alert); text-shadow: 0 0 70px rgba(255, 42, 42, 0.6), 0 10px 0 #2a0000; }
+.count3.go { animation: slam .95s cubic-bezier(.2, .9, .3, 1) forwards; }
+@keyframes slam { 0% { opacity: 0; transform: scale(2.8) rotate(-8deg); } 16% { opacity: 1; transform: scale(.92) rotate(0); }
+  26% { transform: scale(1.05); } 38% { transform: scale(1); } 70% { opacity: .95; } 100% { opacity: 0; transform: scale(.85); } }
+.showtime { position: fixed; inset: 0; display: grid; place-items: center; overflow: hidden; pointer-events: none; visibility: hidden; }
+.showtime.on { visibility: visible; }
+.showtime::before { content: ''; position: absolute; inset: 0; opacity: 0; transition: opacity .35s ease;
+  background: radial-gradient(ellipse at 50% 50%, rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0.82)); }
+.showtime.on::before { opacity: 1; }
+.tape { position: absolute; left: -10%; width: 120%; height: 62px; display: flex; align-items: center; overflow: hidden;
+  background: repeating-linear-gradient(-45deg, #ffcc00 0 18px, #0a0a0b 18px 36px); box-shadow: 0 14px 40px rgba(0, 0, 0, 0.7); }
+.tape-a { top: calc(50% - 210px); transform: rotate(-6deg) translateX(-110%); }
+.tape-b { top: calc(50% + 150px); transform: rotate(4deg) translateX(110%); }
+.showtime.on .tape-a { animation: tapeA .42s cubic-bezier(.2, .9, .3, 1) forwards; }
+.showtime.on .tape-b { animation: tapeB .42s .1s cubic-bezier(.2, .9, .3, 1) forwards; }
+@keyframes tapeA { to { transform: rotate(-6deg) translateX(0); } }
+@keyframes tapeB { to { transform: rotate(4deg) translateX(0); } }
+.tape-run { display: flex; width: max-content; background: #ffcc00; padding: 7px 0; animation: run 16s linear infinite; }
+.tape-b .tape-run { animation-direction: reverse; }
+.tape-run span { font: 400 24px/1 var(--display); letter-spacing: 0.14em; color: #0a0a0b; white-space: pre; }
+@keyframes run { to { transform: translateX(-50%); } }
+.title { position: relative; display: flex; flex-direction: column; align-items: center; opacity: 0; }
+.showtime.on .title { animation: titleSlam .7s .3s cubic-bezier(.2, .9, .3, 1) forwards; }
+@keyframes titleSlam { 0% { opacity: 0; transform: scale(2.6) rotate(-5deg); } 30% { opacity: 1; transform: scale(.94) rotate(0); }
+  45% { transform: scale(1.04); } 100% { opacity: 1; transform: scale(1); } }
+.t1 { font: 400 54px/1 var(--display); letter-spacing: 0.16em; color: #fff; }
+.t2 { font: 400 156px/.95 var(--display); letter-spacing: 0.04em; color: var(--alert); -webkit-text-stroke: 2px #ff7a7a;
+  text-shadow: 0 0 60px rgba(255, 42, 42, 0.7), 0 10px 0 #2a0000; }
+.t3 { margin-top: 16px; font: 600 15px var(--body); letter-spacing: 0.32em; color: var(--text); }
+.flash { position: absolute; inset: 0; background: #fff; opacity: 0; }
+.showtime.out .flash { animation: flash .5s ease-out forwards; }
+@keyframes flash { 0% { opacity: 0; } 30% { opacity: .92; } 100% { opacity: 1; } }
+body.shake #world, body.shake #labels { animation: shake .45s cubic-bezier(.36, .07, .19, .97); }
+@keyframes shake { 10%, 90% { transform: translate(-2px, 1px); } 20%, 80% { transform: translate(4px, -2px); }
+  30%, 50%, 70% { transform: translate(-7px, 3px); } 40%, 60% { transform: translate(7px, -3px); } }
+@media (prefers-reduced-motion: reduce) { body.shake #world, body.shake #labels { animation: none; } }
+.coaching .tag.you::after { content: 'DRAG ME'; position: absolute; left: 50%; top: -30px; transform: translateX(-50%); padding: 4px 9px;
+  border-radius: 4px; background: var(--hazard); color: #0a0a0b; font: 400 11px/14px var(--display); letter-spacing: 0.12em; animation: nudge 1.1s ease-in-out infinite; }
+.tag { position: relative; }
+@keyframes nudge { 50% { transform: translate(-50%, -5px); } }
+.ask { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 300px; padding: 20px; border-radius: 10px; text-align: center;
+  background: rgba(9, 9, 10, 0.9); border: 1px solid rgba(255, 204, 0, 0.35); backdrop-filter: blur(10px); box-shadow: 0 24px 60px rgba(0,0,0,.6); }
+.ask[hidden] { display: none; }
+.ask-title { font: 400 18px/22px var(--display); letter-spacing: 0.03em; }
+.ask-sub { font: 400 14px/18px var(--body); color: var(--muted); margin: 6px 0 16px; }
+.ask-row { display: flex; gap: 8px; justify-content: center; }
+.ask-yes { background: var(--hazard); color: #0a0a0b; border: 0; }
+@media (max-height: 480px) and (min-width: 721px) {
+  .hud { padding-top: max(12px, env(safe-area-inset-top)); padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+  .brand, .hint { display: none; }
+  .count { font-size: 22px; line-height: 26px; }
+  .time { font-size: 34px; line-height: 38px; }
+  .center { bottom: max(12px, env(safe-area-inset-bottom)); }
+  .count3 { font-size: 140px; }
+  .t1 { font-size: 28px; } .t2 { font-size: 80px; } .t3 { font-size: 12px; }
+  .tape { height: 44px; } .tape-run span { font-size: 16px; }
+  .tape-a { top: calc(50% - 130px); } .tape-b { top: calc(50% + 90px); }
+}
+@media (pointer: coarse), (max-width: 720px) {
+  /* Blurs over a canvas that redraws every frame are costly on phones. */
+  .tag, .pill, .icon-btn, .toast, .tray, .ask { backdrop-filter: none; }
+}
+.fallback { position: fixed; inset: 0; display: none; place-items: center; text-align: center; padding: 24px; color: var(--muted); }
+
+@media (max-width: 720px) {
+  .hud { padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+  .tag { gap: 5px; padding: 3px 8px 3px 5px; font-size: 11px; line-height: 14px; }
+  .bubble { padding: 5px 10px; font-size: 13px; }
+  .brand { display: none; }
+  .count { font-size: 22px; line-height: 26px; }
+  .time { font-size: 36px; line-height: 40px; }
+  .feed { top: 96px; }
+  .feed .toast:nth-child(n+3) { display: none; }
+  .count .at { display: none; }
+  .time.wait { font-size: 14px; line-height: 20px; white-space: nowrap; }
+  .center { bottom: max(16px, env(safe-area-inset-bottom)); width: calc(100% - 32px); }
+  .tray { max-width: 100%; overflow-x: auto; }
+  .hint, .leave { display: none; }
+  .count3 { font-size: 160px; }
+  .t1 { font-size: 30px; } .t2 { font-size: 84px; } .t3 { font-size: 12px; letter-spacing: 0.24em; }
+  .tape { height: 46px; } .tape-run span { font-size: 17px; }
+  .tape-a { top: calc(50% - 150px); } .tape-b { top: calc(50% + 105px); }
+}
+</style>
+</head>
+<body>
+<canvas id="world"></canvas>
+<div id="labels"></div>
+<div class="vignette"></div>
+
+<header class="hud top">
+  <div>
+    <div class="brand">OPEN<span>MERCY</span></div>
+    <div class="eyebrow">PUBLIC TABLE</div>
+    <div class="count"><b id="count">1</b><span class="at"> AT THE TABLE</span> <small>/ 7</small></div>
+  </div>
+  <div class="clock">
+    <div class="eyebrow" id="clockLabel">TABLE FILLING</div>
+    <div class="time wait" id="time">WAITING FOR 6 MORE</div>
+    <button class="icon-btn" id="sound" aria-label="Mute sound">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/>
+        <g class="on"><path d="M16 9a5 5 0 0 1 0 6"/><path d="M19.364 18.364a9 9 0 0 0 0-12.728"/></g>
+        <g class="off"><line x1="22" x2="16" y1="9" y2="15"/><line x1="16" x2="22" y1="9" y2="15"/></g>
+      </svg>
+    </button>
+  </div>
+</header>
+<div class="feed" id="feed"></div>
+<footer class="hud bottom">
+  <div></div>
+  <div class="center">
+    <div class="hint"><em>Drag your card</em> move · <em>Tap a player</em> flick · <em>Tap the deck</em> draw</div>
+    <div class="tray" id="tray"></div>
+  </div>
+  <button class="pill leave">LEAVE</button>
+</footer>
+<div class="ask" id="ask" hidden>
+  <div class="ask-title">Turn on the table music?</div>
+  <div class="ask-sub">Your browser needs one tap before it plays sound.</div>
+  <div class="ask-row"><button class="pill ask-yes" id="askYes">SOUND ON</button><button class="pill" id="askNo">NOT NOW</button></div>
+</div>
+<div class="count3" id="count3"></div>
+<div class="showtime" id="showtime">
+  <div class="tape tape-a"><div class="tape-run" id="tapeA"></div></div>
+  <div class="tape tape-b"><div class="tape-run" id="tapeB"></div></div>
+  <div class="title"><span class="t1">SHOW NO</span><span class="t2">MERCY</span><span class="t3" id="showSub"></span></div>
+  <div class="flash"></div>
+</div>
+<div class="curtain" id="curtain"></div>
+<div class="fallback" id="fallback">This browser can't draw the 3D table. The list view would show here.</div>
+
+<script type="module">
+import { createLounge, FACES, TABLE } from './lounge.js'
+import { gsap } from 'gsap'
+
+const $ = (id) => document.getElementById(id)
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
+const PHRASES = ['Hi!', 'Good luck!', 'Mercy!', 'gg', '😂', '🔥', '💀', '😭']
+const SEATS = 7 // a public table seats seven; the next player starts a new table
+const START = 15 // the clock only starts once the table is full
+
+let lounge
+try {
+  lounge = await createLounge({ canvas: $('world'), overlay: $('labels'), artBase: '/frontend/src/assets/cards-webp/', badgeBase: '/frontend/src/assets/badges/', reducedMotion: reduced })
+} catch (err) {
+  console.error(err)
+  $('fallback').style.display = 'grid'
+  throw err
+}
+window.__lounge = lounge
+
+document.body.classList.add('coaching')
+function endCoach() { document.body.classList.remove('coaching') }
+setTimeout(endCoach, 10000)
+
+lounge.onEvent(({ text }) => {
+  const el = document.createElement('div')
+  el.className = 'toast'
+  el.textContent = text
+  $('feed').prepend(el)
+  while ($('feed').children.length > 3) $('feed').lastChild.remove()
+  setTimeout(() => el.remove(), 3300)
+})
+
+function apply(id, i) {
+  if (i.kind === 'move') lounge.move(id, i.x, i.z, i.drag)
+  else if (i.kind === 'flick') lounge.flick(id, i.angle, i.speed)
+  else if (i.kind === 'draw') lounge.draw(id, i.face)
+  else if (i.kind === 'emote') lounge.emote(id, i.text)
+}
+lounge.onIntent((i) => { apply('you', i); if (i.kind === 'move' || i.kind === 'flick' || i.kind === 'draw') endCoach() })
+
+for (const text of PHRASES) {
+  const b = document.createElement('button')
+  b.textContent = text
+  if (text === 'Mercy!') b.className = 'mercy'
+  b.onclick = () => { apply('you', { kind: 'emote', text }); endCoach() }
+  $('tray').append(b)
+}
+
+// ---------------------------------------------------------------- the room, simulated
+const BOTS = [
+  { id: 'b1', name: 'SkyRazor', skin: 'ice', rank: { tier: 9, global: 212 }, at: 1.4 },
+  { id: 'b2', name: 'WildCard', skin: 'toxic', rank: { tier: 3, global: 18920 }, at: 3.0 },
+  { id: 'b3', name: 'DJ_Stack', skin: 'hazard', rank: { tier: 7, global: 902 }, at: 4.8 },
+  { id: 'b4', name: 'Kestrel', skin: 'royal', rank: { tier: 11, global: 57 }, at: 8.5 },
+  { id: 'b5', name: 'PaperTiger', skin: 'ember', rank: null, at: 13 },
+  { id: 'b6', name: 'Mochi_77', skin: 'gold', rank: { tier: 5, global: 6415 }, at: 19 },
+]
+const seated = new Set(['you'])
+let clock = null, dealing = false
+
+lounge.join({ id: 'you', name: 'NightOwl', skin: 'ember', rank: { tier: 6, global: 1284 }, you: true })
+const fillTable = () => { for (const b of BOTS) setTimeout(() => { lounge.join(b); seated.add(b.id); onJoin() }, b.at * 1000) }
+fillTable()
+
+function onJoin() {
+  $('count').textContent = lounge.players.size
+  if (seated.size < SEATS || clock !== null) return
+  clock = START
+  $('clockLabel').textContent = 'TABLE FULL · DEALING IN'
+}
+
+function render() {
+  const t = $('time')
+  if (clock === null) { t.textContent = `WAITING FOR ${SEATS - lounge.players.size} MORE`; t.classList.add('wait'); return }
+  t.classList.remove('wait')
+  const s = Math.max(0, Math.ceil(clock))
+  t.classList.toggle('urgent', s < 10)
+  t.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+}
+addEventListener('keydown', (e) => { if (e.key === 'd') clock = Math.min(clock ?? 3.01, 3.01) })
+
+// ---------------------------------------------------------------- the start of the game
+const wait = (ms) => new Promise((r) => setTimeout(r, ms))
+let lastBeat = null, ac = null
+// ponytail: synthesised thuds; a recorded sting can replace tone() later
+// Only on a running context: a suspended one keeps currentTime at 0, so queued stings would all fire on the first tap.
+function tone(freq, to, dur, gain, type = 'sine') {
+  if (!soundOn || ac?.state !== 'running') return
+  const t = ac.currentTime, o = ac.createOscillator(), g = ac.createGain()
+  o.type = type
+  o.frequency.setValueAtTime(freq, t)
+  o.frequency.exponentialRampToValueAtTime(to, t + dur)
+  g.gain.setValueAtTime(gain, t)
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur)
+  o.connect(g).connect(ac.destination)
+  o.start(t)
+  o.stop(t + dur)
+}
+const boom = () => { tone(150, 30, 1.0, 0.6); tone(900, 200, 0.4, 0.1, 'square') }
+function beat(n) {
+  const el = $('count3')
+  el.textContent = n
+  el.classList.remove('go'); void el.offsetWidth; el.classList.add('go')
+  lounge.pulse(0.7 + (3 - n) * 0.35)
+  tone(240 + (3 - n) * 80, 60, 0.3, 0.4, 'triangle')
+}
+function showtime() {
+  const fill = (el, text) => el.replaceChildren(...[0, 1].map(() => Object.assign(document.createElement('span'), { textContent: text })))
+  const names = [...lounge.players.values()].map((p) => p.name.toUpperCase())
+  fill($('tapeA'), names.map((nm) => `${nm}  ·  `).join('').repeat(4))
+  fill($('tapeB'), `PUBLIC TABLE  ·  ${names.length} PLAYERS  ·  7 CARDS EACH  ·  `.repeat(4))
+  $('showSub').textContent = `${names.length} PLAYERS  ·  7 CARDS EACH`
+  $('showtime').classList.add('on')
+  setTimeout(() => { document.body.classList.add('shake'); tone(110, 35, 0.7, 0.55) }, 360)
+  setTimeout(() => document.body.classList.remove('shake'), 820)
+}
+
+// The prototype loops into the next public table: everyone else is in the game, you wait for a new seven.
+function resetTable() {
+  $('showtime').classList.remove('on', 'out')
+  lounge.reset()
+  for (const id of [...seated]) if (id !== 'you') { lounge.leave(id); seated.delete(id) }
+  $('feed').replaceChildren()
+  $('count').textContent = lounge.players.size
+  $('clockLabel').textContent = 'TABLE FILLING'
+  $('curtain').classList.remove('on')
+  clock = null; dealing = false
+  fillTable()
+  track.currentTime = 0
+  startTrack()
+}
+
+let lastTick = performance.now()
+setInterval(async () => {
+  const now = performance.now(), dt = (now - lastTick) / 1000
+  lastTick = now
+  if (clock !== null && !dealing) {
+    clock -= dt
+    const n = Math.ceil(clock)
+    if (n >= 1 && n <= 3 && n !== lastBeat) { lastBeat = n; beat(n) }
+    if (clock <= 0) try {
+      dealing = true
+      lastBeat = null
+      fadeTrack(0)
+      boom()
+      await lounge.deal()
+      showtime()
+      await wait(2400)
+      $('showtime').classList.add('out')
+      await wait(260)
+      $('curtain').classList.add('on')
+      await wait(700)
+      resetTable()
+    } finally {
+      // An error mid-sequence must not leave the table frozen in the dealing state.
+      if (dealing) resetTable()
+    }
+  }
+  render()
+}, 250)
+
+function botTurn(b) {
+  if (!seated.has(b.id) || dealing) return
+  const me = lounge.players.get(b.id)
+  const others = [...lounge.players.values()].filter((p) => p.id !== b.id)
+  const r = Math.random()
+  if (r < 0.5 || !me) {
+    const a = Math.random() * Math.PI * 2, f = 0.55 + Math.random() * 0.45
+    apply(b.id, { kind: 'move', x: Math.cos(a) * (TABLE.rx - 0.6) * f, z: Math.sin(a) * (TABLE.rz - 0.5) * f })
+  } else if (r < 0.72 && others.length) {
+    const o = others[(Math.random() * others.length) | 0]
+    const dx = o.g.position.x - me.g.position.x, dz = o.g.position.z - me.g.position.z
+    apply(b.id, { kind: 'flick', angle: Math.atan2(dz, dx) + (Math.random() - 0.5) * 0.3, speed: (Math.hypot(dx, dz) + 0.5) * 1.6 })
+  } else if (r < 0.84) {
+    const faces = Object.keys(FACES)
+    if (!lounge.busy) apply(b.id, { kind: 'draw', face: faces[(Math.random() * faces.length) | 0] })
+  } else {
+    apply(b.id, { kind: 'emote', text: PHRASES[(Math.random() * PHRASES.length) | 0] })
+  }
+}
+for (const b of BOTS) {
+  const loop = () => { botTurn(b); setTimeout(loop, 2600 + Math.random() * 3800) }
+  setTimeout(loop, b.at * 1000 + 1500 + Math.random() * 2000)
+}
+
+// ---------------------------------------------------------------- the lounge track
+// Fetched when you land on the table, never with the app; it gives way to the game when the deck deals.
+// The level is baked into the file: iOS ignores audio.volume, so 1 here keeps every platform equal.
+const VOLUME = 1
+const track = Object.assign(new Audio('./division.mp3'), { loop: true, volume: VOLUME })
+let soundOn = true
+function fadeTrack(to) {
+  gsap.to(track, { volume: to, duration: to ? 2 : 1.2, ease: 'sine.inOut', overwrite: true, onComplete: () => { if (!to) track.pause() } })
+}
+function startTrack() {
+  if (!soundOn || dealing) return
+  gsap.killTweensOf(track)
+  track.volume = VOLUME
+  track.play().catch(() => { $('ask').hidden = false })
+}
+startTrack()
+// The track stops with the tab: phones would otherwise keep the loop playing after the player switches apps.
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) track.pause()
+  else startTrack()
+})
+// iOS: follow the silent switch and mix with other audio, like a game's background music (Safari 16.4+).
+if (navigator.audioSession) navigator.audioSession.type = 'ambient'
+// Safari does not count pointerdown as permission to play sound; click and touchend do.
+for (const e of ['pointerdown', 'click', 'touchend', 'keydown']) {
+  addEventListener(e, (ev) => {
+    // iOS only lets an AudioContext start inside a tap, so the stings unlock here with the track.
+    // ('interrupted' is iOS after a lock or a call, so resume on anything but 'running'.)
+    if (soundOn) { ac ??= new AudioContext(); if (ac.state !== 'running') ac.resume() }
+    if (!ev.target.closest?.('#sound, #ask') && track.paused) startTrack()
+  }, { passive: true })
+}
+window.__track = track
+
+// The icon shows what you actually hear: muted until the browser lets the track play.
+const audible = () => soundOn && (!track.paused || dealing)
+function syncIcon() {
+  $('sound').classList.toggle('muted', !audible())
+  $('sound').setAttribute('aria-label', audible() ? 'Mute sound' : 'Turn sound on')
+}
+track.addEventListener('play', () => { $('ask').hidden = true; syncIcon() })
+$('askYes').onclick = () => { soundOn = true; startTrack() }
+$('askNo').onclick = () => { soundOn = false; $('ask').hidden = true; syncIcon() }
+track.addEventListener('pause', syncIcon)
+syncIcon()
+$('sound').onclick = () => {
+  soundOn = !audible()
+  if (soundOn) startTrack()
+  else { gsap.killTweensOf(track); track.pause() }
+  syncIcon()
+}
+</script>
+</body>
+</html>
