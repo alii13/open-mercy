@@ -47,8 +47,8 @@ export function publicTableView(joinable: LiveTable[], inProgress: number, loade
         headline: 'OPEN TABLE',
         status: inProgress > 0
             ? `${inProgress} GAME${inProgress === 1 ? '' : 'S'} IN PROGRESS · START THE NEXT`
-            : 'BE THE FIRST SEAT',
-        body: 'Nobody is waiting yet. Take a seat and the game starts once a second player joins.',
+            : '',
+        body: 'Take a seat. The game starts when someone joins.',
         rules,
     }
 }

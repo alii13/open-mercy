@@ -136,7 +136,7 @@ withDefaults(
   box-shadow: var(--shadow-glow-red);
 }
 
-/* hazard — solid yellow, for answering someone (accept) and the public table's seat button */
+/* hazard — solid yellow, for answering someone (accept) rather than playing */
 .btn--hazard {
   background: var(--color-hazard);
   border-color: var(--color-hazard);

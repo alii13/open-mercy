@@ -42,8 +42,8 @@ describe('public table card', () => {
 
         expect(view.target).toBeNull()
         expect(view.headline).toBe('OPEN TABLE')
-        expect(view.status).toBe('BE THE FIRST SEAT')
-        expect(view.body).toMatch(/Nobody is waiting yet/)
+        expect(view.status).toBe('')
+        expect(view.body).toBe('Take a seat. The game starts when someone joins.')
     })
 
     it('mentions games in progress when every table is mid-game', () => {

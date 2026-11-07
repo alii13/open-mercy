@@ -153,7 +153,7 @@
           </div>
           <template v-if="!dailyRecord">
             <p class="daily-desc">The same shuffle for every player in the world. One scored attempt.</p>
-            <Button variant="secondary" size="md" block @click="$emit('playDaily')">
+            <Button variant="secondary" size="md" block class="daily-play" @click="$emit('playDaily')">
               {{ dailyInProgress ? 'CONTINUE' : 'PLAY' }}
             </Button>
           </template>
@@ -1935,6 +1935,8 @@ function copyLink() {
      link to the bottom — the slack then lands in the list, where more entries
      would go, instead of above a floating footer. */
   .board-card .lb-link { margin-top: auto; }
+  /* Same row as CREATE A ROOM: pinned down so the two buttons line up. */
+  .daily-play { margin-top: auto; }
 }
 
 

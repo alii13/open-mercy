@@ -25,7 +25,7 @@ defineEmits<{ takeSeat: [] }>()
       <h2 id="pt-headline" class="pt-headline">{{ view.headline }}</h2>
       <p v-if="view.status" class="pt-status">{{ view.status }}</p>
       <p class="pt-desc">{{ view.body }}</p>
-      <Button variant="hazard" size="md" block class="pt-cta" :disabled="loading" @click="$emit('takeSeat')">
+      <Button variant="secondary" size="md" block class="pt-cta" :disabled="loading" @click="$emit('takeSeat')">
         {{ loading ? 'FINDING A SEAT...' : 'TAKE A SEAT' }}
       </Button>
     </div>
@@ -118,6 +118,17 @@ defineEmits<{ takeSeat: [] }>()
 
 .pt-cta {
   margin-top: var(--spacing-2);
+}
+
+/* The daily card's PLAY: outlined yellow, filled on hover. */
+.pt-card :deep(.btn--secondary) {
+  border-color: var(--color-hazard);
+  color: var(--color-hazard);
+}
+
+.pt-card :deep(.btn--secondary:hover:not(:disabled)) {
+  background: var(--color-hazard);
+  color: #000;
 }
 
 /* Wide screens: copy on the left, the table on the right, the button pinned
