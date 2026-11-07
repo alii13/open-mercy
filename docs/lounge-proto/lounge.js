@@ -47,6 +47,7 @@ const rand = (a, b) => a + Math.random() * (b - a)
 const finite = (...v) => v.every(Number.isFinite)
 
 // A host that can unmount during load keeps the promise and disposes through it: ready.then((l) => l.dispose()).
+// Each lounge needs its own canvas, sized by CSS: dispose() and a failed load leave the old canvas's context lost for good.
 export async function createLounge({ canvas, overlay, artBase, badgeBase, reducedMotion = false }) {
   await Promise.all([document.fonts.load('64px "Black Ops One"'), document.fonts.load('600 16px "Chakra Petch"')])
 
@@ -546,57 +547,72 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
   }
 
   // ------------------------------------------------------------ drawing from the deck
-  // Draws play one at a time. One that arrives mid-animation waits its turn, so every screen shows every draw.
+  // Draws play one at a time and none is dropped, so every screen shows the same draws: a backlog plays faster, and a
+  // tab back from the background (where nothing animates) lands all but the last few on the pile at once. A draw
+  // keeps its player's name from when it arrived, so it still shows if they leave first. The deal is the one
+  // exception: it takes the deck, so draws still waiting when it starts are dropped.
   const pile = []
   const drawQueue = []
   let drawing = false, drawTl = null
   function draw(id, face) {
-    if (dealing || !players.has(id) || !Object.hasOwn(FACES, face)) return
-    // ponytail: three waiting is plenty for seven seats; past that the oldest drops
-    if (drawQueue.push({ id, face }) > 3) drawQueue.shift()
+    const p = players.get(id)
+    if (dealing || !p || !Object.hasOwn(FACES, face)) return
+    drawQueue.push({ who: p.you ? 'You' : p.name, face })
     if (!drawing) nextDraw()
+    else drawTl.timeScale(1 + drawQueue.length)
+  }
+  const pileSpot = () => ({ x: PILE_AT.x + rand(-0.06, 0.06), y: 0.004 + (pile.length % 30) * 0.0012, z: PILE_AT.z + rand(-0.06, 0.06) })
+  function toPile(c) {
+    pile.push(c)
+    settle(c)
+    if (pile.length > 14) scene.remove(pile.shift())
+  }
+  function land({ who, face }) {
+    const c = makeCard(faceMats[face])
+    c.position.copy(pileSpot())
+    c.rotation.set(-Math.PI / 2, rand(-0.5, 0.5), 0)
+    scene.add(c)
+    toPile(c)
+    emit('event', { text: `${who} drew ${FACES[face]}` })
   }
   function nextDraw() {
     drawing = false
     if (dealing) { drawQueue.length = 0; return }
+    while (drawQueue.length > 3) land(drawQueue.shift())
     const next = drawQueue.shift()
     if (!next) return
-    const p = players.get(next.id)
-    if (!p) { nextDraw(); return }
     drawing = true
-    const face = next.face
-    const c = makeCard(faceMats[face])
+    const c = makeCard(faceMats[next.face])
     c.position.set(DECK_AT.x, deckTop() + 0.004, DECK_AT.z)
     c.rotation.set(Math.PI / 2, deck.rotation.y, 0)
     scene.add(c)
-    emit('event', { text: `${p.you ? 'You' : p.name} drew ${FACES[face]}` })
+    emit('event', { text: `${next.who} drew ${FACES[next.face]}` })
     const camYaw = Math.atan2(camera.position.x - DECK_AT.x, camera.position.z - DECK_AT.z)
-    const restY = 0.004 + (pile.length % 30) * 0.0012
-    drawTl = gsap.timeline({ onComplete: nextDraw })
+    const rest = pileSpot()
+    drawTl = gsap.timeline({ onComplete: nextDraw }).timeScale(1 + drawQueue.length)
       .to(c.position, { y: 1.45, x: DECK_AT.x + 0.1, duration: 0.6, ease: 'power3.out' })
       .to(c.rotation, { x: 0, y: camYaw + Math.PI * 2, duration: 0.6, ease: 'power2.out' }, '<')
       .to(c.position, { y: 1.55, duration: 1.3, ease: 'sine.inOut' })
       .to(c.rotation, { z: 0.08, duration: 1.3, ease: 'sine.inOut' }, '<')
-      .to(c.position, { x: PILE_AT.x + rand(-0.06, 0.06), y: restY, z: PILE_AT.z + rand(-0.06, 0.06), duration: 0.42, ease: 'power2.in' })
+      .to(c.position, { ...rest, duration: 0.42, ease: 'power2.in' })
       .to(c.rotation, { x: -Math.PI / 2, y: rand(-0.5, 0.5), z: 0, duration: 0.42, ease: 'power2.in' }, '<')
       .call(() => {
-        pile.push(c)
-        settle(c)
-        if (pile.length > 14) scene.remove(pile.shift())
+        toPile(c)
         shockwave(c.position.x, c.position.z, new THREE.Color('#ffcc00').multiplyScalar(1.6), 2.2)
       })
   }
 
   // ------------------------------------------------------------ the deal
-  let dealing = false, dealTl = null, dealDone = null
+  let dealing = false, dealTl = null, dealDone = null, dealRun = null
   const dealt = []
   const view = { k: 0 }
   function deal() {
-    if (dealing) return Promise.resolve()
+    // A second call while dealing gets the running deal's promise, never an early answer.
+    if (dealing) return dealRun
     dealing = true
     const seats = [...players.values()]
     // Module scope, so reset() and dispose() can stop a deal halfway; a killed timeline's then() would never settle.
-    const tl = dealTl = gsap.timeline({ onComplete: () => dealDone?.() })
+    const tl = dealTl = gsap.timeline({ onComplete: () => dealDone?.(true) })
     pulse(1.8)
     tl.to(deck.position, { y: 0.42, duration: 0.2, ease: 'power2.out', yoyo: true, repeat: 1 }, 0)
     tl.to(deck.rotation, { y: deck.rotation.y + Math.PI * 2, duration: 0.55, ease: 'power3.out' }, 0)
@@ -636,7 +652,8 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
     tl.to(deck.scale, { y: 0.3, duration: i * STAGGER, ease: 'none' }, START)
     tl.to(view, { k: 1, duration: 1.4, ease: 'power3.inOut' }, '-=0.35')
     emit('event', { text: 'Dealing seven to everyone' })
-    return new Promise((res) => { dealDone = res })
+    // Resolves true when the deal finishes, false when reset() or dispose() cuts it short.
+    return (dealRun = new Promise((res) => { dealDone = res }))
   }
 
   // A beat of the countdown: a shockwave from the deck, the lamp flares, the camera jolts.
@@ -650,9 +667,10 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
 
   function reset() {
     dealTl?.kill()
-    dealDone?.()
+    dealDone?.(false)
     dealTl = dealDone = null
     deck.position.y = DECK_AT.y
+    deck.rotation.y = 0.08
     for (const c of dealt) scene.remove(c)
     dealt.length = 0
     gsap.to(deck.scale, { y: 1, duration: 0.6, ease: 'power2.out' })
@@ -663,7 +681,8 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
   // ------------------------------------------------------------ camera framing
   const base = { pos: new THREE.Vector3(), look: new THREE.Vector3() }
   let baseFov = 40, portrait = false
-  // Sized from the canvas, not the window: a host can mount the lounge in any box.
+  // Sized from the canvas, not the window: a host can mount the lounge in any box, as long as CSS sizes the canvas.
+  // Without a CSS size the canvas lays out at its own buffer size, which grows by the pixel ratio on every resize.
   function frame() {
     const w = canvas.clientWidth, h = canvas.clientHeight, a = w / h
     if (!w || !h) return
@@ -736,9 +755,13 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
   // Drag your card to move it, tap the felt to walk there, tap someone to flick a card at them,
   // tap the deck to draw, tap yourself to wave.
   let drag = null
-  // One finger steers. A second one resting on the screen must not take over a drag or turn a wave into a move.
+  // One finger steers: while it drags, other fingers are ignored. Not isPrimary: a finger resting on the screen
+  // would make every later touch non-primary and block all input.
   canvas.addEventListener('pointerdown', (e) => {
-    if (dealing || !e.isPrimary) return
+    if (dealing || e.button !== 0) return
+    // A drag whose pointer capture is gone (the canvas moved mid-touch, a context menu took the pointerup) is stale.
+    if (drag && !canvas.hasPointerCapture(drag.id)) drag = null
+    if (drag) return
     const h = pick(e)
     if (h.what === 'you') { drag = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false, sent: 0 }; canvas.setPointerCapture(e.pointerId) }
     else if (h.what === 'player' && me()) {
@@ -749,7 +772,7 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
     else if (h.what === 'felt') emit('intent', { kind: 'move', x: h.felt.x, z: h.felt.z })
   }, { signal })
   canvas.addEventListener('pointermove', (e) => {
-    if (!e.isPrimary || (drag && e.pointerId !== drag.id)) return
+    if (drag ? e.pointerId !== drag.id : !e.isPrimary) return
     const r = canvas.getBoundingClientRect()
     pointer.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1)
     const h = pick(e)
@@ -774,7 +797,10 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
     drag = null
   }
   canvas.addEventListener('pointerup', endDrag, { signal })
-  canvas.addEventListener('pointercancel', (e) => { if (drag && e.pointerId === drag.id) drag = null }, { signal })
+  // A drag that loses its pointer without a pointerup must not block every later tap.
+  const dropDrag = (e) => { if (drag && e.pointerId === drag.id) drag = null }
+  canvas.addEventListener('pointercancel', dropDrag, { signal })
+  canvas.addEventListener('lostpointercapture', dropDrag, { signal })
 
   // ------------------------------------------------------------ loop
   const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: lite ? 0 : 4 }))
@@ -784,7 +810,8 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
   composer.addPass(bloom)
   composer.addPass(new OutputPass())
   frame()
-  const sizer = new ResizeObserver(frame)
+  // ResizeObserver runs after the frame is drawn and resizing clears the canvas, so draw again or it blinks.
+  const sizer = new ResizeObserver(() => { frame(); composer.render(); labels.render(scene, camera) })
   sizer.observe(canvas)
 
   // Phones drop the GL context when a backgrounded tab is short of memory. three rebuilds its state on restore,
@@ -867,6 +894,7 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
       off.abort()
       sizer.disconnect()
       dealTl?.kill()
+      dealDone?.(false)
       drawTl?.kill()
       renderer.setAnimationLoop(null)
       overlay.replaceChildren()
