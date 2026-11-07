@@ -108,14 +108,20 @@ export function pendingLoud(
     return newest
 }
 
-/** Follow an entry's button: an app route in place, an outside link in a new tab. */
+/**
+ * Follow an entry's button: an app route in place, an outside link in a new
+ * tab. `takeSeat` sits the reader at the public table; where nobody can sit
+ * down (signed out) the button only goes home.
+ */
 export function followCta(
     cta: ChangelogCta,
     nav: (r: Route) => void,
     open: (url: string, target: string, features: string) => unknown = (u, t, f) => window.open(u, t, f),
     ownCode?: string | null,
+    takeSeat?: () => void,
 ): void {
     if ('href' in cta) open(cta.href, '_blank', 'noopener,noreferrer')
+    else if ('takeSeat' in cta) { nav({ name: 'home' }); takeSeat?.() }
     else if ('ownProfile' in cta) { if (ownCode) nav({ name: 'profile', code: ownCode }) }
     else if ('scrollTo' in cta) {
         const el = document.getElementById(cta.scrollTo)

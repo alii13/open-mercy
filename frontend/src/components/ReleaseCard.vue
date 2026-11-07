@@ -65,10 +65,15 @@ import { useAuthStore } from '../stores/authStore'
 import { supabase } from '../lib/supabase'
 import { navigate } from '../utils/routes'
 import { followCta } from '../utils/whatsNew'
+import { useMultiplayerStore } from '../stores/multiplayerStore'
+import { PUBLIC_TABLE_RULES } from '../utils/publicTable'
 import { track } from '../utils/analytics'
 
 const { card, dismissCard, markAllRead } = useWhatsNew()
 const authStore = useAuthStore()
+// A changelog button can sit the reader at the public table, as TAKE A SEAT does.
+const mp = useMultiplayerStore()
+const takeSeat = () => void mp.quickMatch(PUBLIC_TABLE_RULES)
 
 const entry = computed(() => card.value)
 const signedIn = computed(() => authStore.isAuthenticated)
@@ -163,7 +168,7 @@ function go() {
     dismissCard(entry.value.id)
     // Acting on the card is a stronger read receipt than opening the panel.
     markAllRead()
-    if (cta) followCta(cta, navigate, undefined, authStore.profile?.share_code)
+    if (cta) followCta(cta, navigate, undefined, authStore.profile?.share_code, takeSeat)
 }
 </script>
 

@@ -28,6 +28,8 @@ export type ChangelogCta =
     | { label: string; ownProfile: true }
     /** An element on the home screen, by id; from another page it goes home. */
     | { label: string; scrollTo: string }
+    /** Sits the reader at the public table, the same as its TAKE A SEAT. */
+    | { label: string; takeSeat: true }
 
 export interface ChangelogEntry {
     /** ISO date, sortable. */
@@ -69,10 +71,10 @@ export const CHANGELOG: ChangelogEntry[] = [
         id: '2026-11-07',
         level: 'loud',
         tag: 'NEW',
-        title: 'Play strangers at the public table',
-        body: 'No room code, no host: tap TAKE A SEAT to join strangers at a live table.',
+        title: 'Take a seat at the public table',
+        body: 'A new 3D table where you play people from anywhere, no room code needed. Sit down, and the game deals itself once all seven seats are filled.',
         image: publicTableImage,
-        cta: { label: 'SEE THE PUBLIC TABLE', scrollTo: 'public-table' },
+        cta: { label: 'TAKE A SEAT', takeSeat: true },
     },
     {
         id: '2026-11-05',

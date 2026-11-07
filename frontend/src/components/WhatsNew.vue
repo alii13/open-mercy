@@ -63,11 +63,16 @@ import { useWhatsNew } from '../composables/useWhatsNew'
 import { relativeTime } from '../utils/relativeTime'
 import { navigate, type Route } from '../utils/routes'
 import { followCta } from '../utils/whatsNew'
+import { useMultiplayerStore } from '../stores/multiplayerStore'
+import { PUBLIC_TABLE_RULES } from '../utils/publicTable'
 import { useAuthStore } from '../stores/authStore'
 import { track } from '../utils/analytics'
 import type { ChangelogEntry } from '../data/changelog'
 
 const authStore = useAuthStore()
+// A changelog button can sit the reader at the public table, as TAKE A SEAT does.
+const mp = useMultiplayerStore()
+const takeSeat = () => void mp.quickMatch(PUBLIC_TABLE_RULES)
 
 const { entries, unread, unreadIds, markAllRead } = useWhatsNew()
 
@@ -116,7 +121,7 @@ function goEntry(entry: ChangelogEntry) {
     if (!entry.cta) return
     track('whatsnew_entry_clicked', { entry_id: entry.id })
     close()
-    followCta(entry.cta, go, undefined, authStore.profile?.share_code)
+    followCta(entry.cta, go, undefined, authStore.profile?.share_code, takeSeat)
 }
 
 function goChangelog() {

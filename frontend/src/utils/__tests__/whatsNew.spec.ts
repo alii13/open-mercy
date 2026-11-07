@@ -196,3 +196,18 @@ describe('followCta to your own profile', () => {
         expect(nav).not.toHaveBeenCalled()
     })
 })
+
+describe('followCta to the public table', () => {
+    it('goes home and takes a seat, the same as TAKE A SEAT', () => {
+        const nav = vi.fn(), takeSeat = vi.fn()
+        followCta({ label: 'TAKE A SEAT', takeSeat: true }, nav, vi.fn(), null, takeSeat)
+        expect(nav).toHaveBeenCalledWith({ name: 'home' })
+        expect(takeSeat).toHaveBeenCalledOnce()
+    })
+
+    it('only goes home where nobody can sit down (signed out)', () => {
+        const nav = vi.fn()
+        followCta({ label: 'TAKE A SEAT', takeSeat: true }, nav, vi.fn(), null)
+        expect(nav).toHaveBeenCalledWith({ name: 'home' })
+    })
+})
