@@ -196,31 +196,35 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 let beat = 0
 let showing = false
-let shownFor = 0
+let lastClockAt = 0
 const clock = setInterval(() => {
     if (!lounge || showing) return
     const a = mp.autoStart
     if (!a) {
-        // The room dealt a beat before this clock got to zero: play the start now.
+        // The room dealt: the start plays here while the game view waits.
         if (mp.loungeShow && mp.gameStatus !== 'waiting') { void showtime(); return }
+        // The room says "started" a moment before it sends the game, so a held
+        // start waits for it. A clock that ends with no game (fewer than two
+        // stayed) lets go once the game has had time to arrive.
+        if (mp.loungeShow && Date.now() - lastClockAt < 2500) return
         beat = 0
         secs.value = null
         mp.loungeShow = false
         return
     }
+    lastClockAt = Date.now()
     const left = a.deadline - Date.now()
     secs.value = Math.max(0, Math.ceil(left / 1000))
     const n = secs.value
+    // From the last few seconds the start is committed and the game view waits
+    // for it. Set on every tick, not on one beat: a busy page can skip a tick.
+    if (left <= 3500) mp.loungeShow = true
     if (n >= 1 && n <= 3 && n !== beat) {
         beat = n
-        // From three the start is committed: the game view waits for it.
-        mp.loungeShow = true
         slam.value = n
         lounge.pulse(0.7 + (3 - n) * 0.35)
         tone(240 + (3 - n) * 80, 60, 0.3, 0.4, 'triangle')
     }
-    // Once per deadline: a room that did not deal clears or moves the clock.
-    if (left <= 0 && a.deadline !== shownFor) { shownFor = a.deadline; void showtime() }
 }, 100)
 
 // At zero: the deal, the hazard tapes with every name at the table, a flash,
