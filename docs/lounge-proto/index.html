@@ -404,7 +404,7 @@ function fadeTrack(to) {
   gsap.to(track, { volume: to, duration: to ? 2 : 1.2, ease: 'sine.inOut', overwrite: true, onComplete: () => { if (!to) track.pause() } })
 }
 function startTrack() {
-  if (!soundOn || dealing) return
+  if (!soundOn || dealing || document.hidden) return
   gsap.killTweensOf(track)
   track.volume = VOLUME
   track.play().catch(() => { $('ask').hidden = false })

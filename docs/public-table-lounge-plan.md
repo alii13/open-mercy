@@ -74,7 +74,9 @@ Each one ships on its own and is useful on its own.
   
 - Server: one new message, `lounge`, with `kind: 'move' | 'flick' | 'draw' | 'emote'` and a small payload. The DO relays it to the room and stores nothing. No tick, no physics on the server. Every client animates the same event from the same numbers.
   
-- Late joiners: when presence changes, each client re-sends its own `move` once with a random delay under half a second. No server state needed.
+- Late joiners: when presence changes, each client re-sends its own `move` once with a random delay under half a second. No server state needed. A seven-session test without this step put everyone up to 8.6 m from their real spot on a rejoining player's screen. A relay that keeps each player's last spot and sends it with the roster fixed it too.
+  
+- A client sends no lounge message until the room confirms its join. In the same test, a draw sent in the same second as the join reached only the sender.
   
 - Photo: add a `photo` URL to the auth message and the presence player record. It changes only on join, so it is safe on presence.
   
@@ -97,9 +99,9 @@ Each one ships on its own and is useful on its own.
 - Size: two to three days.
   
 ### 3. Toys
-- `flick`: payload is origin, direction and speed. Each client runs the same skid with friction and the same wobble on the card it hits.
+- `flick`: the sender's client runs the skid and sends the outcome with the direction and speed: where the card stops and whose card it hits. Other clients replay that path instead of simulating it. In the seven-session test, independent skids put one flick into three different players on three screens.
   
-- `draw`: payload is a card id from the deck art set. The top card lifts, flips and shows the face for two seconds, with the caption.
+- `draw`: payload is a card id from the deck art set. The top card lifts, flips and shows the face for two seconds, with the caption. A slow client never drops a draw: it plays its backlog faster. Before that change, a client that fell behind in the test skipped two draws the others showed.
   
 - Emote bubbles grow to a radial picker on your own card.
   
