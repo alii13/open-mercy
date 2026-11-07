@@ -427,8 +427,8 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-/* Over the page and its footer, under the lobby top bar (50) and the
-   release card (60). */
+/* Over the page and its footer, under the release card (60). The lobby
+   hides its top bar while the table is up. */
 .ptl {
   position: fixed;
   inset: 0;
@@ -478,9 +478,8 @@ onUnmounted(() => {
   pointer-events: auto;
 }
 
-/* Below the lobby's top bar, which stays over the table. */
 .ptl-top {
-  top: calc(64px + env(safe-area-inset-top));
+  top: env(safe-area-inset-top);
 }
 
 .ptl-bottom {
@@ -814,7 +813,7 @@ onUnmounted(() => {
 
 .ptl-feed {
   position: absolute;
-  top: calc(64px + env(safe-area-inset-top) + var(--spacing-4));
+  top: calc(env(safe-area-inset-top) + var(--spacing-4));
   left: 50%;
   transform: translateX(-50%);
   margin: 0;

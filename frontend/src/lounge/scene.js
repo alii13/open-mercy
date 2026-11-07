@@ -306,6 +306,20 @@ export async function createLounge({ canvas, overlay, artUrl, badgeUrl, reducedM
   cone.position.y = CONE_H / 2
   scene.add(cone)
 
+  // A tall screen has empty height above the table, so the lamp hangs higher there and its beam fills it.
+  // The spot widens and strengthens with the drop, so the felt is lit the same from any height.
+  let lampY = LAMP_Y, spotPower = 95
+  function hang(y) {
+    lampY = y
+    pivot.position.y = y + 7
+    cone.scale.y = (y + 0.05) / CONE_H
+    cone.position.y = (y + 0.05) / 2
+    spot.angle = Math.atan(TABLE.rx / y)
+    spot.intensity = spotPower = 95 * (y / LAMP_Y) ** 2
+    spot.shadow.camera.far = y + 5
+    spot.shadow.camera.updateProjectionMatrix()
+  }
+
   const DUST = lite ? 260 : 520
   const dust = { theta: new Float32Array(DUST), frac: new Float32Array(DUST), y: new Float32Array(DUST), phase: new Float32Array(DUST) }
   const dustPos = new Float32Array(DUST * 3)
@@ -437,7 +451,7 @@ export async function createLounge({ canvas, overlay, artUrl, badgeUrl, reducedM
 
   // Portrait phones see the table from far back, so seated cards stand larger there; frame() re-runs this on rotation.
   function sizeSeat(p) {
-    const sc = portrait ? 1.3 : 1
+    const sc = portrait ? 1.6 : 1
     p.baseY = (CARD.h / 2) * Math.cos(TILT) * sc + 0.01
     p.card.scale.setScalar(sc)
     p.hit.scale.setScalar(sc)
@@ -471,7 +485,7 @@ export async function createLounge({ canvas, overlay, artUrl, badgeUrl, reducedM
   }
 
   function freeSpot(you) {
-    if (you) return portrait ? clampToSeats(SEAT.rx * 0.92, rand(-0.4, 0.4)) : clampToSeats(rand(0.9, 1.3), SEAT.rz * 0.92)
+    if (you) return clampToSeats(rand(0.9, 1.3), SEAT.rz * 0.92)
     let best = null, bestD = -1
     for (let i = 0; i < 40; i++) {
       const a = rand(0, Math.PI * 2), f = rand(0.55, 1)
@@ -714,7 +728,7 @@ export async function createLounge({ canvas, overlay, artUrl, badgeUrl, reducedM
   let shake = 0
   function pulse(strength = 1) {
     shockwave(DECK_AT.x, DECK_AT.z, new THREE.Color('#ff2a2a').multiplyScalar(1.3), 2.4 + strength * 1.6)
-    gsap.fromTo(spot, { intensity: 95 * (1 + 0.9 * strength) }, { intensity: 95, duration: 0.7, ease: 'power2.out' })
+    gsap.fromTo(spot, { intensity: spotPower * (1 + 0.9 * strength) }, { intensity: spotPower, duration: 0.7, ease: 'power2.out' })
     gsap.fromTo(cone.material.uniforms.uStrength, { value: 0.16 * (1 + strength) }, { value: 0.16, duration: 0.7, ease: 'power2.out' })
     if (!reducedMotion) shake = Math.max(shake, 0.05 * strength)
   }
@@ -744,19 +758,19 @@ export async function createLounge({ canvas, overlay, artUrl, badgeUrl, reducedM
     composer.setSize(w, h)
     labels.setSize(w, h)
     portrait = a < 0.9
-    camera.fov = baseFov = portrait ? 58 : 40
+    camera.fov = baseFov = portrait ? 50 : 40
     camera.aspect = a
     camera.updateProjectionMatrix()
     const halfH = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))
     const hf = Math.atan(halfH * a)
-    // ponytail: a portrait screen looks down the table's long axis with the lamp hidden; the real phone pass is iteration 4
-    const dir = portrait ? new THREE.Vector3(1, 1.6, 0).normalize() : new THREE.Vector3(0, 0.52, 1).normalize()
-    // Portrait stands back and looks past the deck so every seat lands between the host's heading and its controls.
-    const d = portrait ? (1.18 * (TABLE.rz + 0.35)) / Math.tan(hf) : Math.max(7.6, (TABLE.rx + 0.05) / Math.tan(hf))
-    base.look.set(portrait ? -0.3 : 0, portrait ? 0 : 0.2, portrait ? 0 : 0.1)
+    // Every screen sees the table from the front. A portrait one sits higher and aims above the felt,
+    // giving the screen's spare height to a taller lamp and its beam.
+    const dir = new THREE.Vector3(0, portrait ? 0.9 : 0.52, 1).normalize()
+    hang(portrait ? 7 : LAMP_Y)
+    // Portrait lets the rail run off the sides, as wide screens do, so the seats get the width.
+    const d = Math.max(7.6, (portrait ? TABLE.rx - 0.3 : TABLE.rx + 0.05) / Math.tan(hf))
+    base.look.set(0, portrait ? 1.6 : 0.2, 0.1)
     base.pos.copy(base.look).addScaledVector(dir, d)
-    // Hide the lamp's meshes, never the group: an invisible parent also switches off the spot light and every shadow.
-    for (const m of lamp.children) if (m !== spot && m !== spot.target) m.visible = !portrait
     for (const p of players.values()) sizeSeat(p)
   }
 
@@ -859,7 +873,7 @@ export async function createLounge({ canvas, overlay, artUrl, badgeUrl, reducedM
   canvas.addEventListener('lostpointercapture', dropDrag, { signal })
 
   // ------------------------------------------------------------ loop
-  const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: lite ? 0 : 4 }))
+  const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 }))
   composer.setPixelRatio(renderer.getPixelRatio())
   composer.addPass(new RenderPass(scene, camera))
   const bloom = new UnrealBloomPass(new THREE.Vector2(512, 512), 0.6, 0.55, 1.6)
@@ -897,8 +911,8 @@ export async function createLounge({ canvas, overlay, artUrl, badgeUrl, reducedM
     for (let i = 0; i < DUST; i++) {
       dust.y[i] += dt * 0.035 * motion
       dust.theta[i] += dt * 0.025 * motion
-      if (dust.y[i] > LAMP_Y - 0.2) dust.y[i] = 0.08
-      const r = dust.frac[i] * (3.6 * (1 - dust.y[i] / CONE_H) + 0.08)
+      if (dust.y[i] > lampY - 0.2) dust.y[i] = 0.08
+      const r = dust.frac[i] * (3.6 * (1 - dust.y[i] / (lampY + 0.05)) + 0.08)
       const wob = Math.sin(t * 0.6 + dust.phase[i]) * 0.05
       dustPos[i * 3] = Math.cos(dust.theta[i]) * r + wob
       dustPos[i * 3 + 1] = dust.y[i]
