@@ -14,9 +14,9 @@ TL;DR: Quick match becomes its own "Public table" card on the home page, and the
   
 - Four gestures, each one tap or one drag, all of them fine on a phone:
   
-  1. Tap the felt: your card slides there. Everyone sees it move.
+  1. Drag your card, or tap the felt: your card slides there. Everyone sees it move.
     
-  2. Drag from your card and let go: you flick a card across the felt. It skids, hits someone's card, theirs wobbles.
+  2. Tap someone's card: you flick a card at them across the felt. It skids, hits their card, theirs wobbles.
     
   3. Tap the deck: a card lifts, flips and shows a face to everyone. "WildCard drew +10."
     

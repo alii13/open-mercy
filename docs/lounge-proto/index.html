@@ -326,6 +326,21 @@ function showtime() {
   setTimeout(() => document.body.classList.remove('shake'), 820)
 }
 
+// The prototype loops into the next public table: everyone else is in the game, you wait for a new seven.
+function resetTable() {
+  $('showtime').classList.remove('on', 'out')
+  lounge.reset()
+  for (const id of [...seated]) if (id !== 'you') { lounge.leave(id); seated.delete(id) }
+  $('feed').replaceChildren()
+  $('count').textContent = lounge.players.size
+  $('clockLabel').textContent = 'TABLE FILLING'
+  $('curtain').classList.remove('on')
+  clock = null; dealing = false
+  fillTable()
+  track.currentTime = 0
+  startTrack()
+}
+
 let lastTick = performance.now()
 setInterval(async () => {
   const now = performance.now(), dt = (now - lastTick) / 1000
@@ -346,21 +361,10 @@ setInterval(async () => {
       await wait(260)
       $('curtain').classList.add('on')
       await wait(700)
-      $('showtime').classList.remove('on', 'out')
-      // The prototype loops into the next public table: everyone else is in the game, you wait for a new seven.
-      lounge.reset()
-      for (const id of [...seated]) if (id !== 'you') { lounge.leave(id); seated.delete(id) }
-      $('feed').replaceChildren()
-      $('count').textContent = lounge.players.size
-      $('clockLabel').textContent = 'TABLE FILLING'
-      $('curtain').classList.remove('on')
-      clock = null; dealing = false
-      fillTable()
-      track.currentTime = 0
-      startTrack()
+      resetTable()
     } finally {
       // An error mid-sequence must not leave the table frozen in the dealing state.
-      if (dealing) { dealing = false; clock = null }
+      if (dealing) resetTable()
     }
   }
   render()
@@ -406,6 +410,13 @@ function startTrack() {
   track.play().catch(() => { $('ask').hidden = false })
 }
 startTrack()
+// The track stops with the tab: phones would otherwise keep the loop playing after the player switches apps.
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) track.pause()
+  else startTrack()
+})
+// iOS: follow the silent switch and mix with other audio, like a game's background music (Safari 16.4+).
+if (navigator.audioSession) navigator.audioSession.type = 'ambient'
 // Safari does not count pointerdown as permission to play sound; click and touchend do.
 for (const e of ['pointerdown', 'click', 'touchend', 'keydown']) {
   addEventListener(e, (ev) => {

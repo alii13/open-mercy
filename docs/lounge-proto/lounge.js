@@ -43,7 +43,10 @@ export const FACES = {
 const lerp = (a, b, t) => a + (b - a) * t
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x))
 const rand = (a, b) => a + Math.random() * (b - a)
+// Positions, angles and speeds arrive from other players once the room relays them; one NaN would spread to every card.
+const finite = (...v) => v.every(Number.isFinite)
 
+// A host that can unmount during load keeps the promise and disposes through it: ready.then((l) => l.dispose()).
 export async function createLounge({ canvas, overlay, artBase, badgeBase, reducedMotion = false }) {
   await Promise.all([document.fonts.load('64px "Black Ops One"'), document.fonts.load('600 16px "Chakra Petch"')])
 
@@ -173,19 +176,28 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
 
   const loader = new THREE.TextureLoader()
   const faceMats = {}
-  await Promise.all(Object.keys(FACES).map(async (name) => {
-    const t = await loader.loadAsync(`${artBase}${name}.webp`)
-    t.colorSpace = THREE.SRGBColorSpace
-    t.anisotropy = maxAniso
-    faceMats[name] = new THREE.MeshStandardMaterial({ map: t, color: 0xd2d2d2, roughness: 0.48, alphaTest: 0.5 })
-  }))
+  try {
+    await Promise.all(Object.keys(FACES).map(async (name) => {
+      const t = await loader.loadAsync(`${artBase}${name}.webp`)
+      t.colorSpace = THREE.SRGBColorSpace
+      t.anisotropy = maxAniso
+      faceMats[name] = new THREE.MeshStandardMaterial({ map: t, color: 0xd2d2d2, roughness: 0.48, alphaTest: 0.5 })
+    }))
+  } catch (err) {
+    // A missing asset must not strand a live WebGL context: each retry would add another until the browser evicts them.
+    renderer.dispose()
+    renderer.forceContextLoss()
+    throw err
+  }
 
   // ------------------------------------------------------------ table, lamp, room
   const backMat = new THREE.MeshStandardMaterial({ map: backTex, roughness: 0.55 })
 
+  // Phones skip the sheen and clearcoat: the felt fills most of the screen, so its shader cost is paid on almost every pixel.
   const felt = new THREE.Mesh(
     new THREE.CircleGeometry(1, 160).rotateX(-Math.PI / 2),
-    new THREE.MeshPhysicalMaterial({ map: feltTex, roughness: 0.92, sheen: 0.7, sheenRoughness: 0.55, sheenColor: new THREE.Color(0x6b5a46) }),
+    lite ? new THREE.MeshStandardMaterial({ map: feltTex, roughness: 0.92 })
+      : new THREE.MeshPhysicalMaterial({ map: feltTex, roughness: 0.92, sheen: 0.7, sheenRoughness: 0.55, sheenColor: new THREE.Color(0x6b5a46) }),
   )
   felt.scale.set(TABLE.rx, 1, TABLE.rz)
   felt.receiveShadow = true
@@ -194,13 +206,15 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
   const ellipseTube = (rx, rz, y, radius, mat) => {
     const pts = []
     for (let i = 0; i < 128; i++) { const a = (i / 128) * Math.PI * 2; pts.push(new THREE.Vector3(Math.cos(a) * rx, y, Math.sin(a) * rz)) }
-    const m = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, true), 320, radius, 20, true), mat)
-    m.castShadow = true; m.receiveShadow = true
+    const m = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, true), lite ? 160 : 320, radius, lite ? 10 : 20, true), mat)
+    // The rails' shadows fall outward onto the dark floor, where nobody can see them, so they stay out of the shadow map.
+    m.receiveShadow = true
     scene.add(m)
     return m
   }
-  ellipseTube(TABLE.rx + 0.12, TABLE.rz + 0.12, 0.07, 0.21,
-    new THREE.MeshPhysicalMaterial({ color: 0x1e0a0d, roughness: 0.42, clearcoat: 0.55, clearcoatRoughness: 0.32 }))
+  ellipseTube(TABLE.rx + 0.12, TABLE.rz + 0.12, 0.07, 0.21, lite
+    ? new THREE.MeshStandardMaterial({ color: 0x1e0a0d, roughness: 0.42 })
+    : new THREE.MeshPhysicalMaterial({ color: 0x1e0a0d, roughness: 0.42, clearcoat: 0.55, clearcoatRoughness: 0.32 }))
   ellipseTube(TABLE.rx - 0.07, TABLE.rz - 0.07, 0.012, 0.022,
     new THREE.MeshStandardMaterial({ color: 0xdedee4, metalness: 1, roughness: 0.16 }))
 
@@ -279,7 +293,8 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
         float shafts = 0.72 + 0.28 * sin(a * 7.0 + uTime * 0.25) * sin(a * 3.0 - uTime * 0.17);
         gl_FragColor = vec4(uColor, through * fade * shafts * uStrength);
       }`,
-    transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
+    // Additive with no depth writes, so one pass of both faces looks the same as three's default back-then-front pair.
+    transparent: true, depthWrite: false, side: THREE.DoubleSide, forceSinglePass: true, blending: THREE.AdditiveBlending,
   }))
   cone.position.y = CONE_H / 2
   scene.add(cone)
@@ -350,7 +365,8 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
   const hitGeo = new THREE.BoxGeometry(CARD.w * (lite ? 1.6 : 1.25), CARD.h * 1.25, 0.5).translate(0, CARD.h / 2, 0)
   const hitMat = new THREE.MeshBasicMaterial()
   const listeners = { intent: [], event: [] }
-  const emit = (type, payload) => listeners[type].forEach((fn) => fn(payload))
+  // Some events fire inside the frame; a listener that throws there would stop the render loop.
+  const emit = (type, payload) => listeners[type].forEach((fn) => { try { fn(payload) } catch (err) { console.error(err) } })
 
   function shockwave(x, z, color, size = 3.2) {
     const m = new THREE.Mesh(new THREE.RingGeometry(0.3, 0.36, 64).rotateX(-Math.PI / 2),
@@ -364,7 +380,7 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
   function join({ id, name, skin = 'ember', rank = null, you = false, x, z }) {
     if (players.has(id)) return
     const g = new THREE.Group()
-    const sk = SKINS[skin] ?? SKINS.ember
+    const sk = Object.hasOwn(SKINS, skin) ? SKINS[skin] : SKINS.ember
     const faceTex = playerFaceTex(sk, rank)
     const card = makeCard(new THREE.MeshStandardMaterial({ map: faceTex, roughness: 0.5, emissive: 0xffffff, emissiveMap: faceTex, emissiveIntensity: 0.2 }))
     card.rotation.x = -TILT
@@ -392,7 +408,7 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
     g.add(tag, bubble)
     for (const el of [tagEl, bubbleEl]) el.style.pointerEvents = 'none'
 
-    const spot0 = x === undefined ? freeSpot(you) : { x, z }
+    const spot0 = finite(x, z) ? clampToSeats(x, z) : freeSpot(you)
     g.position.set(spot0.x, 0, spot0.z)
     scene.add(g)
     const p = { id, name, you, g, card, ring, glow, hit, tagEl, bubbleEl, tag, bubble, baseY: 0, tx: spot0.x, tz: spot0.z, k: 3.2,
@@ -459,7 +475,7 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
 
   function move(id, x, z, drag = false) {
     const p = players.get(id)
-    if (!p) return
+    if (!p || !finite(x, z)) return
     const c = clampToSeats(x, z)
     p.tx = c.x; p.tz = c.z
     p.k = drag ? 12 : 3.2
@@ -484,7 +500,8 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
   let litterLayer = 0
   function flick(id, angle, speed) {
     const p = players.get(id)
-    if (!p) return
+    if (!p || !finite(angle, speed)) return
+    speed = clamp(speed, 0, 18)
     const c = makeCard(faceMats[randomFace()])
     c.rotation.x = -Math.PI / 2
     c.rotation.y = rand(0, Math.PI * 2)
@@ -517,7 +534,7 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
       for (const p of players.values()) {
         if (p === f.owner && f.age < 0.4) continue
         const dx = p.g.position.x - pos.x, dz = p.g.position.z - pos.z, d = Math.hypot(dx, dz)
-        if (d > 0.34 || d < 1e-4) continue
+        if (!(d >= 1e-4 && d <= 0.34)) continue
         const nx = dx / d, nz = dz / d, vn = f.vx * nx + f.vz * nz
         if (vn <= 0) continue
         f.vx = (f.vx - 2 * vn * nx) * 0.45; f.vz = (f.vz - 2 * vn * nz) * 0.45
@@ -529,12 +546,25 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
   }
 
   // ------------------------------------------------------------ drawing from the deck
+  // Draws play one at a time. One that arrives mid-animation waits its turn, so every screen shows every draw.
   const pile = []
-  let drawing = false
+  const drawQueue = []
+  let drawing = false, drawTl = null
   function draw(id, face) {
-    const p = players.get(id)
-    if (!p || drawing || dealing) return
+    if (dealing || !players.has(id) || !Object.hasOwn(FACES, face)) return
+    // ponytail: three waiting is plenty for seven seats; past that the oldest drops
+    if (drawQueue.push({ id, face }) > 3) drawQueue.shift()
+    if (!drawing) nextDraw()
+  }
+  function nextDraw() {
+    drawing = false
+    if (dealing) { drawQueue.length = 0; return }
+    const next = drawQueue.shift()
+    if (!next) return
+    const p = players.get(next.id)
+    if (!p) { nextDraw(); return }
     drawing = true
+    const face = next.face
     const c = makeCard(faceMats[face])
     c.position.set(DECK_AT.x, deckTop() + 0.004, DECK_AT.z)
     c.rotation.set(Math.PI / 2, deck.rotation.y, 0)
@@ -542,7 +572,7 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
     emit('event', { text: `${p.you ? 'You' : p.name} drew ${FACES[face]}` })
     const camYaw = Math.atan2(camera.position.x - DECK_AT.x, camera.position.z - DECK_AT.z)
     const restY = 0.004 + (pile.length % 30) * 0.0012
-    gsap.timeline({ onComplete: () => { drawing = false } })
+    drawTl = gsap.timeline({ onComplete: nextDraw })
       .to(c.position, { y: 1.45, x: DECK_AT.x + 0.1, duration: 0.6, ease: 'power3.out' })
       .to(c.rotation, { x: 0, y: camYaw + Math.PI * 2, duration: 0.6, ease: 'power2.out' }, '<')
       .to(c.position, { y: 1.55, duration: 1.3, ease: 'sine.inOut' })
@@ -558,14 +588,15 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
   }
 
   // ------------------------------------------------------------ the deal
-  let dealing = false
+  let dealing = false, dealTl = null, dealDone = null
   const dealt = []
   const view = { k: 0 }
   function deal() {
     if (dealing) return Promise.resolve()
     dealing = true
     const seats = [...players.values()]
-    const tl = gsap.timeline()
+    // Module scope, so reset() and dispose() can stop a deal halfway; a killed timeline's then() would never settle.
+    const tl = dealTl = gsap.timeline({ onComplete: () => dealDone?.() })
     pulse(1.8)
     tl.to(deck.position, { y: 0.42, duration: 0.2, ease: 'power2.out', yoyo: true, repeat: 1 }, 0)
     tl.to(deck.rotation, { y: deck.rotation.y + Math.PI * 2, duration: 0.55, ease: 'power3.out' }, 0)
@@ -605,7 +636,7 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
     tl.to(deck.scale, { y: 0.3, duration: i * STAGGER, ease: 'none' }, START)
     tl.to(view, { k: 1, duration: 1.4, ease: 'power3.inOut' }, '-=0.35')
     emit('event', { text: 'Dealing seven to everyone' })
-    return tl.then()
+    return new Promise((res) => { dealDone = res })
   }
 
   // A beat of the countdown: a shockwave from the deck, the lamp flares, the camera jolts.
@@ -618,6 +649,10 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
   }
 
   function reset() {
+    dealTl?.kill()
+    dealDone?.()
+    dealTl = dealDone = null
+    deck.position.y = DECK_AT.y
     for (const c of dealt) scene.remove(c)
     dealt.length = 0
     gsap.to(deck.scale, { y: 1, duration: 0.6, ease: 'power2.out' })
@@ -628,8 +663,10 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
   // ------------------------------------------------------------ camera framing
   const base = { pos: new THREE.Vector3(), look: new THREE.Vector3() }
   let baseFov = 40, portrait = false
+  // Sized from the canvas, not the window: a host can mount the lounge in any box.
   function frame() {
-    const w = innerWidth, h = innerHeight, a = w / h
+    const w = canvas.clientWidth, h = canvas.clientHeight, a = w / h
+    if (!w || !h) return
     renderer.setSize(w, h, false)
     composer.setSize(w, h)
     labels.setSize(w, h)
@@ -644,7 +681,8 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
     const d = portrait ? (TABLE.rz + 0.35) / Math.tan(hf) : Math.max(7.6, (TABLE.rx + 0.05) / Math.tan(hf))
     base.look.set(portrait ? 0.4 : 0, portrait ? 0 : 0.2, portrait ? 0 : 0.1)
     base.pos.copy(base.look).addScaledVector(dir, d)
-    pivot.visible = !portrait
+    // Hide the lamp's meshes, never the group: an invisible parent also switches off the spot light and every shadow.
+    for (const m of lamp.children) if (m !== spot && m !== spot.target) m.visible = !portrait
     for (const p of players.values()) sizeSeat(p)
   }
 
@@ -698,8 +736,9 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
   // Drag your card to move it, tap the felt to walk there, tap someone to flick a card at them,
   // tap the deck to draw, tap yourself to wave.
   let drag = null
+  // One finger steers. A second one resting on the screen must not take over a drag or turn a wave into a move.
   canvas.addEventListener('pointerdown', (e) => {
-    if (dealing) return
+    if (dealing || !e.isPrimary) return
     const h = pick(e)
     if (h.what === 'you') { drag = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false, sent: 0 }; canvas.setPointerCapture(e.pointerId) }
     else if (h.what === 'player' && me()) {
@@ -710,6 +749,7 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
     else if (h.what === 'felt') emit('intent', { kind: 'move', x: h.felt.x, z: h.felt.z })
   }, { signal })
   canvas.addEventListener('pointermove', (e) => {
+    if (!e.isPrimary || (drag && e.pointerId !== drag.id)) return
     const r = canvas.getBoundingClientRect()
     pointer.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1)
     const h = pick(e)
@@ -734,7 +774,7 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
     drag = null
   }
   canvas.addEventListener('pointerup', endDrag, { signal })
-  canvas.addEventListener('pointercancel', () => { drag = null }, { signal })
+  canvas.addEventListener('pointercancel', (e) => { if (drag && e.pointerId === drag.id) drag = null }, { signal })
 
   // ------------------------------------------------------------ loop
   const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: lite ? 0 : 4 }))
@@ -744,7 +784,21 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
   composer.addPass(bloom)
   composer.addPass(new OutputPass())
   frame()
-  addEventListener('resize', frame, { signal })
+  const sizer = new ResizeObserver(frame)
+  sizer.observe(canvas)
+
+  // Phones drop the GL context when a backgrounded tab is short of memory. three rebuilds its state on restore,
+  // but not render-target contents, so the environment map is rendered again or chrome and the lamp come back black.
+  canvas.addEventListener('webglcontextlost', (e) => {
+    e.preventDefault()
+    emit('event', { text: 'The browser paused the table graphics' })
+  }, { signal })
+  canvas.addEventListener('webglcontextrestored', () => {
+    const g = new THREE.PMREMGenerator(renderer)
+    scene.environment.dispose()
+    scene.environment = g.fromScene(new RoomEnvironment(), 0.04).texture
+    g.dispose()
+  }, { signal })
 
   let t = 0, last = performance.now()
   function tick(now) {
@@ -773,7 +827,7 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
     // ponytail: O(n²) separation, fine for a 20-seat table
     for (let a = 0; a < all.length; a++) for (let b = a + 1; b < all.length; b++) {
       const A = all[a].g.position, B = all[b].g.position, dx = B.x - A.x, dz = B.z - A.z, d = Math.hypot(dx, dz)
-      if (d > 0.58 || d < 1e-4) continue
+      if (!(d >= 1e-4 && d <= 0.58)) continue
       const push = (0.58 - d) * 0.5, nx = dx / d, nz = dz / d
       A.x -= nx * push; A.z -= nz * push; B.x += nx * push; B.z += nz * push
     }
@@ -808,9 +862,12 @@ export async function createLounge({ canvas, overlay, artBase, badgeBase, reduce
     get busy() { return drawing || dealing },
     stats: () => ({ ...renderer.info.memory }),
     // For a host that unmounts the lounge (the Vue port): stop the loop, drop listeners, free the GPU.
-    // ponytail: running gsap tweens are left to finish; they only touch plain objects now detached from the scene.
+    // ponytail: the deal and draw timelines are killed; the short join, leave and shockwave tweens finish on detached objects.
     dispose() {
       off.abort()
+      sizer.disconnect()
+      dealTl?.kill()
+      drawTl?.kill()
       renderer.setAnimationLoop(null)
       overlay.replaceChildren()
       scene.traverse((o) => {
