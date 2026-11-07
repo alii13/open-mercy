@@ -145,9 +145,12 @@ function syncPlayers() {
 // rank, read once per player. Your own comes from alltime_my_rank, which the
 // leaderboard already uses; everyone else's from alltime_ranks
 // (supabase/alltime-ranks.sql), and until that is installed their cards stay
-// plain card backs.
+// plain card backs. A player with no games yet is a Recruit in last place:
+// any game scores at least 25, so on the leaderboard's own order they sit
+// below everyone who has played.
 const { badges: tiers, fetchBadges } = useBadges()
 const globalRanks = new Map<string, number | null>()
+let lastPlace: number | null = null
 let ranksMissing = false
 
 async function loadRanks(ids: string[]) {
@@ -158,7 +161,8 @@ async function loadRanks(ids: string[]) {
         fetchBadges(ids),
         mine && supabase.rpc('alltime_my_rank', { p_country: null }).then(({ data, error }) => {
             if (error) return
-            const row = (data as { my_rank: number | null }[] | null)?.[0]
+            const row = (data as { my_rank: number | null; total_players: number }[] | null)?.[0]
+            if (row) lastPlace = Number(row.total_players) + 1
             globalRanks.set(me, row?.my_rank == null ? null : Number(row.my_rank))
         }),
         others.length > 0 && !ranksMissing && supabase.rpc('alltime_ranks', { ids: others }).then(({ data, error }) => {
@@ -169,7 +173,7 @@ async function loadRanks(ids: string[]) {
     ])
     for (const id of ids) {
         if (!globalRanks.has(id)) continue
-        const global = globalRanks.get(id)
+        const global = globalRanks.get(id) ?? lastPlace
         lounge?.setRank(id, global == null ? null : { tier: tiers.value[id]?.badge.tier ?? 1, global })
     }
 }
