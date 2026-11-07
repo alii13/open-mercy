@@ -434,6 +434,11 @@ export const useAuthStore = defineStore('auth', () => {
         const clean = sanitizeName(name)
         if (!clean || !user.value) return { success: false, error: 'Invalid name' }
         try {
+            // The store can outlive the SDK's session. Without one the write
+            // goes out as anon, which has no grant on profiles, and the player
+            // sees a raw Postgres error.
+            const { data: { session } } = await supabase.auth.getSession()
+            if (!session) return { success: false, error: 'You were signed out. Reload the page and try again.' }
             // upsert, not update: a guest whose profile row is missing (see the
             // trigger race in signInAnonymously) would get a silent 0-row update
             // and a rename that never persists. upsert creates the row if absent.
