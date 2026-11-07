@@ -15,6 +15,8 @@ export interface LoungeJoin {
     you?: boolean
     x?: number
     z?: number
+    /** Already at the table when you arrived: no 'joined' toast or shockwave. */
+    quiet?: boolean
 }
 
 export interface Lounge {

@@ -653,7 +653,12 @@ import InviteFriends from './InviteFriends.vue'
 import WhatsNew from './WhatsNew.vue'
 import PublicTableCard from './PublicTableCard.vue'
 // The 3D table is its own chunk: three.js loads only when a public room opens.
-const PublicTableLounge = defineAsyncComponent(() => import('./PublicTableLounge.vue'))
+// A chunk that fails to load (a deploy since page load, a dropped connection)
+// falls back to the list, the same as a browser that cannot draw the table.
+const PublicTableLounge = defineAsyncComponent({
+  loader: () => import('./PublicTableLounge.vue'),
+  onError: (_err, _retry, fail) => { loungeFailed.value = true; fail() },
+})
 import { publicTableView, PUBLIC_TABLE_RULES } from '../utils/publicTable'
 import { useWhatsNew } from '../composables/useWhatsNew'
 import { nextBot, ladderProgress, isLadderComplete } from '../utils/botLadder'
@@ -915,7 +920,7 @@ const friendlyError = computed(() => {
   const map: Record<string, string> = {
     'Game not found': "That room code didn't match any game. Double-check it and try again.",
     'Game already started': 'That game already kicked off. Ask the host for a new room, or start your own.',
-    'Game is full (max 20 players)': 'That room is full (20 players max). Start your own instead.',
+    'That room is full': 'That room is full. Start your own instead.',
   }
   if (map[e]) return map[e]
   if (/full/i.test(e)) return 'That room is full. Start your own instead.'

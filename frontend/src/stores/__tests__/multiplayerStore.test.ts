@@ -1005,6 +1005,52 @@ describe('what a reload brings back', () => {
         expect(stored()).toBeNull()
     })
 
+    async function nextSocket(n: number) {
+        for (let i = 0; i < 40 && FakeWebSocket.instances.length < n; i++) await Promise.resolve()
+        return FakeWebSocket.instances[n - 1]
+    }
+
+    it('still keeps a public game for a reload after the socket blips mid-game', async () => {
+        vi.useFakeTimers()
+        try {
+            const mp = useMultiplayerStore()
+            const ws = await join(mp, true)
+            ws.receive({ t: 'snapshot', seq: 1, game: playingView() })
+            const sockets = FakeWebSocket.instances.length
+            ws.close()
+            await vi.advanceTimersByTimeAsync(1_000)
+            const again = (await nextSocket(sockets + 1))!
+            again.open()
+            again.receive({ t: 'hello', roomCode: 'AB12CD', userId: 'me', hostUserId: 'me', isPublic: true })
+            again.receive({ t: 'snapshot', seq: 2, game: playingView() })
+            await vi.advanceTimersByTimeAsync(0)
+            expect(stored()).toBe('AB12CD')
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
+    it('stops and says so when a reconnect finds the seat given away', async () => {
+        vi.useFakeTimers()
+        try {
+            const mp = useMultiplayerStore()
+            const ws = await join(mp, true)
+            const sockets = FakeWebSocket.instances.length
+            ws.close()
+            await vi.advanceTimersByTimeAsync(1_000)
+            const again = (await nextSocket(sockets + 1))!
+            again.open()
+            again.receive({ t: 'error', code: 'room-full' })
+            again.close()
+            await vi.advanceTimersByTimeAsync(30_000)
+            expect(FakeWebSocket.instances.length).toBe(sockets + 1)
+            expect(mp.error).toBe('Your seat went to another player')
+            expect(mp.currentGame).toBeNull()
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
     it('keeps a public table once its game is under way, so a reload goes back in', async () => {
         const ws = await join(useMultiplayerStore(), true)
         ws.receive({ t: 'snapshot', seq: 1, game: playingView() })

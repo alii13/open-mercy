@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import type { Card, CardColor } from '../types/card'
 import { DEFAULT_STACKING_MODE, type StackingMode } from '../utils/gameRules'
 import { getDrawValue } from '../utils/gameRules'
@@ -226,10 +226,6 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
             updated_at: '',
         }
     })
-    watch(
-        () => (isPublicRoom.value && currentGame.value?.status === 'playing' ? roomCodeRef.value : null),
-        (code) => { if (code) storeRoom(code) },
-    )
 
     const gamePlayers = computed<GamePlayerRow[]>(() => {
         const v = view.value
@@ -346,6 +342,7 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
                 if (msg.seq < lastSeq) break
                 lastSeq = msg.seq
                 view.value = msg.game
+                if (isPublicRoom.value && msg.game.status === 'playing' && roomCodeRef.value) storeRoom(roomCodeRef.value)
                 turnDeadline.value = msg.game.turnEndsInMs != null ? Date.now() + msg.game.turnEndsInMs : null
                 stackingMode.value = msg.game.stackingMode
                 pendingIntent = null
@@ -549,7 +546,7 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
                 if (msg.t === 'hello') {
                     roomCodeRef.value = code
                     // A public table is kept for a reload only once its game
-                    // is under way (the watch below): a reload while it fills
+                    // is under way (on each snapshot): a reload while it fills
                     // goes home instead of sitting you back down.
                     if (msg.isPublic) {
                         try { localStorage.removeItem(STORED_ROOM_KEY) } catch { /* noop */ }
@@ -557,9 +554,19 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
                         storeRoom(code)
                     }
                 }
+                if (msg.t === 'error' && msg.code === 'room-full' && roomCodeRef.value === code) {
+                    // A reconnect found our seat given away (gone past the
+                    // grace at a filling public table): retrying cannot help.
+                    closedByUs = true
+                    try { localStorage.removeItem(STORED_ROOM_KEY) } catch { /* noop */ }
+                    resetState()
+                    error.value = 'Your seat went to another player'
+                    settle(false)
+                    return
+                }
                 if (msg.t === 'error' && (msg.code === 'unauthorized' || msg.code === 'room-not-found' || msg.code === 'room-full')) {
                     error.value = msg.code === 'room-not-found' ? ROOM_GONE
-                        : msg.code === 'room-full' ? 'Game is full (max 20 players)'
+                        : msg.code === 'room-full' ? 'That room is full'
                         : 'Could not authenticate'
                     settle(false)
                 }

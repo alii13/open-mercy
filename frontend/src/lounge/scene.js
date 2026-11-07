@@ -384,7 +384,8 @@ export async function createLounge({ canvas, overlay, artUrl, badgeUrl, reducedM
     gsap.to(m.material, { opacity: 0, duration: 0.9, ease: 'power1.in', onComplete: () => { scene.remove(m); m.geometry.dispose(); m.material.dispose() } })
   }
 
-  function join({ id, name, skin = 'ember', rank, you = false, x, z }) {
+  // quiet: someone already at the table when you arrive, so no 'joined' toast or shockwave for them.
+  function join({ id, name, skin = 'ember', rank, you = false, x, z, quiet = false }) {
     if (players.has(id)) return
     const g = new THREE.Group()
     const sk = Object.hasOwn(SKINS, skin) ? SKINS[skin] : SKINS.ember
@@ -427,8 +428,10 @@ export async function createLounge({ canvas, overlay, artUrl, badgeUrl, reducedM
     ring.scale.setScalar(0.01)
     gsap.to(p, { lift: 0, duration: 0.9, ease: 'back.out(1.5)' })
     gsap.to(ring.scale, { x: 1, y: 1, z: 1, duration: 0.7, delay: 0.2, ease: 'back.out(2)' })
-    shockwave(spot0.x, spot0.z, you ? RING.you : RING.other)
-    emit('event', { text: you ? 'You joined' : `${name} joined` })
+    if (!quiet) {
+      shockwave(spot0.x, spot0.z, you ? RING.you : RING.other)
+      emit('event', { text: you ? 'You joined' : `${name} joined` })
+    }
     return p
   }
 
@@ -835,8 +838,8 @@ export async function createLounge({ canvas, overlay, artUrl, badgeUrl, reducedM
     }
     canvas.style.cursor = 'grabbing'
     if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 6) drag.moved = true
-    // ponytail: 100 ms between drag moves; the room relay allows one lounge message per 250 ms, so raise this there
-    if (!drag.moved || !h.felt || performance.now() - drag.sent < 100) return
+    // 150 ms between drag moves leaves room under the socket's 10 a second for taps on the deck and flicks mid-drag.
+    if (!drag.moved || !h.felt || performance.now() - drag.sent < 150) return
     drag.sent = performance.now()
     emit('intent', { kind: 'move', x: h.felt.x, z: h.felt.z, drag: true })
   }, { signal })

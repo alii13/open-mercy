@@ -11,7 +11,7 @@ import { createAllowed } from './createLimit'
 import { addParticipant, createMeeting, deactivateMeeting, voiceConfigured, type VoiceEnv } from './voice'
 import { gcWindowMs } from './roomGc'
 import { ROOM_CODE_ALPHABET, isRoomCode, normalizeRoomCode } from '../../shared/roomCode'
-import { canSeat, MAX_PLAYERS, PUBLIC_SEATS } from './seats'
+import { doorVerdict, PUBLIC_SEATS } from './seats'
 import { autoStartTick, canDeal } from './autoStart'
 import { chatAllowed, loungeAllowed } from './chatLimit'
 import { cleanLoungeAct } from '../../shared/lounge'
@@ -262,6 +262,8 @@ export class GameRoomDO {
     /** Last spot on the 3D table per player, for late joiners. Memory only:
      *  after hibernation clients fall back to the shared seat spots. */
     private loungeSpots = new Map<string, [number, number]>()
+    /** When each player's last socket closed, for the seat grace at the door. In memory: hibernation forgets it, which counts as long gone. */
+    private goneAt = new Map<string, number>()
     // Per-socket message buckets (see socketLimit.ts).
     private buckets = new WeakMap<WebSocket, Bucket>()
     // Voice tokens already minted this wake, so a repeated voice-join reuses
@@ -544,27 +546,31 @@ export class GameRoomDO {
                 return
             }
             const roster = (await this.ctx.storage.get<Record<string, RosterEntry>>('roster')) ?? {}
-            // A public table counting down is locked: its seven are in, so a
-            // stranger goes to the next table. Someone already seated still
-            // gets back in after a dropped connection.
-            const locked = room.isPublic && !(verified.userId in roster) && (await this.getTimers()).startAt !== undefined
-            if (locked || !canSeat(roster, verified.userId, room.isPublic ? PUBLIC_SEATS : MAX_PLAYERS)) {
-                // A full public lobby that is still filling hands a closed
-                // tab's seat to the next stranger: otherwise one ghost keeps a
-                // seven-seat table from ever dealing.
-                await this.loadGame()
-                const live = new Set(this.roomSockets(ws).map(s => s.userId))
-                const ghost = !locked && room.isPublic && this.roomStatus() === 'lobby'
-                    ? Object.keys(roster).find(id => !live.has(id))
-                    : undefined
-                if (!ghost) {
-                    this.send(ws, { t: 'error', code: 'room-full' })
-                    ws.close(1008, 'room full')
-                    return
-                }
-                delete roster[ghost]
-                this.loungeSpots.delete(ghost)
+            // The seat rules live in seats.ts: a seated player always gets
+            // back in, a public table counting down is locked to strangers,
+            // and a full filling table hands on a seat gone past its grace.
+            await this.loadGame()
+            const verdict = doorVerdict({
+                userId: verified.userId,
+                rosterIds: Object.keys(roster),
+                liveIds: this.roomSockets(ws).map(s => s.userId),
+                goneAt: Object.fromEntries(this.goneAt),
+                isPublic: room.isPublic,
+                phase: this.roomStatus(),
+                locked: (await this.getTimers()).startAt !== undefined,
+                now: Date.now(),
+            })
+            if (!verdict.seat) {
+                this.send(ws, { t: 'error', code: 'room-full' })
+                ws.close(1008, 'room full')
+                return
             }
+            if (verdict.evict) {
+                delete roster[verdict.evict]
+                this.loungeSpots.delete(verdict.evict)
+                this.goneAt.delete(verdict.evict)
+            }
+            this.goneAt.delete(verified.userId)
             const entry = roster[verified.userId]
             const name = cleanName(msg.name)
             const skin = cleanSkin(msg.skin)
@@ -859,12 +865,21 @@ export class GameRoomDO {
 
     // The closing socket is still enumerable in getWebSockets() while these
     // handlers run — exclude it or it counts itself as connected.
+    private markGone(ws: WebSocket) {
+        const tag = ws.deserializeAttachment() as SocketTag
+        if (!tag || !('userId' in tag)) return
+        if (this.roomSockets(ws).some(s => s.userId === tag.userId)) return
+        this.goneAt.set(tag.userId, Date.now())
+    }
+
     async webSocketClose(ws: WebSocket) {
+        this.markGone(ws)
         await this.broadcastPresence(undefined, ws)
         await this.armTurnGrace(ws)
     }
 
     async webSocketError(ws: WebSocket) {
+        this.markGone(ws)
         await this.broadcastPresence(undefined, ws)
         await this.armTurnGrace(ws)
     }

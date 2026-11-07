@@ -128,17 +128,25 @@ function apply(id: string, act: LoungeAct) {
 
 // A late joiner places everyone where the room last saw them; anyone who has
 // not moved stands at the seat every client computes from the room's order.
+// Your own card sends its first spot, so the room's record of it, not a seat
+// index that shifts as people come and go, is what every later joiner reads.
+let synced = false
 function syncPlayers() {
     if (!lounge) return
     const list = here.value
     const ids = new Set(list.map((p) => p.userId))
+    const me = auth.user?.id
     list.forEach((p, i) => {
         if (lounge!.players.has(p.userId)) return
-        const [x, z] = mp.loungeSpots[p.userId] ?? seatSpot(i, Math.max(PUBLIC_SEATS, list.length))
-        lounge!.join({ id: p.userId, name: p.name, skin: p.skin, you: p.userId === auth.user?.id, x, z })
+        const known = mp.loungeSpots[p.userId]
+        const [x, z] = known ?? seatSpot(i, Math.max(PUBLIC_SEATS, list.length))
+        const you = p.userId === me
+        const seat = lounge!.join({ id: p.userId, name: p.name, skin: p.skin, you, x, z, quiet: !synced && !you }) as { tx: number; tz: number } | undefined
+        if (you && !known && seat) mp.sendLounge({ kind: 'move', x: seat.tx, z: seat.tz, drag: false })
     })
+    synced = true
     for (const id of [...lounge.players.keys()]) if (!ids.has(id)) lounge.leave(id)
-    void loadRanks([...ids])
+    queueRanks()
 }
 
 // ---- Ranks. Every card shows its player's badge tier and all-time global
@@ -150,6 +158,13 @@ function syncPlayers() {
 // below everyone who has played.
 const { badges: tiers, fetchBadges } = useBadges()
 const globalRanks = new Map<string, number | null>()
+// One lookup per burst of arrivals, not one per presence change: each scans
+// every game played.
+let rankTimer: ReturnType<typeof setTimeout> | undefined
+function queueRanks() {
+    clearTimeout(rankTimer)
+    rankTimer = setTimeout(() => void loadRanks(here.value.map((p) => p.userId)), 800)
+}
 let lastPlace: number | null = null
 let ranksMissing = false
 
@@ -197,9 +212,16 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
 let beat = 0
 let showing = false
 let lastClockAt = 0
+let preloaded = false
 const clock = setInterval(() => {
     if (!lounge || showing) return
     const a = mp.autoStart
+    if (a && !preloaded) {
+        // The game view is its own chunk: fetch it while the clock runs, so
+        // nothing loads behind the curtain after the start.
+        preloaded = true
+        void import('./game/MultiplayerGameView.vue')
+    }
     if (!a) {
         // The room dealt: the start plays here while the game view waits.
         if (mp.loungeShow && mp.gameStatus !== 'waiting') { void showtime(); return }
@@ -321,6 +343,7 @@ onMounted(async () => {
 onUnmounted(() => {
     unmounted = true
     clearInterval(clock)
+    clearTimeout(rankTimer)
     mp.loungeShow = false
     for (const off of offs) off()
     gsap.killTweensOf(track)
