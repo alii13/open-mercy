@@ -130,6 +130,37 @@ describe('joining and the lobby adapter', () => {
     })
 })
 
+describe('the 3D public table', () => {
+    it('knows a public room from the hello, and a private one by default', async () => {
+        const mp = useMultiplayerStore()
+        const ws = await joinRoom(mp)
+        expect(mp.isPublicRoom).toBe(false)
+        ws.receive({ t: 'hello', roomCode: 'AB12CD', userId: 'me', hostUserId: 'me', isPublic: true })
+        expect(mp.isPublicRoom).toBe(true)
+    })
+
+    it('keeps the last spots the room sends with presence', async () => {
+        const mp = useMultiplayerStore()
+        const ws = await joinRoom(mp)
+        ws.receive({ t: 'presence', players: [{ userId: 'me', name: 'TESTER', connected: true }], spots: { me: [1, -0.5] } })
+        expect(mp.loungeSpots).toEqual({ me: [1, -0.5] })
+    })
+
+    it('hands other players moves to listeners and sends our own', async () => {
+        const mp = useMultiplayerStore()
+        const ws = await joinRoom(mp)
+        const heard: unknown[] = []
+        const off = mp.onLounge((userId, act) => heard.push([userId, act]))
+        ws.receive({ t: 'lounge', userId: 'p2', act: { kind: 'draw', face: 'wild-roulette' } })
+        off()
+        ws.receive({ t: 'lounge', userId: 'p2', act: { kind: 'draw', face: 'five-red' } })
+        expect(heard).toEqual([['p2', { kind: 'draw', face: 'wild-roulette' }]])
+
+        mp.sendLounge({ kind: 'move', x: 1, z: 2, drag: false })
+        expect(ws.lastSent()).toEqual({ t: 'lounge', act: { kind: 'move', x: 1, z: 2, drag: false } })
+    })
+})
+
 describe('the playing snapshot adapter', () => {
     it('maps the personalized view onto the legacy row shapes', async () => {
         const mp = useMultiplayerStore()

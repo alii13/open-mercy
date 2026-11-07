@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { chatAllowed, CHAT_MIN_GAP_MS, CHAT_BURST, CHAT_WINDOW_MS } from './chatLimit'
+import { chatAllowed, loungeAllowed, CHAT_MIN_GAP_MS, CHAT_BURST, CHAT_WINDOW_MS, LOUNGE_PER_SECOND } from './chatLimit'
 
 const NOW = 1_700_000_000_000
 
@@ -36,5 +36,19 @@ describe('chatAllowed', () => {
         chatAllowed(times, NOW)
         chatAllowed(times, NOW + 10) // blocked spam attempt
         expect(times.length).toBe(1)
+    })
+})
+
+describe('loungeAllowed', () => {
+    it('lets a drag stream through and stops a flood', () => {
+        const times: number[] = []
+        const sent = Array.from({ length: 30 }, (_, i) => loungeAllowed(times, NOW + i * 10)).filter(Boolean).length
+        expect(sent).toBe(LOUNGE_PER_SECOND)
+    })
+
+    it('allows a steady drag of one move every 120 ms indefinitely', () => {
+        const times: number[] = []
+        const all = Array.from({ length: 50 }, (_, i) => loungeAllowed(times, NOW + i * 120))
+        expect(all.every(Boolean)).toBe(true)
     })
 })

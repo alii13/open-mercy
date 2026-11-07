@@ -11,6 +11,7 @@ import { useVoiceStore } from './voiceStore'
 import type { ClientMsg, IntentAction, PersonalView, PresencePlayer, ServerMsg } from '@protocol'
 import { MAX_TURN_TIMEOUTS } from '@protocol'
 import { quickChatPhrase } from '@quickChat'
+import type { LoungeAct } from '@lounge'
 
 // The authoritative game server (Cloudflare Worker + one Durable Object per
 // room). The client is a thin mirror: it sends intents and renders the
@@ -140,6 +141,13 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
     // Mutes are client-side and room-scoped — a muted sender's frames are
     // dropped at receive, instantly and without a server round trip.
     const lastChat = ref<{ userId: string; name: string; text: string; n: number } | null>(null)
+    /** A quick-match room: the waiting room shows the 3D table instead of the list. */
+    const isPublicRoom = ref(false)
+    /** Last spot on the 3D table per player, from the room, for a late joiner. */
+    const loungeSpots = ref<Record<string, [number, number]>>({})
+    // Moves arrive several times a second, so the table listens rather than
+    // watching a reactive value that would re-render the lobby on every one.
+    const loungeListeners = new Set<(userId: string, act: LoungeAct) => void>()
     const chatLog = ref<{ userId: string; name: string; text: string; n: number }[]>([])
     const mutedChatIds = ref<Set<string>>(new Set())
     let chatN = 0
@@ -284,12 +292,14 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
             case 'hello':
                 myUserId.value = msg.userId
                 hostUserId.value = msg.hostUserId
+                isPublicRoom.value = msg.isPublic === true
                 realtimeStatus.value = 'SUBSCRIBED'
                 reconnectAttempts = 0
                 break
 
             case 'presence':
                 presence.value = msg.players
+                loungeSpots.value = msg.spots ?? {}
                 autoStart.value = typeof msg.autoStartInMs === 'number'
                     ? {
                         deadline: Date.now() + msg.autoStartInMs,
@@ -315,6 +325,10 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
                 }
                 break
             }
+
+            case 'lounge':
+                for (const fn of loungeListeners) fn(msg.userId, msg.act)
+                break
 
             case 'chat': {
                 if (mutedChatIds.value.has(msg.userId)) break
@@ -611,6 +625,16 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
         sendMsg({ t: 'chat', phraseId })
     }
 
+    function sendLounge(act: LoungeAct) {
+        sendMsg({ t: 'lounge', act })
+    }
+
+    /** Subscribe to other players' moves, flicks and draws; returns the unsubscribe. */
+    function onLounge(fn: (userId: string, act: LoungeAct) => void): () => void {
+        loungeListeners.add(fn)
+        return () => loungeListeners.delete(fn)
+    }
+
     // One pending invite per target, resolved by the room's answer. The room
     // owns this rather than the invite store, because only a socket that is
     // seated in the room can send it - which is exactly what makes the invite
@@ -688,6 +712,8 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
         lastMercyCall.value = null
         autoStart.value = null
         lastChat.value = null
+        isPublicRoom.value = false
+        loungeSpots.value = {}
         chatLog.value = []
         mutedChatIds.value = new Set()
         error.value = null
@@ -1008,6 +1034,10 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
         extendAutoStart,
         sendInvite,
         lastChat,
+        isPublicRoom,
+        loungeSpots,
+        sendLounge,
+        onLounge,
         chatLog,
         mutedChatIds,
         sendChat,

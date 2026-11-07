@@ -322,6 +322,14 @@
         </button>
       </div>
 
+      <!-- A public room waits at the 3D table; private rooms, and any browser
+           that cannot draw it, keep the list below. -->
+      <PublicTableLounge
+        v-else-if="mpStore.gameStatus === 'waiting' && mpStore.isPublicRoom && !loungeFailed"
+        @fallback="loungeFailed = true"
+        @leave="showLeaveConfirm = true"
+      />
+
       <!-- Waiting room — after creating, before starting -->
       <div v-else-if="mpStore.gameStatus === 'waiting'" class="waiting-room">
         <!-- Joined right as a game here ended: no seat in that game, so the
@@ -641,7 +649,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { ArrowRight, Bot, Check, ChevronDown, ChevronRight, Clock, Copy, Flame, Hash, HelpCircle, Menu as MenuIcon, Minus, Pencil, Share2, Skull, Users, Volume1, VolumeX, X } from 'lucide-vue-next'
 import { useRetentionStore } from '../stores/retentionStore'
 import {
@@ -658,6 +666,8 @@ import { usePresence } from '../composables/usePresence'
 import InviteFriends from './InviteFriends.vue'
 import WhatsNew from './WhatsNew.vue'
 import PublicTableCard from './PublicTableCard.vue'
+// The 3D table is its own chunk: three.js loads only when a public room opens.
+const PublicTableLounge = defineAsyncComponent(() => import('./PublicTableLounge.vue'))
 import { publicTableView, PUBLIC_TABLE_RULES } from '../utils/publicTable'
 import { useWhatsNew } from '../composables/useWhatsNew'
 import { nextBot, ladderProgress, isLadderComplete } from '../utils/botLadder'
@@ -829,6 +839,8 @@ const showJoinModal = ref(false)
 // A join hit a room the server no longer knows — show the ended card, not a retry trap.
 const roomEnded = ref(false)
 const showLeaveConfirm = ref(false)
+/** The 3D table could not start (no WebGL, an asset failed): use the list. */
+const loungeFailed = ref(false)
 const showSignOutConfirm = ref(false)
 const editingName = ref(false)
 const editTarget = ref<'bar' | 'room' | null>(null)

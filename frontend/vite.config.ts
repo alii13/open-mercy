@@ -13,6 +13,7 @@ export default defineConfig({
       '@protocol': path.resolve(__dirname, '../shared/protocol.ts'),
       '@roomCode': path.resolve(__dirname, '../shared/roomCode.ts'),
       '@quickChat': path.resolve(__dirname, '../shared/quickChat.ts'),
+      '@lounge': path.resolve(__dirname, '../shared/lounge.ts'),
     },
   },
   assetsInclude: ['**/*.png', '**/*.jpg', '**/*.jpeg'],

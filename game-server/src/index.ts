@@ -13,7 +13,8 @@ import { gcWindowMs } from './roomGc'
 import { ROOM_CODE_ALPHABET, isRoomCode, normalizeRoomCode } from '../../shared/roomCode'
 import { canSeat, MAX_PLAYERS } from './seats'
 import { autoStartTick, autoStartBump, autoStartBumpsLeft, AUTO_START_MIN_PLAYERS, type AutoStartState } from './autoStart'
-import { chatAllowed } from './chatLimit'
+import { chatAllowed, loungeAllowed } from './chatLimit'
+import { cleanLoungeAct } from '../../shared/lounge'
 import { sendRoomInvite } from './invites'
 import { quickChatPhrase } from '../../shared/quickChat'
 import type { StackingMode } from '../../shared/engine'
@@ -263,6 +264,10 @@ export class GameRoomDO {
     // Per-user quick-chat timestamps. In-memory: hibernation clears it, which
     // is acceptable for a best-effort spam guard.
     private chatTimes = new Map<string, number[]>()
+    private loungeTimes = new Map<string, number[]>()
+    /** Last spot on the 3D table per player, for late joiners. Memory only:
+     *  after hibernation clients fall back to the shared seat spots. */
+    private loungeSpots = new Map<string, [number, number]>()
     // Per-socket message buckets (see socketLimit.ts).
     private buckets = new WeakMap<WebSocket, Bucket>()
     // Voice tokens already minted this wake, so a repeated voice-join reuses
@@ -564,7 +569,7 @@ export class GameRoomDO {
             // Activity resets the GC clock.
             await this.touchGc()
 
-            this.send(ws, { t: 'hello', roomCode: room.code, userId: verified.userId, hostUserId: room.hostUserId })
+            this.send(ws, { t: 'hello', roomCode: room.code, userId: verified.userId, hostUserId: room.hostUserId, isPublic: room.isPublic })
             await this.broadcastPresence(roster)
             // Catch the joiner up — lobby state or a running game.
             await this.loadGame()
@@ -684,6 +689,28 @@ export class GameRoomDO {
                     // that merely stringifies to a valid id must not ride to
                     // every socket in the room.
                     this.send(s.ws, { t: 'chat', userId: tag.userId, phraseId: phrase.id })
+                }
+                return
+            }
+
+            case 'lounge': {
+                // The 3D public table: relay a rebuilt act to the rest of the
+                // table, only in a public room's lobby. Never the raw frame.
+                if (!(await this.isRoomPublic())) return
+                await this.loadGame()
+                if (this.roomStatus() !== 'lobby') return
+                const act = cleanLoungeAct(msg.act)
+                if (!act) {
+                    this.send(ws, { t: 'error', code: 'bad-message' })
+                    return
+                }
+                const times = this.loungeTimes.get(tag.userId) ?? []
+                // Over the limit: drop silently, like chat.
+                if (!loungeAllowed(times, Date.now())) return
+                this.loungeTimes.set(tag.userId, times)
+                if (act.kind === 'move') this.loungeSpots.set(tag.userId, [act.x, act.z])
+                for (const s of this.roomSockets()) {
+                    if (s.userId !== tag.userId) this.send(s.ws, { t: 'lounge', userId: tag.userId, act })
                 }
                 return
             }
@@ -968,7 +995,8 @@ export class GameRoomDO {
         // Presence changes are exactly when the auto-start clock moves, so the
         // frame carries it and the clients never need to poll.
         const auto = await this.tickAutoStart([...connectedIds], Object.keys(roster).length)
-        const frame: ServerMsg = { t: 'presence', players, ...auto }
+        const spots = Object.fromEntries([...this.loungeSpots].filter(([id]) => id in roster))
+        const frame: ServerMsg = { t: 'presence', players, ...auto, ...(Object.keys(spots).length ? { spots } : {}) }
         for (const { ws } of sockets) {
             this.send(ws, frame)
         }
