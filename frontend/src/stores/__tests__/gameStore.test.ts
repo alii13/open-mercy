@@ -498,15 +498,22 @@ describe('daily and ladder analytics', () => {
 describe('daily resume after a reload', () => {
     const today = '2026-08-10'
     const saved = new Map<string, string>()
+    const tab = new Map<string, string>()
 
     beforeEach(() => {
         vi.useFakeTimers()
         vi.setSystemTime(new Date(`${today}T12:00:00`))
         saved.clear()
+        tab.clear()
         vi.stubGlobal('localStorage', {
             getItem: (k: string) => saved.get(k) ?? null,
             setItem: (k: string, v: string) => { saved.set(k, v) },
             removeItem: (k: string) => { saved.delete(k) },
+        })
+        vi.stubGlobal('sessionStorage', {
+            getItem: (k: string) => tab.get(k) ?? null,
+            setItem: (k: string, v: string) => { tab.set(k, v) },
+            removeItem: (k: string) => { tab.delete(k) },
         })
     })
 
@@ -564,6 +571,27 @@ describe('daily resume after a reload', () => {
         expect(store.resumeDaily()).toBe(true)
         expect(store.gameState).toBe('PLAYING')
         expect(store.dailyDate).toBe(today)
+        expect(table(store)).toEqual(before)
+    })
+
+    it('drops a player who reloads mid-game straight back in', async () => {
+        const before = table(await startDaily())
+
+        const store = reload()
+
+        expect(store.resumeDailyAfterReload()).toBe(true)
+        expect(table(store)).toEqual(before)
+    })
+
+    it('keeps a player who left for the lobby there after a reload, with CONTINUE still working', async () => {
+        const before = table(await startDaily())
+        useGameStore().returnToLobby()
+
+        const store = reload()
+
+        expect(store.resumeDailyAfterReload()).toBe(false)
+        expect(store.gameState).toBe('LOBBY')
+        expect(store.resumeDaily()).toBe(true)
         expect(table(store)).toEqual(before)
     })
 

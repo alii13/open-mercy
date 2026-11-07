@@ -131,6 +131,25 @@ export function clearDailyProgress(): void {
     } catch { /* localStorage disabled */ }
 }
 
+// Per tab, so it survives a reload of this tab but not leaving the game: a
+// player who went back to the lobby stays there after a reload, with CONTINUE.
+const DAILY_OPEN_KEY = 'uno_daily_open'
+
+export function markDailyOpen(open: boolean): void {
+    try {
+        if (open) sessionStorage.setItem(DAILY_OPEN_KEY, '1')
+        else sessionStorage.removeItem(DAILY_OPEN_KEY)
+    } catch { /* sessionStorage disabled */ }
+}
+
+export function isDailyOpen(): boolean {
+    try {
+        return sessionStorage.getItem(DAILY_OPEN_KEY) === '1'
+    } catch {
+        return false
+    }
+}
+
 /**
  * The localStorage gate above is per device, so playing today's deal on a
  * phone and then opening a laptop looks like a fresh day — that is how two
