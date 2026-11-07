@@ -1,7 +1,7 @@
 <template>
   <div class="lobby-container">
     <!-- Top bar — slim, brand left, identity + auth controls right. No scan-line. -->
-    <header class="lobby-top-bar">
+    <header class="lobby-top-bar" :class="{ 'menu-open': accountOpen }">
       <a class="brand-mark" href="#" @click.prevent>
         <span class="brand-mark-uno">OPEN</span>
         <span class="brand-mark-nomercy">MERCY</span>
@@ -11,6 +11,7 @@
         <WhatsNew ref="whatsNewRef" class="bar-whatsnew" />
         <div v-if="editingName && editTarget === 'bar'" class="name-edit">
           <input
+            ref="barNameEl"
             v-model="nameInput"
             v-focus-ring
             class="username-edit-input"
@@ -48,12 +49,12 @@
             class="menu-burger"
             aria-haspopup="menu"
             :aria-expanded="accountOpen"
-            :aria-label="whatsNewUnread ? `Menu, ${whatsNewUnread} new` : 'Menu'"
+            :aria-label="burgerLabel"
             @click="accountOpen = !accountOpen"
           >
             <X v-if="accountOpen" :size="20" :stroke-width="2" aria-hidden="true" />
             <MenuIcon v-else :size="20" :stroke-width="2" aria-hidden="true" />
-            <span v-if="whatsNewUnread && !accountOpen" class="burger-dot" aria-hidden="true" />
+            <span v-if="(whatsNewUnread || social.incoming.length) && !accountOpen" class="burger-dot" aria-hidden="true" />
           </button>
           <button
             class="username-chip username-chip-editable"
@@ -66,9 +67,9 @@
             <span v-if="social.incoming.length" class="chip-badge" :title="`${social.incoming.length} friend request${social.incoming.length > 1 ? 's' : ''}`">{{ social.incoming.length }}</span>
             <ChevronDown class="chip-edit-icon" :stroke-width="2" aria-hidden="true" />
           </button>
-          <div v-if="accountOpen" class="menu-scrim" aria-hidden="true" />
+          <div v-if="accountOpen" class="menu-scrim" aria-hidden="true" @click="closeAccount" />
           <div v-if="accountOpen" class="account-menu" role="menu">
-            <div class="menu-phone menu-who">
+            <div class="menu-phone menu-who" role="none">
               <Avatar :uid="authStore.user?.id" :name="authStore.username" :size="36" />
               <span class="menu-who-text">
                 <span class="menu-who-name">{{ authStore.username }}</span>
@@ -94,8 +95,9 @@
             <button class="account-item account-item--out" role="menuitem" @click="signOutFromMenu">Sign out</button>
           </div>
         </div>
-        <!-- Stays in the bar rather than the menu: it is the conversion CTA,
-             and a guest who never opens the menu should still see it. -->
+        <!-- Stays in the bar rather than the menu on wide screens: it is the
+             conversion CTA. Phones move it to the top of the burger menu, as a
+             button, so the bar fits one row. -->
         <button
           v-if="authStore.isAnonymous"
           class="text-link upgrade-link"
@@ -639,7 +641,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { ArrowRight, Bot, Check, ChevronDown, ChevronRight, Clock, Copy, Flame, Hash, HelpCircle, Menu as MenuIcon, Minus, Pencil, Share2, Skull, Users, Volume1, VolumeX, X } from 'lucide-vue-next'
 import { useRetentionStore } from '../stores/retentionStore'
 import {
@@ -833,10 +835,12 @@ const editTarget = ref<'bar' | 'room' | null>(null)
 const nameInput = ref('')
 const nameError = ref('')
 const nameSuggestions = ref<string[]>([])
+const barNameEl = ref<HTMLInputElement | null>(null)
 const joinCode = ref('')
 const joinCodeError = ref('')
 const copied = ref(false)
-const selectedStackingMode = ref<StackingMode>(gameStore.stackingMode)
+// The player's saved pick, not the last game's rules: the daily always plays Official.
+const selectedStackingMode = ref<StackingMode>(gameStore.preferredStackingMode)
 
 // When the page loads with ?join=ABCDEF, pre-fill the join input and
 // fire the join automatically. Friends sharing the invite URL drop
@@ -981,15 +985,12 @@ onMounted(() => live.start())
 
 const tableView = computed(() => publicTableView(live.joinable.value, live.inProgressCount.value, live.loaded.value))
 
-// The card's own table first, so its count is the table you land at. When it
-// filled or started between poll and tap, or there is none, quick match finds
-// another open room or opens a new House table.
+// Quick match picks the same table the card describes, the fullest open room by
+// connected players, and refuses one that dealt between poll and tap. With none
+// open it starts a new House table.
 async function handleTakeSeat() {
     if (mpStore.loading) return
     roomEnded.value = false
-    const target = tableView.value.target
-    if (target && (await mpStore.joinGame(target.code, 'live'))) return
-    if (target) void live.refresh()
     await mpStore.quickMatch(PUBLIC_TABLE_RULES)
 }
 
@@ -1040,6 +1041,9 @@ function startEditName(target: 'bar' | 'room' = 'bar') {
   nameInput.value = current && current !== 'Player' ? current : ''
   editTarget.value = target
   editingName.value = true
+  // On a phone the bar editor replaces the burger, so it takes focus at once:
+  // tapping away then saves and brings the burger back.
+  if (target === 'bar') void nextTick(() => barNameEl.value?.focus())
 }
 
 function closeNameEdit() {
@@ -1101,6 +1105,14 @@ function closeAccount() { accountOpen.value = false }
 
 const whatsNewRef = ref<InstanceType<typeof WhatsNew> | null>(null)
 const { unread: whatsNewUnread } = useWhatsNew()
+// The burger is the only route to friends on a phone, so a waiting request lights it too.
+const burgerLabel = computed(() => {
+    const parts = [
+        whatsNewUnread.value ? `${whatsNewUnread.value} new` : '',
+        social.incoming.length ? `${social.incoming.length} friend request${social.incoming.length > 1 ? 's' : ''}` : '',
+    ].filter(Boolean)
+    return parts.length ? `Menu, ${parts.join(', ')}` : 'Menu'
+})
 
 function openWhatsNewFromMenu() {
     closeAccount()
@@ -2140,8 +2152,8 @@ function copyLink() {
 
 .menu-burger {
   position: relative;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   align-items: center;
   justify-content: center;
   background: none;
@@ -2151,14 +2163,20 @@ function copyLink() {
   cursor: pointer;
 }
 
-/* Phones only: dims the page under the open menu; a tap on it closes the
-   menu through the same outside-pointer handler as everywhere else. */
+/* Phones only: dims the page under the open menu, and a tap on it closes the
+   menu. Click, not pointerdown, so the tap cannot land on what is underneath. */
 .menu-scrim {
   display: none;
   position: fixed;
   inset: 0;
   z-index: 55;
   background: rgba(0, 0, 0, 0.7);
+}
+
+/* The release card is fixed at z-index 60 at the page root; while the menu is
+   open the bar, and the scrim inside it, must sit above it. */
+.lobby-top-bar.menu-open {
+  z-index: 70;
 }
 
 .burger-dot {
@@ -3007,25 +3025,6 @@ function copyLink() {
     letter-spacing: 0.15em;
   }
 
-  /* Was display:none when the chip was only a rename affordance and the bar
-     was tight. It is now the only route to profile, stats and sign out, so it
-     has to survive on a phone — truncated rather than hidden. */
-  .username-chip {
-    max-width: 10.5rem;
-    overflow: hidden;
-    white-space: nowrap;
-    font-size: 0.7rem;
-    padding: var(--spacing-1) var(--spacing-2);
-    min-height: 36px;
-  }
-
-  /* Only the name gives way, so the avatar and the menu chevron always show. */
-  .chip-name {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
   /* Menu items keep a comfortable tap target and may wrap on a narrow phone. */
   .account-item {
     padding: var(--spacing-3);
@@ -3033,19 +3032,9 @@ function copyLink() {
     white-space: normal;
   }
 
-  /* Brand + account links share one row; compact the links so they fit,
-     and right-anchor the cluster so a worst-case wrap still looks placed. */
+  /* Brand and burger share one row; the burger sits on the right. */
   .top-bar-cta {
-    gap: var(--spacing-1);
     margin-left: auto;
-  }
-
-  .lobby-top-bar .text-link {
-    font-size: 0.65rem;
-    letter-spacing: 0.1em;
-    padding: var(--spacing-1) var(--spacing-2);
-    min-height: 36px;
-    white-space: nowrap;
   }
 
   .lobby-content {

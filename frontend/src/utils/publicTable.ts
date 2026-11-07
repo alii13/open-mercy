@@ -1,9 +1,9 @@
 /**
  * Copy for the home screen's public table card, from the live directory.
  *
- * The card describes the table a tap actually seats you at: the fullest open
- * public room, so its count is the table you land at. With nothing open, a tap
- * opens a new House table. The wording follows today's server: a public room
+ * The card describes the table quick match will seat you at: the fullest open
+ * public room by connected players, the same measure the directory sorts on.
+ * With nothing open, a tap opens a new House table. The wording follows today's server: a public room
  * deals itself on a clock that starts once two players are in.
  */
 
@@ -13,7 +13,7 @@ import type { LiveTable } from '../composables/useLiveTables'
 export const PUBLIC_TABLE_RULES = 'house'
 
 export interface PublicTableView {
-    /** The room a tap joins, or null when a tap opens a new one. */
+    /** The room quick match will pick, or null when a tap opens a new one. */
     target: LiveTable | null
     headline: string
     status: string
@@ -23,13 +23,18 @@ export interface PublicTableView {
 
 const SIT_DOWN = 'Strangers, no room code. Sit down and it deals itself.'
 
+/** People actually at the table: a closed tab keeps its seat but not its socket. */
+const present = (t: LiveTable) => t.connected ?? t.players
+
 export function publicTableView(joinable: LiveTable[], inProgress: number, loaded: boolean): PublicTableView {
-    const target = joinable.reduce<LiveTable | null>((best, t) => (!best || t.players > best.players ? t : best), null)
+    const target = joinable
+        .filter((t) => present(t) > 0)
+        .reduce<LiveTable | null>((best, t) => (!best || present(t) > present(best) ? t : best), null)
     if (target) {
         return {
             target,
-            headline: `${target.players} AT THE TABLE`,
-            status: target.players >= 2 ? 'CLOCK IS RUNNING · DEALS ITSELF' : 'STARTS ITSELF ONCE 2 ARE IN',
+            headline: `${present(target)} AT THE TABLE`,
+            status: present(target) >= 2 ? 'CLOCK IS RUNNING · DEALS ITSELF' : 'STARTS ITSELF ONCE 2 ARE IN',
             body: SIT_DOWN,
             rules: `${(target.mode || PUBLIC_TABLE_RULES).toUpperCase()} RULES`,
         }

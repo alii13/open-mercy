@@ -117,6 +117,18 @@ describe('rules a player starts on', () => {
         setActivePinia(createPinia())
         expect(useGameStore().stackingMode).toBe('official')
     })
+
+    it("plays the daily on Official without touching the player's saved pick", () => {
+        stored.set('uno_stacking_mode', 'house')
+        setActivePinia(createPinia())
+        const store = useGameStore()
+
+        store.initializeGame(['You', 'Terminator'], 'official', { dailySeed: '2026-08-10' })
+
+        expect(store.stackingMode).toBe('official')
+        expect(store.preferredStackingMode).toBe('house')
+        expect(stored.get('uno_stacking_mode')).toBe('house')
+    })
 })
 
 describe('initializeGame', () => {

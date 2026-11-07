@@ -1,12 +1,12 @@
 /**
- * Public rooms that are alive right now, for the lobby's live-games entry.
+ * Public rooms that are alive right now, for the lobby's public table card.
  *
  * Deliberately not on the landing page. The 78% spectate-to-play conversion
  * that motivated this is measured on players who were already in a game and
  * got knocked out — not on cold visitors — and at current traffic a landing
  * strip would be empty most of the time, which advertises the opposite of
- * what it intends. This surface lives where players already are and hides
- * itself completely when nothing is running.
+ * what it intends. The card lives where players already are, and when nothing
+ * is running it offers an open table instead of counting nobody.
  *
  * The payload carries no player names by design; see game-server/directory.ts.
  */
@@ -18,7 +18,10 @@ const GAME_SERVER = (import.meta.env.VITE_GAME_SERVER_URL as string | undefined)
 
 export interface LiveTable {
     code: string
+    /** Seats, including ones a closed tab still holds. */
     players: number
+    /** Live sockets. Absent from an older Worker's payload - fall back to players. */
+    connected?: number
     seatsFree: number
     inProgress: boolean
     mode: string

@@ -111,8 +111,12 @@ export const useGameStore = defineStore('game', () => {
         return 'house'
     }
     const stackingMode = ref<StackingMode>(loadStackingMode())
+    /** The player's own pick, as saved. The lobby's picker reads this, never the
+     *  last game's rules: the daily always plays Official and must not change it. */
+    const preferredStackingMode = ref<StackingMode>(stackingMode.value)
     function setStackingMode(m: StackingMode) {
         stackingMode.value = m
+        preferredStackingMode.value = m
         try { localStorage.setItem('uno_stacking_mode', m) } catch { /* noop */ }
     }
 
@@ -272,7 +276,8 @@ export const useGameStore = defineStore('game', () => {
         hostRng = dailyDate.value ? dailyRng(dailyDate.value) : Math.random
         dealGeneration++
         closeCatchWindow()
-        if (mode) setStackingMode(mode)
+        if (mode && opts?.dailySeed) stackingMode.value = mode
+        else if (mode) setStackingMode(mode)
         spStartedAt = Date.now()
         warmGame = !dailyDate.value && opts?.warmUp === true
         track('sp_game_started', { rules: stackingMode.value, warm_up: warmGame })
@@ -1017,6 +1022,7 @@ export const useGameStore = defineStore('game', () => {
         suppressDiscardSlam,
         lastPlay,
         stackingMode,
+        preferredStackingMode,
         playerStats,
         setStackingMode,
         initializeGame,

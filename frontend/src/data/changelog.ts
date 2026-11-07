@@ -70,7 +70,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         level: 'loud',
         tag: 'NEW',
         title: 'Play strangers at the public table',
-        body: 'No room code, no host: tap TAKE A SEAT to join a live table. New games now start on House rules.',
+        body: 'No room code, no host: tap TAKE A SEAT to join strangers at a live table.',
         image: publicTableImage,
         cta: { label: 'SEE THE PUBLIC TABLE', scrollTo: 'public-table' },
     },

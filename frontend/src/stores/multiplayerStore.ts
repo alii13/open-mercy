@@ -717,8 +717,8 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
         }
     }
 
-    // 'live' is a join from the lobby's live-games entry — kept distinct from
-    // 'quick_match' so we can tell whether showing the room actually converts.
+    // 'live' is a join from the waiting room's rescue row (a busier public
+    // table) - kept distinct from 'quick_match' so the rescue's pull is measurable.
     type JoinMethod = 'created' | 'code' | 'link' | 'quick_match' | 'restore' | 'live'
 
     function trackJoined(method: JoinMethod) {

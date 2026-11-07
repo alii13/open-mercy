@@ -15,6 +15,15 @@ describe('public table card', () => {
         expect(view.status).toBe('CLOCK IS RUNNING · DEALS ITSELF')
     })
 
+    it('picks and counts by who is connected when the server says, not by seats a closed tab holds', () => {
+        const ghosts = { ...table('GHOSTS', 3), connected: 0 }
+        const live = { ...table('LIVE', 1), connected: 1 }
+        const view = publicTableView([ghosts, live], 0, true)
+
+        expect(view.target?.code).toBe('LIVE')
+        expect(view.headline).toBe('1 AT THE TABLE')
+    })
+
     it('tells a lone waiting player apart from a running clock', () => {
         const view = publicTableView([table('AAAAAA', 1)], 0, true)
 

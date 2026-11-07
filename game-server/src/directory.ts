@@ -46,6 +46,8 @@ export interface DirEntry {
 export interface PublicTable {
     code: string
     players: number
+    /** Players with a live socket; a closed tab keeps its seat in `players`. */
+    connected: number
     seatsFree: number
     inProgress: boolean
     mode: string
@@ -88,9 +90,10 @@ export function normalizeDir(raw: Record<string, DirEntry | number> | undefined)
  * drop the joiner into a game under way; a finished one would seat them in
  * front of someone else's game-over.
  */
+const filling = (e: DirEntry) => e.connected ?? e.players ?? 0
+
 export function dirCodes(raw: Record<string, DirEntry | number> | undefined): string[] {
     const dir = normalizeDir(raw)
-    const filling = (e: DirEntry) => e.connected ?? e.players ?? 0
     return Object.entries(dir)
         .filter(([, e]) => entryStatus(e) === 'lobby')
         .sort((a, b) => filling(b[1]) - filling(a[1]) || a[1].at - b[1].at)
@@ -113,13 +116,16 @@ export function liveTables(
         // A finished game is not an invitation to anything.
         .filter(([, e]) => entryStatus(e) !== 'finished')
         .filter(([, e]) => now - (e.updatedAt ?? e.at) < DIR_STALE_MS)
-        // Fullest first: a table with people on it is the better invitation,
-        // and a nearly-empty room reads as a dead game.
-        .sort((a, b) => (b[1].players ?? 0) - (a[1].players ?? 0) || a[1].at - b[1].at)
+        // Waiting tables first, so one never drops out of the short list behind
+        // games already running; then fullest by who is actually connected, the
+        // same measure quick match sorts on. A nearly-empty room reads as a dead game.
+        .sort((a, b) => Number(entryStatus(b[1]) === 'lobby') - Number(entryStatus(a[1]) === 'lobby')
+            || filling(b[1]) - filling(a[1]) || a[1].at - b[1].at)
         .slice(0, limit)
         .map(([code, e]) => ({
             code,
             players: e.players ?? 0,
+            connected: filling(e),
             seatsFree: e.seatsFree ?? 0,
             inProgress: !!e.inProgress,
             mode: e.mode ?? 'official',
