@@ -16,6 +16,7 @@
  */
 
 import type { Route } from '../utils/routes'
+import publicTableImage from '../assets/public-table.jpg'
 
 export type ChangelogLevel = 'quiet' | 'loud'
 export type ChangelogTag = 'NEW' | 'IMPROVED' | 'FIXED'
@@ -25,6 +26,8 @@ export type ChangelogCta =
     | { label: string; href: string }
     /** The reader's own profile page, which no fixed route can name. */
     | { label: string; ownProfile: true }
+    /** An element on the home screen, by id; from another page it goes home. */
+    | { label: string; scrollTo: string }
 
 export interface ChangelogEntry {
     /** ISO date, sortable. */
@@ -57,6 +60,8 @@ export interface ChangelogEntry {
      * makes its point.
      */
     stat?: 'alltime_rank'
+    /** A picture for the release card, imported as an asset so it loads only when the card shows. */
+    image?: string
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
@@ -64,8 +69,10 @@ export const CHANGELOG: ChangelogEntry[] = [
         id: '2026-11-07',
         level: 'loud',
         tag: 'NEW',
-        title: 'Take a seat at a public table',
-        body: 'The home screen shows the public table and who is at it. Tap TAKE A SEAT to play strangers, no room code. House rules are now the default.',
+        title: 'Play strangers at the public table',
+        body: 'No room code, no host: tap TAKE A SEAT to join a live table. New games now start on House rules.',
+        image: publicTableImage,
+        cta: { label: 'SEE THE PUBLIC TABLE', scrollTo: 'public-table' },
     },
     {
         id: '2026-11-05',

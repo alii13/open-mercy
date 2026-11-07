@@ -15,7 +15,7 @@ defineEmits<{ takeSeat: [] }>()
 <template>
   <!-- Strangers, no code: the table a tap sits you at, with the 3D table it
        opens onto. Lamp amber is this card's colour, from the lamp in the render. -->
-  <section class="pt-card" aria-labelledby="pt-headline">
+  <section id="public-table" class="pt-card" aria-labelledby="pt-headline">
     <div class="pt-render">
       <img :src="tableRender" alt="" width="440" height="216" loading="lazy" decoding="async" />
       <span v-if="online.show" class="pt-online"><span class="pt-dot" aria-hidden="true" />{{ online.count }} ONLINE</span>

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { newestId, previousId, seedId, unreadEntries, unreadCount, isOnlyUnread, pendingLoud, followCta } from '../whatsNew'
 import type { ChangelogEntry } from '../../data/changelog'
 
@@ -161,6 +161,25 @@ describe('followCta', () => {
         followCta({ label: 'JOIN', href: 'https://t.me/openmercy' }, nav, open)
         expect(open).toHaveBeenCalledWith('https://t.me/openmercy', '_blank', 'noopener,noreferrer')
         expect(nav).not.toHaveBeenCalled()
+    })
+})
+
+describe('followCta to a spot on the home screen', () => {
+    afterEach(() => vi.unstubAllGlobals())
+
+    it('scrolls the element into view when it is on the page', () => {
+        const scrollIntoView = vi.fn(), nav = vi.fn()
+        vi.stubGlobal('document', { getElementById: (id: string) => (id === 'public-table' ? { scrollIntoView } : null) })
+        followCta({ label: 'SEE IT', scrollTo: 'public-table' }, nav, vi.fn())
+        expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'center' })
+        expect(nav).not.toHaveBeenCalled()
+    })
+
+    it('goes home when the element is not on this page', () => {
+        const nav = vi.fn()
+        vi.stubGlobal('document', { getElementById: () => null })
+        followCta({ label: 'SEE IT', scrollTo: 'public-table' }, nav, vi.fn())
+        expect(nav).toHaveBeenCalledWith({ name: 'home' })
     })
 })
 

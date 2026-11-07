@@ -8,6 +8,7 @@
     </header>
 
     <div class="rc-body">
+      <img v-if="entry.image" class="rc-image" :src="entry.image" alt="" width="440" height="216" />
       <h2 class="rc-title">{{ entry.title }}</h2>
       <p class="rc-text">{{ signedIn ? entry.body : (entry.bodySignedOut ?? entry.body) }}</p>
 
@@ -217,6 +218,15 @@ function go() {
   flex-direction: column;
   gap: var(--spacing-3);
   padding: var(--spacing-4);
+}
+
+.rc-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 440 / 216;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
 }
 
 .rc-title {

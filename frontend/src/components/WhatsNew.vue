@@ -115,6 +115,7 @@ function go(route: Route) {
 function goEntry(entry: ChangelogEntry) {
     if (!entry.cta) return
     track('whatsnew_entry_clicked', { entry_id: entry.id })
+    close()
     followCta(entry.cta, go, undefined, authStore.profile?.share_code)
 }
 

@@ -117,5 +117,11 @@ export function followCta(
 ): void {
     if ('href' in cta) open(cta.href, '_blank', 'noopener,noreferrer')
     else if ('ownProfile' in cta) { if (ownCode) nav({ name: 'profile', code: ownCode }) }
+    else if ('scrollTo' in cta) {
+        const el = document.getElementById(cta.scrollTo)
+        // ponytail: from another page this only goes home; scrolling once the lobby mounts can follow if needed
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        else nav({ name: 'home' })
+    }
     else nav(cta.route)
 }
