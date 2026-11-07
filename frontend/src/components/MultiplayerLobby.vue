@@ -1979,7 +1979,6 @@ function copyLink() {
   .create-card > * { grid-column: 1 / -1; }
   .create-card > .create-eyebrow { grid-column: 1; grid-row: 1; }
   .create-card > .mode-pills { grid-column: 2; grid-row: 1; }
-  .create-card > .create-btn { justify-self: start; width: min(300px, 100%); }
 }
 
 .mode-desc {
