@@ -16,6 +16,8 @@ import { PUBLIC_SEATS, seatSpot, type LoungeAct } from '@lounge'
 import { createLounge, type Lounge } from '../lounge/scene'
 import { music } from '../composables/useMusic'
 import { soundEffects } from '../composables/useSoundEffects'
+import { useBadges } from '../composables/useBadges'
+import { supabase } from '../lib/supabase'
 import QuickChat from './QuickChat.vue'
 import { Volume2, VolumeX } from 'lucide-vue-next'
 
@@ -136,6 +138,31 @@ function syncPlayers() {
         lounge!.join({ id: p.userId, name: p.name, skin: p.skin, you: p.userId === auth.user?.id, x, z })
     })
     for (const id of [...lounge.players.keys()]) if (!ids.has(id)) lounge.leave(id)
+    void loadRanks([...ids])
+}
+
+// ---- Ranks. Every card shows its player's badge tier and all-time global
+// rank, read once per player (alltime_ranks, supabase/alltime-ranks.sql).
+// Until that function is installed the cards stay plain card backs.
+const { badges: tiers, fetchBadges } = useBadges()
+const globalRanks = new Map<string, number | null>()
+let ranksMissing = false
+
+async function loadRanks(ids: string[]) {
+    const missing = ids.filter((id) => !globalRanks.has(id))
+    if (missing.length && !ranksMissing) {
+        const [{ data, error }] = await Promise.all([supabase.rpc('alltime_ranks', { ids: missing }), fetchBadges(ids)])
+        if (error) { ranksMissing = true; return }
+        const byId = new Map(((data ?? []) as { user_id: string; rank: number }[]).map((r) => [r.user_id, Number(r.rank)]))
+        for (const id of missing) globalRanks.set(id, byId.get(id) ?? null)
+    } else {
+        await fetchBadges(ids)
+    }
+    for (const id of ids) {
+        if (!globalRanks.has(id)) continue
+        const global = globalRanks.get(id)
+        lounge?.setRank(id, global == null ? null : { tier: tiers.value[id]?.badge.tier ?? 1, global })
+    }
 }
 
 function toast(text: string) {

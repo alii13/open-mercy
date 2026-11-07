@@ -129,11 +129,12 @@ export async function createLounge({ canvas, overlay, artUrl, badgeUrl, reducedM
     im.onerror = () => res(null)
     im.src = badgeUrl(f)
   })))
-  // Without a known rank the card is the player's own card back, wordmark and all.
+  // rank: undefined while it loads (the player's own card back, wordmark and all), null for a player with
+  // no games (UNRANKED), or { tier, global }.
   function playerFaceTex(skin, rank) {
     return canvasTex(512, 820, (g, w, h) => {
-      const H = drawBack(g, w, h, skin, !rank), s = w / 250
-      if (!rank) return
+      const H = drawBack(g, w, h, skin, rank === undefined), s = w / 250
+      if (rank === undefined) return
       g.scale(s, s)
       const img = rank && badgeImgs[rank.tier - 1]
       if (img) g.drawImage(img, 125 - 62, H / 2 - 62, 124, 124)
@@ -185,6 +186,8 @@ export async function createLounge({ canvas, overlay, artUrl, badgeUrl, reducedM
       const t = await loader.loadAsync(artUrl(name))
       t.colorSpace = THREE.SRGBColorSpace
       t.anisotropy = maxAniso
+      // Upload now: left to the first draw of each face, the decode and upload stalled that draw.
+      renderer.initTexture(t)
       faceMats[name] = new THREE.MeshStandardMaterial({ map: t, color: 0xd2d2d2, roughness: 0.48, alphaTest: 0.5 })
     }))
   } catch (err) {
@@ -381,7 +384,7 @@ export async function createLounge({ canvas, overlay, artUrl, badgeUrl, reducedM
     gsap.to(m.material, { opacity: 0, duration: 0.9, ease: 'power1.in', onComplete: () => { scene.remove(m); m.geometry.dispose(); m.material.dispose() } })
   }
 
-  function join({ id, name, skin = 'ember', rank = null, you = false, x, z }) {
+  function join({ id, name, skin = 'ember', rank, you = false, x, z }) {
     if (players.has(id)) return
     const g = new THREE.Group()
     const sk = Object.hasOwn(SKINS, skin) ? SKINS[skin] : SKINS.ember
@@ -415,7 +418,7 @@ export async function createLounge({ canvas, overlay, artUrl, badgeUrl, reducedM
     const spot0 = finite(x, z) ? clampToSeats(x, z) : freeSpot(you)
     g.position.set(spot0.x, 0, spot0.z)
     scene.add(g)
-    const p = { id, name, you, g, card, ring, glow, hit, tagEl, bubbleEl, tag, bubble, baseY: 0, tx: spot0.x, tz: spot0.z, k: 3.2,
+    const p = { id, name, you, skin: sk, rank, g, card, ring, glow, hit, tagEl, bubbleEl, tag, bubble, baseY: 0, tx: spot0.x, tz: spot0.z, k: 3.2,
       speed: 0, phase: rand(0, 10), w: 0, wv: 0, lift: -1.1, bubbleTimer: null }
     sizeSeat(p)
     players.set(id, p)
@@ -589,25 +592,58 @@ export async function createLounge({ canvas, overlay, artUrl, badgeUrl, reducedM
   }
 
   // ------------------------------------------------------------ drawing from the deck
-  // Draws play one at a time and none is dropped, so every screen shows the same draws: a backlog plays faster, and a
-  // tab back from the background (where nothing animates) lands all but the last few on the pile at once. A draw
-  // keeps its player's name from when it arrived, so it still shows if they leave first. The deal is the one
-  // exception: it takes the deck, so draws still waiting when it starts are dropped.
+  // Every draw flies the moment it arrives, so a player can tap tap tap and watch the cards stream to the pile, and
+  // none is dropped, so every screen shows the same draws. Past MAX_FLYING cards in the air (a burst from the whole
+  // table, a tab back from the background where nothing animates) the rest land straight on the pile. A draw keeps
+  // its player's name from when it arrived, so it still shows if they leave first. The deal takes the deck, so a
+  // draw that arrives while it runs is dropped.
   const pile = []
-  const drawQueue = []
-  let drawing = false, drawTl = null
+  const flights = new Set()
+  const MAX_FLYING = 6
+  // Each card takes the next step up as it comes down, and when the oldest leaves the rest drop a step:
+  // two cards at the same height flicker through each other.
+  const PILE_STEP = 0.0012
+  let landing = 0
+  const pileSpot = () => ({ x: PILE_AT.x + rand(-0.06, 0.06), y: 0.004 + (pile.length + landing) * PILE_STEP, z: PILE_AT.z + rand(-0.06, 0.06) })
   function draw(id, face) {
     const p = players.get(id)
     if (dealing || !p || !Object.hasOwn(FACES, face)) return
-    drawQueue.push({ who: p.you ? 'You' : p.name, face })
-    if (!drawing) nextDraw()
-    else drawTl.timeScale(1 + drawQueue.length)
+    const who = p.you ? 'You' : p.name
+    if (flights.size >= MAX_FLYING) { land({ who, face }); return }
+    const c = makeCard(faceMats[face])
+    c.position.set(DECK_AT.x, deckTop() + 0.004, DECK_AT.z)
+    c.rotation.set(Math.PI / 2, deck.rotation.y, 0)
+    scene.add(c)
+    emit('event', { text: `${who} drew ${FACES[face]}`, kind: 'draw' })
+    const camYaw = Math.atan2(camera.position.x - DECK_AT.x, camera.position.z - DECK_AT.z)
+    // Cards in the air together fan out, so a stream reads as several cards and not one.
+    const lane = flights.size
+    const lift = 1.45 + lane * 0.08
+    const side = DECK_AT.x + 0.1 + (lane % 2 ? -1 : 1) * Math.ceil(lane / 2) * 0.22
+    let rest = null
+    const tl = gsap.timeline({ onComplete: () => flights.delete(tl) })
+      .to(c.position, { y: lift, x: side, duration: 0.45, ease: 'power3.out' })
+      .to(c.rotation, { x: 0, y: camYaw + Math.PI * 2, duration: 0.45, ease: 'power2.out' }, '<')
+      .to(c.position, { y: lift + 0.08, duration: 0.7, ease: 'sine.inOut' })
+      .to(c.rotation, { z: 0.08, duration: 0.7, ease: 'sine.inOut' }, '<')
+      // The pile spot is taken as the card starts down, so cards landing together never share a height.
+      .call(() => { rest = pileSpot(); landing++ })
+      .to(c.position, { x: () => rest.x, y: () => rest.y, z: () => rest.z, duration: 0.38, ease: 'power2.in' })
+      .to(c.rotation, { x: -Math.PI / 2, y: rand(-0.5, 0.5), z: 0, duration: 0.38, ease: 'power2.in' }, '<')
+      .call(() => {
+        landing--
+        toPile(c)
+        shockwave(c.position.x, c.position.z, new THREE.Color('#ffcc00').multiplyScalar(1.6), 2.2)
+      })
+    flights.add(tl)
   }
-  const pileSpot = () => ({ x: PILE_AT.x + rand(-0.06, 0.06), y: 0.004 + (pile.length % 30) * 0.0012, z: PILE_AT.z + rand(-0.06, 0.06) })
   function toPile(c) {
     pile.push(c)
     settle(c)
-    if (pile.length > 14) scene.remove(pile.shift())
+    if (pile.length > 14) {
+      scene.remove(pile.shift())
+      for (const p of pile) p.position.y -= PILE_STEP
+    }
   }
   function land({ who, face }) {
     const c = makeCard(faceMats[face])
@@ -617,33 +653,6 @@ export async function createLounge({ canvas, overlay, artUrl, badgeUrl, reducedM
     toPile(c)
     emit('event', { text: `${who} drew ${FACES[face]}` })
   }
-  function nextDraw() {
-    drawing = false
-    if (dealing) { drawQueue.length = 0; return }
-    while (drawQueue.length > 3) land(drawQueue.shift())
-    const next = drawQueue.shift()
-    if (!next) return
-    drawing = true
-    const c = makeCard(faceMats[next.face])
-    c.position.set(DECK_AT.x, deckTop() + 0.004, DECK_AT.z)
-    c.rotation.set(Math.PI / 2, deck.rotation.y, 0)
-    scene.add(c)
-    emit('event', { text: `${next.who} drew ${FACES[next.face]}`, kind: 'draw' })
-    const camYaw = Math.atan2(camera.position.x - DECK_AT.x, camera.position.z - DECK_AT.z)
-    const rest = pileSpot()
-    drawTl = gsap.timeline({ onComplete: nextDraw }).timeScale(1 + drawQueue.length)
-      .to(c.position, { y: 1.45, x: DECK_AT.x + 0.1, duration: 0.6, ease: 'power3.out' })
-      .to(c.rotation, { x: 0, y: camYaw + Math.PI * 2, duration: 0.6, ease: 'power2.out' }, '<')
-      .to(c.position, { y: 1.55, duration: 1.3, ease: 'sine.inOut' })
-      .to(c.rotation, { z: 0.08, duration: 1.3, ease: 'sine.inOut' }, '<')
-      .to(c.position, { ...rest, duration: 0.42, ease: 'power2.in' })
-      .to(c.rotation, { x: -Math.PI / 2, y: rand(-0.5, 0.5), z: 0, duration: 0.42, ease: 'power2.in' }, '<')
-      .call(() => {
-        toPile(c)
-        shockwave(c.position.x, c.position.z, new THREE.Color('#ffcc00').multiplyScalar(1.6), 2.2)
-      })
-  }
-
   // ------------------------------------------------------------ the deal
   let dealing = false, dealTl = null, dealDone = null, dealRun = null
   const dealt = []
@@ -925,11 +934,22 @@ export async function createLounge({ canvas, overlay, artUrl, badgeUrl, reducedM
     renderer.setAnimationLoop(document.hidden ? null : tick)
   }, { signal })
 
+  // A rank arrives after its player sits down: redraw that card's face in place.
+  function setRank(id, rank) {
+    const p = players.get(id)
+    if (!p || JSON.stringify(p.rank) === JSON.stringify(rank)) return
+    p.rank = rank
+    const face = p.card.children[0].material
+    const old = face.map
+    face.map = face.emissiveMap = playerFaceTex(p.skin, rank)
+    old.dispose()
+  }
+
   return {
-    join, leave, move, flick, simulateFlick, draw, emote, deal, reset, pulse, players,
+    join, leave, move, flick, simulateFlick, draw, emote, deal, reset, pulse, players, setRank,
     onIntent: (fn) => listeners.intent.push(fn),
     onEvent: (fn) => listeners.event.push(fn),
-    get busy() { return drawing || dealing },
+    get busy() { return flights.size > 0 || dealing },
     stats: () => ({ ...renderer.info.memory }),
     // For a host that unmounts the lounge (the Vue port): stop the loop, drop listeners, free the GPU.
     // ponytail: the deal and draw timelines are killed; the short join, leave and shockwave tweens finish on detached objects.
@@ -938,7 +958,7 @@ export async function createLounge({ canvas, overlay, artUrl, badgeUrl, reducedM
       sizer.disconnect()
       dealTl?.kill()
       dealDone?.(false)
-      drawTl?.kill()
+      for (const t of flights) t.kill()
       for (const l of litter) l.tween?.kill()
       renderer.setAnimationLoop(null)
       overlay.replaceChildren()

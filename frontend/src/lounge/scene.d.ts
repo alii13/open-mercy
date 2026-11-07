@@ -3,11 +3,15 @@ import type { LoungeAct } from '@lounge'
 /** What a tap or a drag on the table asks for: a relayable act, or a wave (sent as quick chat). */
 export type LoungeIntent = LoungeAct | { kind: 'wave' }
 
+/** A player's badge tier (1-based, utils/badges.ts) and all-time global rank. */
+export interface LoungeRank { tier: number; global: number }
+
 export interface LoungeJoin {
     id: string
     name: string
     skin?: string
-    rank?: { tier: number; global: number } | null
+    /** Omitted while it loads (plain card back); null for a player with no games (UNRANKED). */
+    rank?: LoungeRank | null
     you?: boolean
     x?: number
     z?: number
@@ -21,6 +25,8 @@ export interface Lounge {
     simulateFlick(id: string, angle: number, speed: number): LoungeAct | null
     draw(id: string, face: string): void
     emote(id: string, text: string): void
+    /** Redraws a seated player's card with their badge and rank, or UNRANKED for null. */
+    setRank(id: string, rank: LoungeRank | null): void
     /** Resolves true when the deal finishes, false when reset() or dispose() cuts it short. */
     deal(): Promise<boolean>
     reset(): void
