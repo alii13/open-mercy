@@ -11,9 +11,10 @@ import { createAllowed } from './createLimit'
 import { addParticipant, createMeeting, deactivateMeeting, voiceConfigured, type VoiceEnv } from './voice'
 import { gcWindowMs } from './roomGc'
 import { ROOM_CODE_ALPHABET, isRoomCode, normalizeRoomCode } from '../../shared/roomCode'
-import { canSeat, MAX_PLAYERS } from './seats'
-import { autoStartTick, autoStartBump, autoStartBumpsLeft, AUTO_START_MIN_PLAYERS, type AutoStartState } from './autoStart'
-import { chatAllowed } from './chatLimit'
+import { doorVerdict, PUBLIC_SEATS } from './seats'
+import { autoStartTick, canDeal } from './autoStart'
+import { chatAllowed, loungeAllowed } from './chatLimit'
+import { cleanLoungeAct } from '../../shared/lounge'
 import { sendRoomInvite } from './invites'
 import { quickChatPhrase } from '../../shared/quickChat'
 import type { StackingMode } from '../../shared/engine'
@@ -241,12 +242,6 @@ interface RoomTimers {
     catchFor?: string
     // Auto-start for public lobbies (see autoStart.ts for the transitions).
     startAt?: number
-    startLeftMs?: number
-    // User ids counted into the clock. Rooms that armed a clock under the
-    // build that stored a count hold a number here - readers must tolerate it.
-    startSeen?: string[] | number
-    /** Extensions the room has already bought. */
-    startBumps?: number
 }
 
 type SocketTag = { userId: string } | null
@@ -263,6 +258,12 @@ export class GameRoomDO {
     // Per-user quick-chat timestamps. In-memory: hibernation clears it, which
     // is acceptable for a best-effort spam guard.
     private chatTimes = new Map<string, number[]>()
+    private loungeTimes = new Map<string, number[]>()
+    /** Last spot on the 3D table per player, for late joiners. Memory only:
+     *  after hibernation clients fall back to the shared seat spots. */
+    private loungeSpots = new Map<string, [number, number]>()
+    /** When each player's last socket closed, for the seat grace at the door. In memory: hibernation forgets it, which counts as long gone. */
+    private goneAt = new Map<string, number>()
     // Per-socket message buckets (see socketLimit.ts).
     private buckets = new WeakMap<WebSocket, Bucket>()
     // Voice tokens already minted this wake, so a repeated voice-join reuses
@@ -545,11 +546,31 @@ export class GameRoomDO {
                 return
             }
             const roster = (await this.ctx.storage.get<Record<string, RosterEntry>>('roster')) ?? {}
-            if (!canSeat(roster, verified.userId)) {
+            // The seat rules live in seats.ts: a seated player always gets
+            // back in, a public table counting down is locked to strangers,
+            // and a full filling table hands on a seat gone past its grace.
+            await this.loadGame()
+            const verdict = doorVerdict({
+                userId: verified.userId,
+                rosterIds: Object.keys(roster),
+                liveIds: this.roomSockets(ws).map(s => s.userId),
+                goneAt: Object.fromEntries(this.goneAt),
+                isPublic: room.isPublic,
+                phase: this.roomStatus(),
+                locked: (await this.getTimers()).startAt !== undefined,
+                now: Date.now(),
+            })
+            if (!verdict.seat) {
                 this.send(ws, { t: 'error', code: 'room-full' })
                 ws.close(1008, 'room full')
                 return
             }
+            if (verdict.evict) {
+                delete roster[verdict.evict]
+                this.loungeSpots.delete(verdict.evict)
+                this.goneAt.delete(verdict.evict)
+            }
+            this.goneAt.delete(verified.userId)
             const entry = roster[verified.userId]
             const name = cleanName(msg.name)
             const skin = cleanSkin(msg.skin)
@@ -564,7 +585,7 @@ export class GameRoomDO {
             // Activity resets the GC clock.
             await this.touchGc()
 
-            this.send(ws, { t: 'hello', roomCode: room.code, userId: verified.userId, hostUserId: room.hostUserId })
+            this.send(ws, { t: 'hello', roomCode: room.code, userId: verified.userId, hostUserId: room.hostUserId, isPublic: room.isPublic })
             await this.broadcastPresence(roster)
             // Catch the joiner up — lobby state or a running game.
             await this.loadGame()
@@ -688,6 +709,28 @@ export class GameRoomDO {
                 return
             }
 
+            case 'lounge': {
+                // The 3D public table: relay a rebuilt act to the rest of the
+                // table, only in a public room's lobby. Never the raw frame.
+                if (!(await this.isRoomPublic())) return
+                await this.loadGame()
+                if (this.roomStatus() !== 'lobby') return
+                const act = cleanLoungeAct(msg.act)
+                if (!act) {
+                    this.send(ws, { t: 'error', code: 'bad-message' })
+                    return
+                }
+                const times = this.loungeTimes.get(tag.userId) ?? []
+                // Over the limit: drop silently, like chat.
+                if (!loungeAllowed(times, Date.now())) return
+                this.loungeTimes.set(tag.userId, times)
+                if (act.kind === 'move') this.loungeSpots.set(tag.userId, [act.x, act.z])
+                for (const s of this.roomSockets()) {
+                    if (s.userId !== tag.userId) this.send(s.ws, { t: 'lounge', userId: tag.userId, act })
+                }
+                return
+            }
+
             case 'kick': {
                 const roomRec = await this.ctx.storage.get<RoomRecord>('room')
                 if (roomRec?.hostUserId !== tag.userId || msg.userId === tag.userId) {
@@ -736,11 +779,8 @@ export class GameRoomDO {
                     // A manual start beats the countdown to the punch —
                     // disarm it so the alarm doesn't fire into a running game.
                     const t = await this.getTimers()
-                    if (t.startAt !== undefined || t.startLeftMs !== undefined) {
+                    if (t.startAt !== undefined) {
                         delete t.startAt
-                        delete t.startLeftMs
-                        delete t.startSeen
-                        delete t.startBumps
                         await this.putTimers(t)
                     }
                 }
@@ -751,26 +791,6 @@ export class GameRoomDO {
                     await this.refreshDirectory(await this.ctx.storage.get<Record<string, RosterEntry>>('roster') ?? {})
                 }
                 await this.broadcastGame(events)
-                return
-            }
-
-            case 'extend-start': {
-                // Anyone at the table can hold the lobby open; the allowance
-                // is the room's, so the second press is refused for everyone.
-                await this.loadGame()
-                if (this.roomStatus() !== 'lobby') return
-                const t = await this.getTimers()
-                // A private room never arms this clock, so the bump is a
-                // no-op there and needs no visibility check of its own.
-                const prev: AutoStartState = { at: t.startAt, bumps: t.startBumps }
-                const next = autoStartBump(prev, Date.now())
-                if (next.at === prev.at) return
-                t.startAt = next.at
-                t.startBumps = next.bumps
-                await this.putTimers(t)
-                await this.touchGc()
-                // One ring, one deadline: everybody's clock moves together.
-                await this.broadcastPresence()
                 return
             }
 
@@ -845,12 +865,21 @@ export class GameRoomDO {
 
     // The closing socket is still enumerable in getWebSockets() while these
     // handlers run — exclude it or it counts itself as connected.
+    private markGone(ws: WebSocket) {
+        const tag = ws.deserializeAttachment() as SocketTag
+        if (!tag || !('userId' in tag)) return
+        if (this.roomSockets(ws).some(s => s.userId === tag.userId)) return
+        this.goneAt.set(tag.userId, Date.now())
+    }
+
     async webSocketClose(ws: WebSocket) {
+        this.markGone(ws)
         await this.broadcastPresence(undefined, ws)
         await this.armTurnGrace(ws)
     }
 
     async webSocketError(ws: WebSocket) {
+        this.markGone(ws)
         await this.broadcastPresence(undefined, ws)
         await this.armTurnGrace(ws)
     }
@@ -875,7 +904,7 @@ export class GameRoomDO {
         if (turnDue) { delete t.turnAt; delete t.turnSeat }
 
         const startDue = !!t.startAt && t.startAt <= now
-        if (startDue) { delete t.startAt; delete t.startLeftMs; delete t.startSeen; delete t.startBumps }
+        if (startDue) delete t.startAt
 
         const gcDue = !!t.gcAt && t.gcAt <= now
         if (gcDue) t.gcAt = now + gcWindowMs(await this.isRoomPublic())
@@ -913,18 +942,22 @@ export class GameRoomDO {
         }
 
         if (startDue) {
-            // The lobby countdown hit zero — deal, exactly as a host start
-            // would, if the room still qualifies. If it no longer does, the
-            // next presence change re-arms a fresh clock.
+            // The countdown hit zero: deal to whoever is still connected, as a
+            // host start would. Fewer than two cannot play, so the room reopens
+            // as a filling table and the presence frame clears every clock.
             await this.loadGame()
             const roomRec = await this.ctx.storage.get<RoomRecord>('room')
             const connected = new Set(this.roomSockets().map(x => x.userId))
             const seated = (await this.rosterList()).filter(r => connected.has(r.userId))
-            if (roomRec?.isPublic && this.roomStatus() === 'lobby' && seated.length >= AUTO_START_MIN_PLAYERS) {
-                const { game, events } = startGame(seated, roomRec.stackingMode as StackingMode)
-                this.game = game
-                await this.refreshDirectory(await this.ctx.storage.get<Record<string, RosterEntry>>('roster') ?? {})
-                await this.broadcastGame(events)
+            if (roomRec?.isPublic && this.roomStatus() === 'lobby') {
+                if (canDeal(seated.length)) {
+                    const { game, events } = startGame(seated, roomRec.stackingMode as StackingMode)
+                    this.game = game
+                    await this.refreshDirectory(await this.ctx.storage.get<Record<string, RosterEntry>>('roster') ?? {})
+                    await this.broadcastGame(events)
+                } else {
+                    await this.broadcastPresence()
+                }
             }
         }
 
@@ -967,8 +1000,9 @@ export class GameRoomDO {
             .map(([userId, entry]) => ({ userId, name: entry.name, connected: connectedIds.has(userId), skin: entry.skin }))
         // Presence changes are exactly when the auto-start clock moves, so the
         // frame carries it and the clients never need to poll.
-        const auto = await this.tickAutoStart([...connectedIds], Object.keys(roster).length)
-        const frame: ServerMsg = { t: 'presence', players, ...auto }
+        const auto = await this.tickAutoStart(connectedIds.size)
+        const spots = Object.fromEntries([...this.loungeSpots].filter(([id]) => id in roster))
+        const frame: ServerMsg = { t: 'presence', players, ...auto, ...(Object.keys(spots).length ? { spots } : {}) }
         for (const { ws } of sockets) {
             this.send(ws, frame)
         }
@@ -978,39 +1012,17 @@ export class GameRoomDO {
     }
 
     /** Advance the auto-start clock; returns the presence-frame fields. */
-    private async tickAutoStart(connectedIds: string[], seated: number): Promise<{ autoStartInMs?: number; autoStartPaused?: boolean; autoStartBumpsLeft?: number }> {
+    private async tickAutoStart(connected: number): Promise<{ autoStartInMs?: number }> {
         if (!(await this.isRoomPublic())) return {}
         await this.loadGame()
         const t = await this.getTimers()
-        const prev: AutoStartState = {
-            at: t.startAt,
-            leftMs: t.startLeftMs,
-            // A clock armed by the count-storing build holds a number - drop
-            // it and let identity tracking rebuild from this tick.
-            seen: Array.isArray(t.startSeen) ? t.startSeen : undefined,
-            bumps: t.startBumps,
-        }
         const now = Date.now()
-        const next = autoStartTick(prev, {
-            isPublic: true,
-            phase: this.roomStatus(),
-            connectedIds,
-            seatsFree: Math.max(0, MAX_PLAYERS - seated),
-            now,
-        })
-        const seenChanged = (next.seen ?? []).join(',') !== (prev.seen ?? []).join(',')
-        if (next.at !== prev.at || next.leftMs !== prev.leftMs || next.bumps !== prev.bumps || seenChanged || typeof t.startSeen === 'number') {
+        const next = autoStartTick({ at: t.startAt }, { isPublic: true, phase: this.roomStatus(), connected, now })
+        if (next.at !== t.startAt) {
             if (next.at === undefined) delete t.startAt; else t.startAt = next.at
-            if (next.leftMs === undefined) delete t.startLeftMs; else t.startLeftMs = next.leftMs
-            if (next.seen === undefined) delete t.startSeen; else t.startSeen = next.seen
-            if (next.bumps === undefined) delete t.startBumps; else t.startBumps = next.bumps
             await this.putTimers(t)
         }
-        if (next.at !== undefined) {
-            return { autoStartInMs: Math.max(0, next.at - now), autoStartBumpsLeft: autoStartBumpsLeft(next) }
-        }
-        if (next.leftMs !== undefined) return { autoStartInMs: next.leftMs, autoStartPaused: true }
-        return {}
+        return next.at === undefined ? {} : { autoStartInMs: Math.max(0, next.at - now) }
     }
 
     /**
@@ -1034,6 +1046,8 @@ export class GameRoomDO {
             await this.loadGame()
             const players = Object.keys(roster).length
             const skins = Object.values(roster).map(e => e.skin).filter(Boolean) as string[]
+            // A table counting down is locked, so it has no seat to offer even when someone has left it.
+            const locked = (await this.getTimers()).startAt !== undefined
             await directoryStub(this.env).fetch('https://do/dir-register', {
                 method: 'POST',
                 body: JSON.stringify({
@@ -1041,7 +1055,8 @@ export class GameRoomDO {
                     snapshot: {
                         players,
                         connected,
-                        seatsFree: Math.max(0, MAX_PLAYERS - players),
+                        // By who is connected: the door hands a closed tab's seat to the next stranger.
+                        seatsFree: locked ? 0 : Math.max(0, PUBLIC_SEATS - connected),
                         // Kept alongside status so a rollback still reads sane entries.
                         inProgress: this.roomStatus() === 'playing',
                         status: this.roomStatus(),

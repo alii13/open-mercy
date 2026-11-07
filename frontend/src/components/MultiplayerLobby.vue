@@ -1,16 +1,17 @@
 <template>
   <div class="lobby-container">
     <!-- Top bar — slim, brand left, identity + auth controls right. No scan-line. -->
-    <header class="lobby-top-bar">
+    <header class="lobby-top-bar" :class="{ 'menu-open': accountOpen }">
       <a class="brand-mark" href="#" @click.prevent>
         <span class="brand-mark-uno">OPEN</span>
         <span class="brand-mark-nomercy">MERCY</span>
       </a>
 
       <div class="top-bar-cta">
-        <WhatsNew />
+        <WhatsNew ref="whatsNewRef" class="bar-whatsnew" />
         <div v-if="editingName && editTarget === 'bar'" class="name-edit">
           <input
+            ref="barNameEl"
             v-model="nameInput"
             v-focus-ring
             class="username-edit-input"
@@ -42,6 +43,19 @@
              to need its own header slot; nesting it here costs no width, which
              matters most on a phone. -->
         <div v-else class="account" ref="accountRef">
+          <!-- Phones: one burger holds everything about "you", so the bar
+               never wraps to a second row. The dot is What's new, unread. -->
+          <button
+            class="menu-burger"
+            aria-haspopup="menu"
+            :aria-expanded="accountOpen"
+            :aria-label="burgerLabel"
+            @click="accountOpen = !accountOpen"
+          >
+            <X v-if="accountOpen" :size="20" :stroke-width="2" aria-hidden="true" />
+            <MenuIcon v-else :size="20" :stroke-width="2" aria-hidden="true" />
+            <span v-if="(whatsNewUnread || social.incoming.length) && !accountOpen" class="burger-dot" aria-hidden="true" />
+          </button>
           <button
             class="username-chip username-chip-editable"
             aria-haspopup="menu"
@@ -53,7 +67,24 @@
             <span v-if="social.incoming.length" class="chip-badge" :title="`${social.incoming.length} friend request${social.incoming.length > 1 ? 's' : ''}`">{{ social.incoming.length }}</span>
             <ChevronDown class="chip-edit-icon" :stroke-width="2" aria-hidden="true" />
           </button>
+          <div v-if="accountOpen" class="menu-scrim" aria-hidden="true" @click="closeAccount" />
           <div v-if="accountOpen" class="account-menu" role="menu">
+            <div class="menu-phone menu-who" role="none">
+              <Avatar :uid="authStore.user?.id" :name="authStore.username" :size="36" />
+              <span class="menu-who-text">
+                <span class="menu-who-name">{{ authStore.username }}</span>
+                <span class="menu-who-kind">{{ authStore.isAnonymous ? 'Guest · progress lives on this device' : 'Signed in' }}</span>
+              </span>
+            </div>
+            <button v-if="authStore.isAnonymous" class="menu-phone menu-claim" role="menuitem" @click="claimFromMenu">
+              {{ authStore.claimPending ? 'CONFIRM YOUR EMAIL' : 'CLAIM ACCOUNT' }}
+            </button>
+            <!-- .stop: What's new closes on any window click outside itself,
+                 and this tap would otherwise close it as it opens. -->
+            <button class="menu-phone account-item account-item--first" role="menuitem" @click.stop="openWhatsNewFromMenu">
+              What's new
+              <span v-if="whatsNewUnread" class="menu-new">{{ whatsNewUnread }} NEW</span>
+            </button>
             <button v-if="authStore.profile?.share_code" class="account-item" role="menuitem" @click="viewProfile">View profile</button>
             <button v-if="!social.unavailable" class="account-item" role="menuitem" @click="openFriends">
               Friends
@@ -64,8 +95,9 @@
             <button class="account-item account-item--out" role="menuitem" @click="signOutFromMenu">Sign out</button>
           </div>
         </div>
-        <!-- Stays in the bar rather than the menu: it is the conversion CTA,
-             and a guest who never opens the menu should still see it. -->
+        <!-- Stays in the bar rather than the menu on wide screens: it is the
+             conversion CTA. Phones move it to the top of the burger menu, as a
+             button, so the bar fits one row. -->
         <button
           v-if="authStore.isAnonymous"
           class="text-link upgrade-link"
@@ -86,8 +118,8 @@
           <Button variant="primary" size="md" block :disabled="mpStore.loading" @click="handleCreateGame">
             {{ mpStore.loading ? 'CREATING...' : 'CREATE A NEW ROOM' }}
           </Button>
-          <Button variant="secondary" size="md" block :disabled="mpStore.loading" @click="handleQuickMatch">
-            QUICK MATCH
+          <Button variant="secondary" size="md" block :disabled="mpStore.loading" @click="handleTakeSeat">
+            JOIN A PUBLIC TABLE
           </Button>
         </div>
       </div>
@@ -121,7 +153,7 @@
           </div>
           <template v-if="!dailyRecord">
             <p class="daily-desc">The same shuffle for every player in the world. One scored attempt.</p>
-            <Button variant="secondary" size="md" block @click="$emit('playDaily')">
+            <Button variant="secondary" size="md" block class="daily-play" @click="$emit('playDaily')">
               {{ dailyInProgress ? 'CONTINUE' : 'PLAY' }}
             </Button>
           </template>
@@ -206,70 +238,47 @@
           <button class="lb-link" @click="openLeaderboard">Full leaderboard <ArrowRight :size="14" :stroke-width="2" aria-hidden="true" /></button>
         </div>
 
-        <!-- Primary action: create a room. The rules choice only applies to
-             created games, so it lives inside the same card, above the button
-             that consumes it. -->
+        <!-- Play with friends: a private room with a code. The rules choice
+             lives inside the same card, above the button that consumes it.
+             Flat children on purpose: a phone stacks them in this order, a
+             wide screen moves the picker up beside the eyebrow. -->
         <div class="create-card">
-          <div class="mode-row">
-            <span class="mode-label">Rules</span>
-            <div class="mode-pills">
-              <button
-                v-for="m in stackingModes"
-                :key="m.value"
-                class="mode-pill"
-                :class="{ active: selectedStackingMode === m.value }"
-                @click="selectedStackingMode = m.value"
-              >
-                {{ m.label }}
-              </button>
-            </div>
+          <span class="create-eyebrow">PLAY WITH FRIENDS</span>
+          <p class="create-note">A private room with a code to share. It starts when you say.</p>
+          <div class="mode-pills">
+            <button
+              v-for="m in stackingModes"
+              :key="m.value"
+              class="mode-pill"
+              :class="{ active: selectedStackingMode === m.value }"
+              @click="selectedStackingMode = m.value"
+            >
+              {{ m.label }}
+            </button>
           </div>
           <p class="mode-desc">{{ currentModeDesc }}</p>
           <Button
             variant="primary"
-            size="lg"
+            size="md"
             block
+            class="create-btn"
             :disabled="mpStore.loading"
             @click="handleCreateGame"
           >
-            {{ mpStore.loading ? 'CREATING...' : 'CREATE GAME' }}
+            {{ mpStore.loading ? 'CREATING...' : 'CREATE A ROOM' }}
           </Button>
         </div>
 
-        <!-- Other ways in: icon-led list rows, one identity color per mode -->
+        <PublicTableCard
+          class="public-table"
+          :view="tableView"
+          :online="{ show: online.show.value, count: online.count.value }"
+          :loading="mpStore.loading"
+          @take-seat="handleTakeSeat"
+        />
+
+        <!-- Other ways in: a friend's code, or the bot ladder. -->
         <div class="mode-list" role="group" aria-label="Other ways to play">
-          <div class="mode-overline-row">
-            <span class="mode-overline">Or jump in</span>
-            <!-- Hidden below a floor on purpose: a true small number reads as
-                 an empty game and sends the reader away. See useOnlineCount. -->
-            <span v-if="online.show.value" class="mode-online">
-              <span class="live-dot" aria-hidden="true" />{{ online.count.value }} ONLINE
-            </span>
-          </div>
-          <!-- Only rendered when a public room with a free seat actually
-               exists. An empty "live games" row advertises that nobody is
-               playing, which is worse than no row at all. -->
-          <button
-            v-if="live.joinable.value.length"
-            class="mode-item mode-item--live"
-            :disabled="mpStore.loading"
-            @click="handleJoinLive"
-          >
-            <span class="mode-glyph mode-glyph--live"><Users :size="16" :stroke-width="2" aria-hidden="true" /></span>
-            <span class="mode-text">
-              <span class="mode-name"><span class="live-dot" aria-hidden="true" />{{ liveHeadline }}</span>
-              <span class="mode-hint">{{ liveHint }}</span>
-            </span>
-            <ChevronRight class="mode-chev" :size="16" aria-hidden="true" />
-          </button>
-          <button class="mode-item" :disabled="mpStore.loading" @click="handleQuickMatch">
-            <span class="mode-glyph mode-glyph--cyan"><Zap :size="16" :stroke-width="2" aria-hidden="true" /></span>
-            <span class="mode-text">
-              <span class="mode-name">{{ mpStore.loading ? 'Matching…' : 'Quick match' }}</span>
-              <span class="mode-hint">Join a public room - the game starts itself</span>
-            </span>
-            <ChevronRight class="mode-chev" :size="16" aria-hidden="true" />
-          </button>
           <button class="mode-item" @click="showJoinModal = true">
             <span class="mode-glyph mode-glyph--cyan"><Hash :size="16" :stroke-width="2" aria-hidden="true" /></span>
             <span class="mode-text">
@@ -298,7 +307,6 @@
                 </span>
               </span>
             </span>
-            <ChevronRight class="mode-chev" :size="16" aria-hidden="true" />
           </button>
         </div>
 
@@ -313,6 +321,14 @@
           Your streak and scores live on this guest session - create an account to keep them
         </button>
       </div>
+
+      <!-- A public room waits at the 3D table; private rooms, and any browser
+           that cannot draw it, keep the list below. -->
+      <PublicTableLounge
+        v-else-if="(mpStore.gameStatus === 'waiting' || mpStore.loungeShow) && mpStore.isPublicRoom && !loungeFailed"
+        @fallback="loungeFailed = true"
+        @leave="showLeaveConfirm = true"
+      />
 
       <!-- Waiting room — after creating, before starting -->
       <div v-else-if="mpStore.gameStatus === 'waiting'" class="waiting-room">
@@ -466,27 +482,13 @@
             </template>
           </div>
 
-          <!-- Public rooms deal themselves once two players are seated; the
-               server owns the clock, this only renders it. -->
+          <!-- A public table deals itself 15 s after its seventh player sits;
+               the server owns the clock, this only renders it. -->
           <AutoStartRing
             v-if="mpStore.autoStart"
             class="table-ring"
             :deadline="mpStore.autoStart.deadline"
-            :paused="mpStore.autoStart.paused"
           />
-
-          <!-- Waiting for a friend who is nearly here: the room can hold the
-               door open one extra minute, once, and then it deals. -->
-          <button
-            v-if="mpStore.autoStart && !mpStore.autoStart.paused && mpStore.autoStart.bumpsLeft > 0"
-            class="hold-row"
-            type="button"
-            title="Hold the room open one more minute"
-            @click="mpStore.extendAutoStart()"
-          >
-            <Clock class="hold-glyph" :size="14" :stroke-width="2" aria-hidden="true" />
-            WAIT LONGER
-          </button>
 
           <!-- The wait teaches the game; the tip lives with the table. -->
           <Transition name="tip-fade" mode="out-in">
@@ -633,8 +635,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { ArrowRight, Bot, Check, ChevronDown, ChevronRight, Clock, Copy, Flame, Hash, HelpCircle, Minus, Pencil, Share2, Skull, Users, Volume1, VolumeX, X, Zap } from 'lucide-vue-next'
+import { ref, computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, watch } from 'vue'
+import { ArrowRight, Bot, Check, ChevronDown, ChevronRight, Copy, Flame, Hash, HelpCircle, Menu as MenuIcon, Minus, Pencil, Share2, Skull, Users, Volume1, VolumeX, X } from 'lucide-vue-next'
 import { useRetentionStore } from '../stores/retentionStore'
 import {
     getDailyRecord, fetchServerDailyRecord, dailyGridCells, buildDailyShareText, loadDailyProgress,
@@ -649,6 +651,16 @@ import { useSocialStore } from '../stores/socialStore'
 import { usePresence } from '../composables/usePresence'
 import InviteFriends from './InviteFriends.vue'
 import WhatsNew from './WhatsNew.vue'
+import PublicTableCard from './PublicTableCard.vue'
+// The 3D table is its own chunk: three.js loads only when a public room opens.
+// A chunk that fails to load (a deploy since page load, a dropped connection)
+// falls back to the list, the same as a browser that cannot draw the table.
+const PublicTableLounge = defineAsyncComponent({
+  loader: () => import('./PublicTableLounge.vue'),
+  onError: (_err, _retry, fail) => { loungeFailed.value = true; fail() },
+})
+import { publicTableView, PUBLIC_TABLE_RULES } from '../utils/publicTable'
+import { useWhatsNew } from '../composables/useWhatsNew'
 import { nextBot, ladderProgress, isLadderComplete } from '../utils/botLadder'
 import { navigate } from '../utils/routes'
 import { track } from '../utils/analytics'
@@ -818,16 +830,20 @@ const showJoinModal = ref(false)
 // A join hit a room the server no longer knows — show the ended card, not a retry trap.
 const roomEnded = ref(false)
 const showLeaveConfirm = ref(false)
+/** The 3D table could not start (no WebGL, an asset failed): use the list. */
+const loungeFailed = ref(false)
 const showSignOutConfirm = ref(false)
 const editingName = ref(false)
 const editTarget = ref<'bar' | 'room' | null>(null)
 const nameInput = ref('')
 const nameError = ref('')
 const nameSuggestions = ref<string[]>([])
+const barNameEl = ref<HTMLInputElement | null>(null)
 const joinCode = ref('')
 const joinCodeError = ref('')
 const copied = ref(false)
-const selectedStackingMode = ref<StackingMode>(gameStore.stackingMode)
+// The player's saved pick, not the last game's rules: the daily always plays Official.
+const selectedStackingMode = ref<StackingMode>(gameStore.preferredStackingMode)
 
 // When the page loads with ?join=ABCDEF, pre-fill the join input and
 // fire the join automatically. Friends sharing the invite URL drop
@@ -904,7 +920,7 @@ const friendlyError = computed(() => {
   const map: Record<string, string> = {
     'Game not found': "That room code didn't match any game. Double-check it and try again.",
     'Game already started': 'That game already kicked off. Ask the host for a new room, or start your own.',
-    'Game is full (max 20 players)': 'That room is full (20 players max). Start your own instead.',
+    'That room is full': 'That room is full. Start your own instead.',
   }
   if (map[e]) return map[e]
   if (/full/i.test(e)) return 'That room is full. Start your own instead.'
@@ -970,33 +986,15 @@ function openFriends() {
 }
 onMounted(() => live.start())
 
-const liveHeadline = computed(() => {
-    const n = live.waitingPlayers.value
-    return n === 1 ? 'Someone is waiting' : `${n} players waiting`
-})
+const tableView = computed(() => publicTableView(live.joinable.value, live.loaded.value))
 
-const liveHint = computed(() => {
-    const rooms = live.joinable.value.length
-    const roomText = rooms === 1 ? '1 open room' : `${rooms} open rooms`
-    const running = live.inProgressCount.value
-    if (!running) return `${roomText} - sit down now`
-    return `${roomText}, ${running} game${running === 1 ? '' : 's'} in progress`
-})
-
-// Fullest room first: joining the busiest table is more likely to start a
-// game than padding out a room with one bored person in it.
-async function handleJoinLive() {
-    const target = [...live.joinable.value].sort((a, b) => b.players - a.players)[0]
-    if (!target || mpStore.loading) return
+// Quick match picks the same table the card describes, the fullest open room by
+// connected players, and refuses one that dealt between poll and tap. With none
+// open it starts a new House table.
+async function handleTakeSeat() {
+    if (mpStore.loading) return
     roomEnded.value = false
-    const joined = await mpStore.joinGame(target.code, 'live')
-    // The room may have filled or started between poll and click.
-    if (!joined) await live.refresh()
-}
-
-async function handleQuickMatch() {
-  roomEnded.value = false
-  await mpStore.quickMatch(selectedStackingMode.value)
+    await mpStore.quickMatch(PUBLIC_TABLE_RULES)
 }
 
 async function joinGame() {
@@ -1046,6 +1044,9 @@ function startEditName(target: 'bar' | 'room' = 'bar') {
   nameInput.value = current && current !== 'Player' ? current : ''
   editTarget.value = target
   editingName.value = true
+  // On a phone the bar editor replaces the burger, so it takes focus at once:
+  // tapping away then saves and brings the burger back.
+  if (target === 'bar') void nextTick(() => barNameEl.value?.focus())
 }
 
 function closeNameEdit() {
@@ -1104,6 +1105,27 @@ const accountOpen = ref(false)
 const accountRef = ref<HTMLElement | null>(null)
 
 function closeAccount() { accountOpen.value = false }
+
+const whatsNewRef = ref<InstanceType<typeof WhatsNew> | null>(null)
+const { unread: whatsNewUnread } = useWhatsNew()
+// The burger is the only route to friends on a phone, so a waiting request lights it too.
+const burgerLabel = computed(() => {
+    const parts = [
+        whatsNewUnread.value ? `${whatsNewUnread.value} new` : '',
+        social.incoming.length ? `${social.incoming.length} friend request${social.incoming.length > 1 ? 's' : ''}` : '',
+    ].filter(Boolean)
+    return parts.length ? `Menu, ${parts.join(', ')}` : 'Menu'
+})
+
+function openWhatsNewFromMenu() {
+    closeAccount()
+    whatsNewRef.value?.openPanel()
+}
+
+function claimFromMenu() {
+    closeAccount()
+    upgradeAccount()
+}
 
 function onDocPointer(e: PointerEvent) {
     if (!accountOpen.value) return
@@ -1453,11 +1475,11 @@ function copyLink() {
 }
 
 .upgrade-link {
-  color: var(--color-neon-blue);
+  color: var(--color-hazard);
 }
 
 .upgrade-link:hover {
-  color: var(--color-hazard);
+  color: var(--text-primary);
 }
 
 /* CONTENT */
@@ -1866,6 +1888,7 @@ function copyLink() {
 /* Today's board reads as a footnote on a phone, not a headline: on narrow
    screens it drops below the ways to play. Inert on the desktop grid, where
    every card is placed explicitly. */
+.public-table { order: 1; }
 .board-card { order: 2; }
 .streak-keep-link { order: 3; }
 
@@ -1902,14 +1925,21 @@ function copyLink() {
   }
   .daily-card       { grid-column: 1; grid-row: 2; }
   .create-card      { grid-column: 2; grid-row: 2; }
-  .board-card       { grid-column: 1; grid-row: 3; }
+  .board-card       { grid-column: 1; grid-row: 3 / span 2; }
   .mode-list        { grid-column: 2; grid-row: 3; }
-  .streak-keep-link { grid-column: 1 / -1; grid-row: 4; }
+  .public-table     { grid-column: 2; grid-row: 4; }
+  /* Side by side here. .lobby-entry > outranks the base .mode-list, which
+     comes later in this file. */
+  .lobby-entry > .mode-list { flex-direction: row; }
+  .mode-list > .mode-item { flex: 1; min-width: 0; }
+  .streak-keep-link { grid-column: 1 / -1; grid-row: 5; }
 
   /* Whichever card is shorter gets stretched to its row, so pin the board's
      link to the bottom — the slack then lands in the list, where more entries
      would go, instead of above a floating footer. */
   .board-card .lb-link { margin-top: auto; }
+  /* Same row as CREATE A ROOM: pinned down so the two buttons line up. */
+  .daily-play { margin-top: auto; }
 }
 
 
@@ -1927,10 +1957,31 @@ function copyLink() {
   padding: var(--spacing-4);
 }
 
-.mode-row {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-3);
+.create-eyebrow {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: var(--text-primary);
+}
+
+.create-note {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+@media (min-width: 601px) {
+  .create-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+  .create-card > * { grid-column: 1 / -1; }
+  .create-card > .create-eyebrow { grid-column: 1; grid-row: 1; }
+  .create-card > .mode-pills { grid-column: 2; grid-row: 1; }
 }
 
 .mode-desc {
@@ -1939,13 +1990,6 @@ function copyLink() {
   font-size: var(--text-xs);
   color: var(--text-muted);
   line-height: 1.5;
-}
-
-.mode-label {
-  font-family: var(--font-body);
-  font-size: var(--text-xs);
-  color: var(--text-muted);
-  flex-shrink: 0;
 }
 
 /* One hairline container holds all three options, so the group reads as a
@@ -1991,24 +2035,7 @@ function copyLink() {
 .mode-list {
   display: flex;
   flex-direction: column;
-  background: rgba(255, 255, 255, 0.025);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: var(--radius-md);
-  padding: var(--spacing-2);
-}
-
-.mode-overline-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--spacing-2);
-}
-
-.mode-overline {
-  font-family: var(--font-body);
-  font-size: var(--text-xs);
-  color: var(--text-muted);
-  padding: var(--spacing-1) var(--spacing-2) var(--spacing-2);
+  gap: var(--spacing-3);
 }
 
 .chip-badge,
@@ -2032,33 +2059,18 @@ function copyLink() {
   margin-left: auto;
 }
 
-.mode-online {
-  display: inline-flex;
-  align-items: center;
-  padding: var(--spacing-1) var(--spacing-2) var(--spacing-2);
-  font-family: var(--font-mono);
-  font-size: 0.62rem;
-  letter-spacing: 0.12em;
-  color: var(--color-neon-green);
-  white-space: nowrap;
-}
-
 .mode-item {
   display: flex;
   align-items: center;
   gap: var(--spacing-3);
   min-height: 60px;
-  padding: var(--spacing-3);
-  background: none;
-  border: none;
-  border-radius: var(--radius-sm);
+  padding: var(--spacing-3) var(--spacing-4);
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: var(--radius-md);
   text-align: left;
   cursor: pointer;
   transition: background var(--duration-snap) var(--ease-snap);
-}
-
-.mode-item + .mode-item {
-  box-shadow: 0 -1px 0 rgba(255, 255, 255, 0.055);
 }
 
 .mode-item:hover:not(:disabled) {
@@ -2132,6 +2144,141 @@ function copyLink() {
 .account-item:hover {
   background: rgba(255, 255, 255, 0.06);
   color: #fff;
+}
+
+/* Phones only: the burger replaces What's new, the name chip and the claim
+   link, and the menu grows the rows they used to be. Same 640px as the
+   What's new sheet, so the panel the menu opens is always the sheet. */
+.menu-burger,
+.menu-phone {
+  display: none;
+}
+
+.menu-burger {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+/* Phones only: dims the page under the open menu, and a tap on it closes the
+   menu. Click, not pointerdown, so the tap cannot land on what is underneath. */
+.menu-scrim {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  background: rgba(0, 0, 0, 0.7);
+}
+
+/* The release card is fixed at z-index 60 at the page root; while the menu is
+   open the bar, and the scrim inside it, must sit above it. */
+.lobby-top-bar.menu-open {
+  z-index: 70;
+}
+
+.burger-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-alert);
+  box-shadow: 0 0 0 2px var(--bg-concrete);
+}
+
+.menu-who {
+  align-items: center;
+  gap: var(--spacing-3);
+  padding: var(--spacing-3);
+}
+
+.menu-who-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.menu-who-name {
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menu-who-kind {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.menu-claim {
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  margin: 0 var(--spacing-3) var(--spacing-3);
+  background: rgba(255, 204, 0, 0.06);
+  border: 1px solid rgba(255, 204, 0, 0.4);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: var(--color-hazard);
+  cursor: pointer;
+}
+
+.account-item--first {
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0;
+}
+
+.menu-new {
+  font-family: var(--font-body);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: var(--color-alert);
+}
+
+@media (max-width: 640px) {
+  .menu-burger,
+  .menu-phone {
+    display: flex;
+  }
+
+  .menu-scrim {
+    display: block;
+  }
+
+  /* Above the scrim, so the X that closes the menu stays lit. */
+  .menu-burger {
+    z-index: 61;
+  }
+
+  /* .top-bar-cta > raises specificity over WhatsNew's own scoped display. */
+  .username-chip,
+  .upgrade-link,
+  .top-bar-cta > .bar-whatsnew {
+    display: none;
+  }
+
+  .account-menu {
+    min-width: 17rem;
+  }
 }
 
 .account-item--out {
@@ -2212,42 +2359,6 @@ function copyLink() {
 
 @media (prefers-reduced-motion: reduce) {
   .mode-tip { transition: none; }
-}
-
-.mode-glyph--live {
-  color: var(--color-neon-green);
-}
-
-/* Slightly lifted from the neighbouring rows: this one is only on screen when
-   there is genuinely someone to play against, so it should read as the live
-   option rather than another menu item. */
-.mode-item--live {
-  border-color: rgba(0, 255, 102, 0.22);
-  background: rgba(0, 255, 102, 0.04);
-}
-
-.mode-item--live:hover:not(:disabled) {
-  border-color: rgba(0, 255, 102, 0.45);
-}
-
-.live-dot {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  margin-right: var(--spacing-2);
-  border-radius: 50%;
-  background: var(--color-neon-green);
-  vertical-align: middle;
-  animation: live-pulse 2s ease-in-out infinite;
-}
-
-@keyframes live-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.35; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .live-dot { animation: none; }
 }
 
 .mode-glyph--dim {
@@ -2453,31 +2564,6 @@ function copyLink() {
   padding-top: var(--spacing-2);
 }
 
-.hold-row {
-  align-self: center;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--spacing-2);
-  padding: var(--spacing-1) var(--spacing-3);
-  background: transparent;
-  border: 1px solid rgba(0, 243, 255, 0.22);
-  border-radius: var(--radius-sm);
-  color: var(--text-secondary);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  letter-spacing: 0.14em;
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s, color 0.15s;
-}
-
-.hold-row:hover {
-  background: rgba(0, 243, 255, 0.08);
-  border-color: rgba(0, 243, 255, 0.45);
-  color: var(--text-primary);
-}
-
-.hold-glyph { color: var(--color-neon-blue); flex-shrink: 0; }
-
 .players-list {
   display: flex;
   flex-wrap: wrap;
@@ -2593,6 +2679,7 @@ function copyLink() {
 .entry-heading {
   font-family: var(--font-display);
   font-size: 1.9rem;
+  text-wrap: balance;
   letter-spacing: 0.08em;
   color: var(--text-primary);
   text-align: center;
@@ -2917,25 +3004,6 @@ function copyLink() {
     letter-spacing: 0.15em;
   }
 
-  /* Was display:none when the chip was only a rename affordance and the bar
-     was tight. It is now the only route to profile, stats and sign out, so it
-     has to survive on a phone — truncated rather than hidden. */
-  .username-chip {
-    max-width: 10.5rem;
-    overflow: hidden;
-    white-space: nowrap;
-    font-size: 0.7rem;
-    padding: var(--spacing-1) var(--spacing-2);
-    min-height: 36px;
-  }
-
-  /* Only the name gives way, so the avatar and the menu chevron always show. */
-  .chip-name {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
   /* Menu items keep a comfortable tap target and may wrap on a narrow phone. */
   .account-item {
     padding: var(--spacing-3);
@@ -2943,19 +3011,9 @@ function copyLink() {
     white-space: normal;
   }
 
-  /* Brand + account links share one row; compact the links so they fit,
-     and right-anchor the cluster so a worst-case wrap still looks placed. */
+  /* Brand and burger share one row; the burger sits on the right. */
   .top-bar-cta {
-    gap: var(--spacing-1);
     margin-left: auto;
-  }
-
-  .lobby-top-bar .text-link {
-    font-size: 0.65rem;
-    letter-spacing: 0.1em;
-    padding: var(--spacing-1) var(--spacing-2);
-    min-height: 36px;
-    white-space: nowrap;
   }
 
   .lobby-content {
@@ -2963,14 +3021,8 @@ function copyLink() {
     gap: var(--spacing-4);
   }
 
-  .mode-row {
-    flex-direction: column;
-    align-items: stretch;
-    gap: var(--spacing-2);
-  }
-
-  /* Label stacks above the control here, so the control spans the column
-     rather than right-anchoring away from its own label. */
+  /* The picker sits under the eyebrow and note here, so it spans the column
+     rather than right-anchoring away from its label. */
   .mode-pills {
     width: 100%;
     margin-left: 0;

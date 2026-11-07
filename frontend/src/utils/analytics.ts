@@ -6,7 +6,7 @@
  * Event dictionary (all custom, snake_case, params are GA4-safe):
  *   page_view          { page_title, page_path }  — virtual, per screen
  *   mp_room_created    { rules, visibility }
- *   mp_room_joined     { method: created|code|link|quick_match|restore }
+ *   mp_room_joined     { method: created|code|link|quick_match|restore|live }
  *   mp_join_failed     { reason: <server message>|ws_closed_<code>|timeout|unknown, attempt: 1|2 }
  *   mp_restore_expired {}  — a stored room was gone on reload. Expected, not a
  *                            failure: rooms are GC'd once empty. Kept out of

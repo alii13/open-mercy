@@ -16,6 +16,7 @@
  */
 
 import type { Route } from '../utils/routes'
+import publicTableImage from '../assets/public-table.jpg'
 
 export type ChangelogLevel = 'quiet' | 'loud'
 export type ChangelogTag = 'NEW' | 'IMPROVED' | 'FIXED'
@@ -25,6 +26,10 @@ export type ChangelogCta =
     | { label: string; href: string }
     /** The reader's own profile page, which no fixed route can name. */
     | { label: string; ownProfile: true }
+    /** An element on the home screen, by id; from another page it goes home. */
+    | { label: string; scrollTo: string }
+    /** Sits the reader at the public table, the same as its TAKE A SEAT. */
+    | { label: string; takeSeat: true }
 
 export interface ChangelogEntry {
     /** ISO date, sortable. */
@@ -57,9 +62,20 @@ export interface ChangelogEntry {
      * makes its point.
      */
     stat?: 'alltime_rank'
+    /** A picture for the release card, imported as an asset so it loads only when the card shows. */
+    image?: string
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+    {
+        id: '2026-11-07',
+        level: 'loud',
+        tag: 'NEW',
+        title: 'Take a seat at the public table',
+        body: 'A new 3D table where you play people from anywhere, no room code needed. Sit down, and the game deals itself once all seven seats are filled.',
+        image: publicTableImage,
+        cta: { label: 'TAKE A SEAT', takeSeat: true },
+    },
     {
         id: '2026-11-05',
         level: 'loud',

@@ -3,7 +3,7 @@ import { ref, computed, watch, toRaw } from 'vue'
 import type { Card, Player, GameState, TurnState, CardColor } from '../types/card'
 import * as engine from '@engine'
 import type { EngineEvent, EngineState } from '@engine'
-import { canPlayCard, getDrawValue, generateFullDeck, shuffleDeck, DEFAULT_STACKING_MODE } from '@engine'
+import { canPlayCard, getDrawValue, generateFullDeck, shuffleDeck } from '@engine'
 import {
     BOT_LADDER, botById, dailyBot, warmUp, chooseSwapTarget, chooseWildColor, chooseDiscardAllTop,
     chooseRouletteColor, wantsSwap, willCatchMercy,
@@ -106,11 +106,17 @@ export const useGameStore = defineStore('game', () => {
             const v = localStorage.getItem('uno_stacking_mode')
             if (v === 'official' || v === 'house' || v === 'casual') return v
         } catch { /* localStorage unavailable */ }
-        return DEFAULT_STACKING_MODE
+        // House until a player picks: the lobby's default for rooms and public tables.
+        // The engine's own default stays Official, since the server leans on it.
+        return 'house'
     }
     const stackingMode = ref<StackingMode>(loadStackingMode())
+    /** The player's own pick, as saved. The lobby's picker reads this, never the
+     *  last game's rules: the daily always plays Official and must not change it. */
+    const preferredStackingMode = ref<StackingMode>(stackingMode.value)
     function setStackingMode(m: StackingMode) {
         stackingMode.value = m
+        preferredStackingMode.value = m
         try { localStorage.setItem('uno_stacking_mode', m) } catch { /* noop */ }
     }
 
@@ -270,7 +276,8 @@ export const useGameStore = defineStore('game', () => {
         hostRng = dailyDate.value ? dailyRng(dailyDate.value) : Math.random
         dealGeneration++
         closeCatchWindow()
-        if (mode) setStackingMode(mode)
+        if (mode && opts?.dailySeed) stackingMode.value = mode
+        else if (mode) setStackingMode(mode)
         spStartedAt = Date.now()
         warmGame = !dailyDate.value && opts?.warmUp === true
         track('sp_game_started', { rules: stackingMode.value, warm_up: warmGame })
@@ -1015,6 +1022,7 @@ export const useGameStore = defineStore('game', () => {
         suppressDiscardSlam,
         lastPlay,
         stackingMode,
+        preferredStackingMode,
         playerStats,
         setStackingMode,
         initializeGame,

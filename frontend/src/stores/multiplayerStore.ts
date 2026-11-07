@@ -11,6 +11,7 @@ import { useVoiceStore } from './voiceStore'
 import type { ClientMsg, IntentAction, PersonalView, PresencePlayer, ServerMsg } from '@protocol'
 import { MAX_TURN_TIMEOUTS } from '@protocol'
 import { quickChatPhrase } from '@quickChat'
+import type { LoungeAct } from '@lounge'
 
 // The authoritative game server (Cloudflare Worker + one Durable Object per
 // room). The client is a thin mirror: it sends intents and renders the
@@ -133,13 +134,22 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
     // Public-lobby auto-start countdown, mirrored from presence frames. The
     // server sends a duration; anchoring it to the local clock here makes the
     // deadline immune to client clock skew.
-    // bumpsLeft is the room's remaining allowance to hold the lobby open; an
-    // older worker sends none, so the button simply never shows.
-    const autoStart = ref<{ deadline: number; paused: boolean; bumpsLeft: number } | null>(null)
+    const autoStart = ref<{ deadline: number } | null>(null)
+    // The 3D table's 3-2-1 and deal outlast the room's own start by a few
+    // seconds; while this is set the lobby keeps the table up and the game
+    // view waits.
+    const loungeShow = ref(false)
     // Quick chat: newest frame (drives bubbles) + a capped per-match log.
     // Mutes are client-side and room-scoped — a muted sender's frames are
     // dropped at receive, instantly and without a server round trip.
     const lastChat = ref<{ userId: string; name: string; text: string; n: number } | null>(null)
+    /** A quick-match room: the waiting room shows the 3D table instead of the list. */
+    const isPublicRoom = ref(false)
+    /** Last spot on the 3D table per player, from the room, for a late joiner. */
+    const loungeSpots = ref<Record<string, [number, number]>>({})
+    // Moves arrive several times a second, so the table listens rather than
+    // watching a reactive value that would re-render the lobby on every one.
+    const loungeListeners = new Set<(userId: string, act: LoungeAct) => void>()
     const chatLog = ref<{ userId: string; name: string; text: string; n: number }[]>([])
     const mutedChatIds = ref<Set<string>>(new Set())
     let chatN = 0
@@ -284,18 +294,16 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
             case 'hello':
                 myUserId.value = msg.userId
                 hostUserId.value = msg.hostUserId
+                isPublicRoom.value = msg.isPublic === true
                 realtimeStatus.value = 'SUBSCRIBED'
                 reconnectAttempts = 0
                 break
 
             case 'presence':
                 presence.value = msg.players
+                loungeSpots.value = msg.spots ?? {}
                 autoStart.value = typeof msg.autoStartInMs === 'number'
-                    ? {
-                        deadline: Date.now() + msg.autoStartInMs,
-                        paused: !!msg.autoStartPaused,
-                        bumpsLeft: msg.autoStartBumpsLeft ?? 0,
-                    }
+                    ? { deadline: Date.now() + msg.autoStartInMs }
                     : null
                 break
 
@@ -316,6 +324,10 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
                 break
             }
 
+            case 'lounge':
+                for (const fn of loungeListeners) fn(msg.userId, msg.act)
+                break
+
             case 'chat': {
                 if (mutedChatIds.value.has(msg.userId)) break
                 const phrase = quickChatPhrase(msg.phraseId)
@@ -330,6 +342,7 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
                 if (msg.seq < lastSeq) break
                 lastSeq = msg.seq
                 view.value = msg.game
+                if (isPublicRoom.value && msg.game.status === 'playing' && roomCodeRef.value) storeRoom(roomCodeRef.value)
                 turnDeadline.value = msg.game.turnEndsInMs != null ? Date.now() + msg.game.turnEndsInMs : null
                 stackingMode.value = msg.game.stackingMode
                 pendingIntent = null
@@ -532,11 +545,28 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
                 const msg = JSON.parse(e.data) as ServerMsg
                 if (msg.t === 'hello') {
                     roomCodeRef.value = code
-                    storeRoom(code)
+                    // A public table is kept for a reload only once its game
+                    // is under way (on each snapshot): a reload while it fills
+                    // goes home instead of sitting you back down.
+                    if (msg.isPublic) {
+                        try { localStorage.removeItem(STORED_ROOM_KEY) } catch { /* noop */ }
+                    } else {
+                        storeRoom(code)
+                    }
+                }
+                if (msg.t === 'error' && msg.code === 'room-full' && roomCodeRef.value === code) {
+                    // A reconnect found our seat given away (gone past the
+                    // grace at a filling public table): retrying cannot help.
+                    closedByUs = true
+                    try { localStorage.removeItem(STORED_ROOM_KEY) } catch { /* noop */ }
+                    resetState()
+                    error.value = 'Your seat went to another player'
+                    settle(false)
+                    return
                 }
                 if (msg.t === 'error' && (msg.code === 'unauthorized' || msg.code === 'room-not-found' || msg.code === 'room-full')) {
                     error.value = msg.code === 'room-not-found' ? ROOM_GONE
-                        : msg.code === 'room-full' ? 'Game is full (max 20 players)'
+                        : msg.code === 'room-full' ? 'That room is full'
                         : 'Could not authenticate'
                     settle(false)
                 }
@@ -611,6 +641,16 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
         sendMsg({ t: 'chat', phraseId })
     }
 
+    function sendLounge(act: LoungeAct) {
+        sendMsg({ t: 'lounge', act })
+    }
+
+    /** Subscribe to other players' moves, flicks and draws; returns the unsubscribe. */
+    function onLounge(fn: (userId: string, act: LoungeAct) => void): () => void {
+        loungeListeners.add(fn)
+        return () => loungeListeners.delete(fn)
+    }
+
     // One pending invite per target, resolved by the room's answer. The room
     // owns this rather than the invite store, because only a socket that is
     // seated in the room can send it - which is exactly what makes the invite
@@ -631,18 +671,6 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
             invitePending.set(userId, settle)
             sendMsg({ t: 'invite', userId })
         })
-    }
-
-    /** Ask the room to wait a minute longer before it deals itself. */
-    function extendAutoStart() {
-        if (!autoStart.value?.bumpsLeft) return
-        sendMsg({ t: 'extend-start' })
-        // Spend the allowance locally too. It belongs to the room, so a
-        // second press can only ever be refused - and the server refuses it
-        // silently, which used to leave a live-looking button on screen until
-        // some other presence change happened to arrive. Two players pressing
-        // together is exactly when that bites.
-        autoStart.value = { ...autoStart.value, bumpsLeft: 0 }
     }
 
     function toggleChatMute(userId: string) {
@@ -687,7 +715,10 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
         lastStackEaten.value = null
         lastMercyCall.value = null
         autoStart.value = null
+        loungeShow.value = false
         lastChat.value = null
+        isPublicRoom.value = false
+        loungeSpots.value = {}
         chatLog.value = []
         mutedChatIds.value = new Set()
         error.value = null
@@ -717,8 +748,8 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
         }
     }
 
-    // 'live' is a join from the lobby's live-games entry — kept distinct from
-    // 'quick_match' so we can tell whether showing the room actually converts.
+    // 'live' is a join from the waiting room's rescue row (a busier public
+    // table) - kept distinct from 'quick_match' so the rescue's pull is measurable.
     type JoinMethod = 'created' | 'code' | 'link' | 'quick_match' | 'restore' | 'live'
 
     function trackJoined(method: JoinMethod) {
@@ -1005,9 +1036,13 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
         lastMercyCall,
         lastBadgeUp,
         autoStart,
-        extendAutoStart,
+        loungeShow,
         sendInvite,
         lastChat,
+        isPublicRoom,
+        loungeSpots,
+        sendLounge,
+        onLounge,
         chatLog,
         mutedChatIds,
         sendChat,

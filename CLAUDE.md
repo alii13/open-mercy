@@ -8,7 +8,7 @@ Guidance for working in this repo. Hard-won - read before changing CSS, raising 
 - **Never hand-roll an icon as inline `<svg>`, and never stand one in as a text glyph or HTML entity** (`&rarr;`, `&times;`, `✕`, `✓`). Import the Lucide component. Hand-drawn duplicates of Lucide shapes and entity arrows were the whole of the 2026-08 icon cleanup.
 - **Icon scale is fixed: `:size="14"` inline-with-text, `16` buttons and chrome, `20` icon-only buttons and section headers, and `:stroke-width="2"` always.** Only large display/empty-state icons may sit outside it (currently two at 40). Deviating is what made the UI read as sloppy - there were six sizes and five stroke widths.
 - Legitimate inline `<svg>` is limited to: brand marks Lucide does not carry (Google, GitHub, X, WhatsApp - prefer `simple-icons` paths), custom artwork (`CardBack`, `AutoStartRing`, the landing strike line), and genuinely two-tone icons Lucide cannot express (the `VoiceMicCluster` mic, whose slash is styled `--color-alert` separately).
-- Concerns are color-zoned with the deck palette: hazard yellow = daily/streak loop, alert red = primary create action, neon cyan = multiplayer, neutral = practice/meta.
+- Concerns are color-zoned with the deck palette: hazard yellow = daily/streak loop (and CLAIM ACCOUNT, and the public table), alert red = primary create action, neon cyan = multiplayer, neutral = practice/meta.
 
 ## CSS tokens
 
@@ -30,11 +30,11 @@ Guidance for working in this repo. Hard-won - read before changing CSS, raising 
 
 - Every user-facing change ships its changelog entry **in the same PR** as the change. `frontend/src/data/changelog.ts` is the single source; the panel, the release card, and `/changelog` all read it. An entry that lands in a later PR announces a feature that is already old.
 - **Ask the human which volume before you open the PR. Never pick it alone.** Two options, and the answer goes in the entry's `level`:
-  - `quiet` - the entry appears in the What's New panel and puts a dot on the top-bar link. This is the default. Use it for anything a player does not need to be told about today.
+  - `quiet` - the entry appears in the What's New panel and puts a dot on the top-bar link (on phones, on the menu button). This is the default. Use it for anything a player does not need to be told about today.
   - `loud` - the entry also fires a one-time release card over the lobby. Reserve it for a change that alters what a player does. At most one per quarter. A card on every release trains people to close it unread, which kills the channel for the release that needs it.
-- Entry shape: `{ id, level, tag, title, body, cta? }`. `id` is the ISO date (`2026-08-26`) and must sort. `tag` is `NEW`, `IMPROVED`, or `FIXED`. `title` is verb-first and under 50 characters. `body` is one or two sentences in plain words. `cta` is optional and must route somewhere in `utils/routes.ts` - no link is better than a link to the home page.
+- Entry shape: `{ id, level, tag, title, body, cta? }`. `id` is the ISO date (`2026-08-26`) and must sort. `tag` is `NEW`, `IMPROVED`, or `FIXED`. `title` is verb-first and under 50 characters. `body` is one or two sentences in plain words. `cta` is optional and must route somewhere in `utils/routes.ts`, or be `takeSeat`, which sits a signed-in reader at the public table - no link is better than a link to the home page.
 - The dot is driven by the newest `id` against a last-seen id in `localStorage`. Adding an entry is what makes the dot appear, so never add one for a change that has not deployed.
-- **Both surfaces are for players, not visitors.** The panel lives in the lobby top bar and the card renders only when signed in, so someone who has never played is not told what changed in a product they have not used. A guest who plays is signed in, so "signed in" means "has played". `/changelog` stays public: a page someone navigates to is not a nudge.
+- **Both surfaces are for players, not visitors.** The panel lives in the lobby top bar (inside the menu on phones) and the card renders only when signed in, so someone who has never played is not told what changed in a product they have not used. A guest who plays is signed in, so "signed in" means "has played". `/changelog` stays public: a page someone navigates to is not a nudge.
 - Write `body` for a signed-in reader; that is the only reader a card has. The optional `stat` field fetches a live number, and a card without one simply has no number line. `bodySignedOut` and `ctaSignedOut` are still on the type but nothing can reach them while the card is signed-in only — do not write new copy into them.
 
 ## Asking players a question

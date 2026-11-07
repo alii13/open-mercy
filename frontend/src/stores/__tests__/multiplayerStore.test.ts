@@ -130,6 +130,37 @@ describe('joining and the lobby adapter', () => {
     })
 })
 
+describe('the 3D public table', () => {
+    it('knows a public room from the hello, and a private one by default', async () => {
+        const mp = useMultiplayerStore()
+        const ws = await joinRoom(mp)
+        expect(mp.isPublicRoom).toBe(false)
+        ws.receive({ t: 'hello', roomCode: 'AB12CD', userId: 'me', hostUserId: 'me', isPublic: true })
+        expect(mp.isPublicRoom).toBe(true)
+    })
+
+    it('keeps the last spots the room sends with presence', async () => {
+        const mp = useMultiplayerStore()
+        const ws = await joinRoom(mp)
+        ws.receive({ t: 'presence', players: [{ userId: 'me', name: 'TESTER', connected: true }], spots: { me: [1, -0.5] } })
+        expect(mp.loungeSpots).toEqual({ me: [1, -0.5] })
+    })
+
+    it('hands other players moves to listeners and sends our own', async () => {
+        const mp = useMultiplayerStore()
+        const ws = await joinRoom(mp)
+        const heard: unknown[] = []
+        const off = mp.onLounge((userId, act) => heard.push([userId, act]))
+        ws.receive({ t: 'lounge', userId: 'p2', act: { kind: 'draw', face: 'wild-roulette' } })
+        off()
+        ws.receive({ t: 'lounge', userId: 'p2', act: { kind: 'draw', face: 'five-red' } })
+        expect(heard).toEqual([['p2', { kind: 'draw', face: 'wild-roulette' }]])
+
+        mp.sendLounge({ kind: 'move', x: 1, z: 2, drag: false })
+        expect(ws.lastSent()).toEqual({ t: 'lounge', act: { kind: 'move', x: 1, z: 2, drag: false } })
+    })
+})
+
 describe('the playing snapshot adapter', () => {
     it('maps the personalized view onto the legacy row shapes', async () => {
         const mp = useMultiplayerStore()
@@ -832,15 +863,11 @@ describe('lobby auto-start countdown', () => {
         const mp = useMultiplayerStore()
         const ws = await joinRoom(mp)
 
-        ws.receive({ t: 'presence', players: seats, autoStartInMs: 60_000, autoStartBumpsLeft: 1 })
-        expect(mp.autoStart?.paused).toBe(false)
+        ws.receive({ t: 'presence', players: seats, autoStartInMs: 15_000 })
         // Sent as a duration; the store anchors it to its own clock.
-        expect(mp.autoStart!.deadline).toBeGreaterThan(Date.now() + 59_000)
+        expect(mp.autoStart!.deadline).toBeGreaterThan(Date.now() + 14_000)
 
-        ws.receive({ t: 'presence', players: seats.slice(0, 1), autoStartInMs: 12_000, autoStartPaused: true })
-        expect(mp.autoStart?.paused).toBe(true)
-
-        // A frame with no countdown clears it (old worker, private room).
+        // A frame with no countdown clears it (someone left, private room).
         ws.receive({ t: 'presence', players: seats })
         expect(mp.autoStart).toBeNull()
     })
@@ -852,27 +879,6 @@ describe('lobby auto-start countdown', () => {
 
         ws.receive({ t: 'event', seq: 1, ev: { t: 'STARTED' } })
         expect(mp.autoStart).toBeNull()
-    })
-
-    it('asks for more time only while the room still has an extension', async () => {
-        const mp = useMultiplayerStore()
-        const ws = await joinRoom(mp)
-
-        ws.receive({ t: 'presence', players: seats, autoStartInMs: 60_000, autoStartBumpsLeft: 1 })
-        mp.extendAutoStart()
-        expect(ws.lastSent()).toEqual({ t: 'extend-start' })
-
-        // The button goes as the press lands, not when the next frame does:
-        // the allowance is the room's, so a second press could only be
-        // refused, and the server refuses it without a word.
-        expect(mp.autoStart?.bumpsLeft).toBe(0)
-        const sentBefore = ws.sent.length
-        mp.extendAutoStart()
-        expect(ws.sent.length).toBe(sentBefore)
-
-        // The server's own count agrees on the next frame.
-        ws.receive({ t: 'presence', players: seats, autoStartInMs: 118_000, autoStartBumpsLeft: 0 })
-        expect(mp.autoStart?.bumpsLeft).toBe(0)
     })
 
     it('sends an invite on the room socket and waits for the room to answer', async () => {
@@ -901,14 +907,6 @@ describe('lobby auto-start countdown', () => {
         ws.receive({ t: 'invite-result', userId: 'someone-else', result: 'sent' })
         ws.receive({ t: 'invite-result', userId: 'friend-1', result: 'sent' })
         expect(await pending).toBe('sent')
-    })
-
-    it('reads an old worker frame as no extension on offer', async () => {
-        const mp = useMultiplayerStore()
-        const ws = await joinRoom(mp)
-
-        ws.receive({ t: 'presence', players: seats, autoStartInMs: 30_000 })
-        expect(mp.autoStart?.bumpsLeft).toBe(0)
     })
 })
 
@@ -979,5 +977,84 @@ describe('leaving', () => {
         expect(mp.roomCode).toBe('')
         expect(localStorage.getItem('uno_mp_room')).toBeNull()
         expect(ws.sent.some(s => JSON.parse(s).t === 'leave')).toBe(true)
+    })
+})
+
+describe('what a reload brings back', () => {
+    async function join(mp: ReturnType<typeof useMultiplayerStore>, isPublic: boolean) {
+        const joining = mp.joinGame('AB12CD')
+        for (let i = 0; i < 20 && FakeWebSocket.instances.length === 0; i++) await Promise.resolve()
+        const ws = FakeWebSocket.instances[FakeWebSocket.instances.length - 1]!
+        ws.open()
+        ws.receive({ t: 'hello', roomCode: 'AB12CD', userId: 'me', hostUserId: 'me', isPublic })
+        ws.receive({ t: 'presence', players: [{ userId: 'me', name: 'TESTER', connected: true }] })
+        ws.receive({ t: 'snapshot', seq: 0, game: playingView({ status: 'lobby', you: null, currentPlayerId: null, players: [] }) })
+        await joining
+        return ws
+    }
+    const stored = () => JSON.parse(fakeStorage.store['uno_mp_room'] ?? 'null')?.code ?? null
+
+    it('keeps a private room for a reload while it waits', async () => {
+        await join(useMultiplayerStore(), false)
+        expect(stored()).toBe('AB12CD')
+    })
+
+    it('forgets a public table that has not dealt, so a reload goes home', async () => {
+        fakeStorage.store['uno_mp_room'] = JSON.stringify({ code: 'AB12CD', at: Date.now() })
+        await join(useMultiplayerStore(), true)
+        expect(stored()).toBeNull()
+    })
+
+    async function nextSocket(n: number) {
+        for (let i = 0; i < 40 && FakeWebSocket.instances.length < n; i++) await Promise.resolve()
+        return FakeWebSocket.instances[n - 1]
+    }
+
+    it('still keeps a public game for a reload after the socket blips mid-game', async () => {
+        vi.useFakeTimers()
+        try {
+            const mp = useMultiplayerStore()
+            const ws = await join(mp, true)
+            ws.receive({ t: 'snapshot', seq: 1, game: playingView() })
+            const sockets = FakeWebSocket.instances.length
+            ws.close()
+            await vi.advanceTimersByTimeAsync(1_000)
+            const again = (await nextSocket(sockets + 1))!
+            again.open()
+            again.receive({ t: 'hello', roomCode: 'AB12CD', userId: 'me', hostUserId: 'me', isPublic: true })
+            again.receive({ t: 'snapshot', seq: 2, game: playingView() })
+            await vi.advanceTimersByTimeAsync(0)
+            expect(stored()).toBe('AB12CD')
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
+    it('stops and says so when a reconnect finds the seat given away', async () => {
+        vi.useFakeTimers()
+        try {
+            const mp = useMultiplayerStore()
+            const ws = await join(mp, true)
+            const sockets = FakeWebSocket.instances.length
+            ws.close()
+            await vi.advanceTimersByTimeAsync(1_000)
+            const again = (await nextSocket(sockets + 1))!
+            again.open()
+            again.receive({ t: 'error', code: 'room-full' })
+            again.close()
+            await vi.advanceTimersByTimeAsync(30_000)
+            expect(FakeWebSocket.instances.length).toBe(sockets + 1)
+            expect(mp.error).toBe('Your seat went to another player')
+            expect(mp.currentGame).toBeNull()
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
+    it('keeps a public table once its game is under way, so a reload goes back in', async () => {
+        const ws = await join(useMultiplayerStore(), true)
+        ws.receive({ t: 'snapshot', seq: 1, game: playingView() })
+        await Promise.resolve()
+        expect(stored()).toBe('AB12CD')
     })
 })

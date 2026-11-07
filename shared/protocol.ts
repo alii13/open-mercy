@@ -1,4 +1,5 @@
 import type { Card, CardColor, StackingMode, TurnState } from './engine'
+import type { LoungeAct } from './lounge'
 
 // --- Turn clock: the room plays a turn for anyone who lets it run out ---
 
@@ -36,9 +37,6 @@ export type ClientMsg =
     | { t: 'rename'; name: string }
     | { t: 'kick'; userId: string }
     | { t: 'start'; stackingMode?: StackingMode }
-    // Hold the public lobby open a minute longer. Anyone at the table may
-    // press it; the allowance is the room's, not the player's.
-    | { t: 'extend-start' }
     // Ask a player to this room. It rides the room socket rather than going
     // to Supabase from the client, because only the room can confirm the
     // sender is in it - see game-server/src/invites.ts.
@@ -49,6 +47,9 @@ export type ClientMsg =
     // the socket, so there is nothing to moderate.
     | { t: 'chat'; phraseId: string }
     | { t: 'intent'; id: string; action: IntentAction }
+    // The 3D public table: a move, flick or draw, relayed to the rest of the
+    // table while a public room is in its lobby. See shared/lounge.ts.
+    | { t: 'lounge'; act: LoungeAct }
 
 // --- Game events: animation-grade facts, personalized per viewer ---
 
@@ -116,18 +117,20 @@ export interface PersonalView {
 }
 
 export type ServerMsg =
-    | { t: 'hello'; roomCode: string; userId: string; hostUserId: string | null }
-    // autoStartInMs: countdown remaining for a public lobby, sent as a
-    // duration so client clock skew cannot bend it; absent = no countdown.
-    // autoStartPaused: the room dipped below the minimum and the clock froze.
-    // autoStartBumpsLeft: extensions the room can still buy; 0 hides the button.
-    | { t: 'presence'; players: PresencePlayer[]; autoStartInMs?: number; autoStartPaused?: boolean; autoStartBumpsLeft?: number }
+    // isPublic: a quick-match room, which the client shows as the 3D table.
+    // Older servers omit it, and the client keeps the list view.
+    | { t: 'hello'; roomCode: string; userId: string; hostUserId: string | null; isPublic?: boolean }
+    // autoStartInMs: countdown remaining once a public table is full, sent as
+    // a duration so client clock skew cannot bend it; absent = no countdown.
+    // spots: each seated player's last spot on the 3D table, for a late joiner.
+    | { t: 'presence'; players: PresencePlayer[]; autoStartInMs?: number; spots?: Record<string, [number, number]> }
     | { t: 'pong'; now: number }
     | { t: 'snapshot'; seq: number; game: PersonalView }
     | { t: 'event'; seq: number; ev: GameEvent; intentId?: string }
     | { t: 'voice-token'; token: string; meetingId: string }
     | { t: 'badge-up'; userId: string; tier: number }
     | { t: 'chat'; userId: string; phraseId: string }
+    | { t: 'lounge'; userId: string; act: LoungeAct }
     // The outcome of one invite, back to whoever asked. Every value is a
     // normal answer, including the refusals.
     | { t: 'invite-result'; userId: string; result: string }

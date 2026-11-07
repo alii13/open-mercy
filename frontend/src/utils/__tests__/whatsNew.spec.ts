@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { newestId, previousId, seedId, unreadEntries, unreadCount, isOnlyUnread, pendingLoud, followCta } from '../whatsNew'
 import type { ChangelogEntry } from '../../data/changelog'
 
@@ -164,6 +164,25 @@ describe('followCta', () => {
     })
 })
 
+describe('followCta to a spot on the home screen', () => {
+    afterEach(() => vi.unstubAllGlobals())
+
+    it('scrolls the element into view when it is on the page', () => {
+        const scrollIntoView = vi.fn(), nav = vi.fn()
+        vi.stubGlobal('document', { getElementById: (id: string) => (id === 'public-table' ? { scrollIntoView } : null) })
+        followCta({ label: 'SEE IT', scrollTo: 'public-table' }, nav, vi.fn())
+        expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'center' })
+        expect(nav).not.toHaveBeenCalled()
+    })
+
+    it('goes home when the element is not on this page', () => {
+        const nav = vi.fn()
+        vi.stubGlobal('document', { getElementById: () => null })
+        followCta({ label: 'SEE IT', scrollTo: 'public-table' }, nav, vi.fn())
+        expect(nav).toHaveBeenCalledWith({ name: 'home' })
+    })
+})
+
 describe('followCta to your own profile', () => {
     it('opens the viewer\'s own profile page', () => {
         const nav = vi.fn()
@@ -175,5 +194,20 @@ describe('followCta to your own profile', () => {
         const nav = vi.fn()
         followCta({ label: 'EDIT', ownProfile: true }, nav, vi.fn(), undefined)
         expect(nav).not.toHaveBeenCalled()
+    })
+})
+
+describe('followCta to the public table', () => {
+    it('goes home and takes a seat, the same as TAKE A SEAT', () => {
+        const nav = vi.fn(), takeSeat = vi.fn()
+        followCta({ label: 'TAKE A SEAT', takeSeat: true }, nav, vi.fn(), null, takeSeat)
+        expect(nav).toHaveBeenCalledWith({ name: 'home' })
+        expect(takeSeat).toHaveBeenCalledOnce()
+    })
+
+    it('only goes home where nobody can sit down (signed out)', () => {
+        const nav = vi.fn()
+        followCta({ label: 'TAKE A SEAT', takeSeat: true }, nav, vi.fn(), null)
+        expect(nav).toHaveBeenCalledWith({ name: 'home' })
     })
 })

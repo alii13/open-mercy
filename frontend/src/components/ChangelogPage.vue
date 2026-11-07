@@ -38,7 +38,7 @@
             <span class="cl-tag" :class="`cl-tag--${e.tag.toLowerCase()}`">{{ e.tag }}</span>
             <h4 class="cl-entry-title">{{ e.title }}</h4>
             <p class="cl-text">{{ e.body }}</p>
-            <button v-if="e.cta" class="cl-cta" type="button" @click="followCta(e.cta, navigate, undefined, authStore.profile?.share_code)">
+            <button v-if="e.cta" class="cl-cta" type="button" @click="followCta(e.cta, navigate, undefined, authStore.profile?.share_code, authStore.isAuthenticated ? takeSeat : undefined)">
               {{ e.cta.label }}
               <ArrowRight :size="14" :stroke-width="2" aria-hidden="true" />
             </button>
@@ -57,10 +57,15 @@ import { ChevronLeft, ArrowRight } from 'lucide-vue-next'
 import { CHANGELOG, type ChangelogTag, type ChangelogEntry } from '../data/changelog'
 import { navigate } from '../utils/routes'
 import { followCta } from '../utils/whatsNew'
+import { useMultiplayerStore } from '../stores/multiplayerStore'
+import { PUBLIC_TABLE_RULES } from '../utils/publicTable'
 import { useAuthStore } from '../stores/authStore'
 import SiteFooter from './SiteFooter.vue'
 
 const authStore = useAuthStore()
+// A changelog button can sit the reader at the public table, as TAKE A SEAT does; this page is public, so only when signed in.
+const mp = useMultiplayerStore()
+const takeSeat = () => void mp.quickMatch(PUBLIC_TABLE_RULES)
 
 type Filter = 'ALL' | ChangelogTag
 

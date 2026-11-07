@@ -79,6 +79,14 @@ describe('dirCodes', () => {
         expect(dirCodes(dir)).toEqual([])
     })
 
+    it('never offers a full table, so the next player starts a new one', () => {
+        const dir = {
+            FULL: { at: NOW, players: 7, connected: 7, seatsFree: 0, status: 'lobby' },
+            NEXT: { at: NOW + 10, players: 1, connected: 1, seatsFree: 6, status: 'lobby' },
+        }
+        expect(dirCodes(dir)).toEqual(['NEXT'])
+    })
+
     it('treats a legacy entry with no flag as joinable', () => {
         expect(dirCodes({ OLD: NOW })).toEqual(['OLD'])
     })
@@ -113,6 +121,24 @@ describe('liveTables', () => {
         expect(out.map((t) => t.code)).toEqual(['FOUR', 'TWO', 'ONE'])
     })
 
+    it('lists a waiting table ahead of bigger games already running', () => {
+        const out = liveTables({
+            G1: room({ players: 7, inProgress: true, status: 'playing' }),
+            G2: room({ players: 6, inProgress: true, status: 'playing' }),
+            G3: room({ players: 5, inProgress: true, status: 'playing' }),
+            WAIT: room({ players: 1, status: 'lobby' }),
+        }, NOW)
+        expect(out[0]!.code).toBe('WAIT')
+    })
+
+    it('ranks and reports by who is connected, not by seats a closed tab still holds', () => {
+        const out = liveTables({
+            GHOSTS: room({ players: 3, connected: 0 }),
+            LIVE: room({ players: 1, connected: 1 }),
+        }, NOW)
+        expect(out.map((t) => [t.code, t.connected])).toEqual([['LIVE', 1], ['GHOSTS', 0]])
+    })
+
     it('caps how many it returns', () => {
         const dir = Object.fromEntries(
             Array.from({ length: 10 }, (_, i) => [`R${i}`, room({ players: i + 1 })]),
@@ -125,7 +151,7 @@ describe('liveTables', () => {
         const out = liveTables({ AAAA: room({ skins: ['neon'] }) }, NOW)
         const keys = Object.keys(out[0]!)
         expect(keys.sort()).toEqual(
-            ['code', 'inProgress', 'mode', 'players', 'seatsFree', 'skins', 'status'].sort(),
+            ['code', 'connected', 'inProgress', 'mode', 'players', 'seatsFree', 'skins', 'status'].sort(),
         )
         // 'players' is a legitimate key, so match only the words that would
         // actually mean a leak. No /i with a [A-Z] class — the flag cancels it.

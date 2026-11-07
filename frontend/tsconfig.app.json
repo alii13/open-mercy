@@ -10,7 +10,8 @@
       "@engine/*": ["../shared/engine/*"],
       "@protocol": ["../shared/protocol.ts"],
       "@roomCode": ["../shared/roomCode.ts"],
-      "@quickChat": ["../shared/quickChat.ts"]
+      "@quickChat": ["../shared/quickChat.ts"],
+      "@lounge": ["../shared/lounge.ts"]
     },
 
     /* Linting */

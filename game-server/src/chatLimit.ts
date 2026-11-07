@@ -17,3 +17,14 @@ export function chatAllowed(times: number[], now: number): boolean {
     times.push(now)
     return true
 }
+
+/** Lounge actions on the 3D public table: a drag sends a move about every
+ *  120 ms, so the cap is a per-second count rather than a gap. */
+export const LOUNGE_PER_SECOND = 12
+
+export function loungeAllowed(times: number[], now: number): boolean {
+    while (times.length && now - times[0]! >= 1_000) times.shift()
+    if (times.length >= LOUNGE_PER_SECOND) return false
+    times.push(now)
+    return true
+}
