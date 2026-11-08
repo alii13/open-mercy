@@ -863,14 +863,18 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
         }
     }
 
-    /** Resume the room stored from a previous session (page refresh). */
-    async function restoreActiveGame() {
+    /**
+     * Resume the room stored from a previous session (page refresh). With
+     * `urlCode`, only when that is the stored room. False when there was nothing
+     * to resume, so the caller can join the URL's room instead.
+     */
+    async function restoreActiveGame(urlCode?: string): Promise<boolean> {
         const code = storedRoom()
-        if (!code) return
+        if (!code || (urlCode && code !== urlCode)) return false
         const ok = await connect(code)
         // The user out-clicked the restore (quick match, a code join) and a
         // newer connect superseded it: the new room's state must survive.
-        if (ok === 'superseded') return
+        if (ok === 'superseded') return true
         if (!ok) {
             // Refresh into a room that's since closed — track before resetState
             // wipes the reason.
@@ -884,20 +888,21 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
             else trackJoinFailed('restore', 1)
             try { localStorage.removeItem(STORED_ROOM_KEY) } catch { /* noop */ }
             resetState()
-            return
+            return true
         }
         // A restore that lands in a finished game this user never sat in is
         // the ghost trap, not a resume — forget the room. A finished game
         // they DID sit in keeps its game-over (and the rematch button).
         if (ghostInFinishedGame.value) {
             quietDisconnect()
-            return
+            return true
         }
         // A restored game keeps its identity so a rematch isn't miscounted
         // as a first game, and finish duration isn't nonsense.
         trackedGameId = view.value?.gameId ?? null
         gameStartedAt = 0
         trackJoined('restore')
+        return true
     }
 
     async function startGame() {

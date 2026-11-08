@@ -36,6 +36,21 @@ describe('parseRoute', () => {
         expect(parseRoute('/p/Ab12Cd34')).toEqual({ name: 'profile', code: 'Ab12Cd34' })
     })
 
+    it('maps /public to the public table', () => {
+        expect(parseRoute('/public')).toEqual({ name: 'public' })
+    })
+
+    it('maps /r/<code> to that room, upper-casing a typed code', () => {
+        expect(parseRoute('/r/ABCD')).toEqual({ name: 'room', code: 'ABCD' })
+        expect(parseRoute('/r/xk7p2m')).toEqual({ name: 'room', code: 'XK7P2M' })
+    })
+
+    it('rejects a room code the server could never mint', () => {
+        expect(parseRoute('/r/ABC')).toEqual({ name: 'home' })
+        expect(parseRoute('/r/AB01')).toEqual({ name: 'home' })
+        expect(parseRoute('/r/ABCDEFGHJ')).toEqual({ name: 'home' })
+    })
+
     it('rejects junk paths to home', () => {
         expect(parseRoute('/leaderboard/extra')).toEqual({ name: 'home' })
         expect(parseRoute('/changelog/extra')).toEqual({ name: 'home' })
@@ -57,6 +72,8 @@ describe('routePath', () => {
         expect(routePath({ name: 'badges' })).toBe('/badges')
         expect(routePath({ name: 'changelog' })).toBe('/changelog')
         expect(routePath({ name: 'profile', code: '9f3ac21b' })).toBe('/p/9f3ac21b')
+        expect(routePath({ name: 'public' })).toBe('/public')
+        expect(routePath({ name: 'room', code: 'XK7P2M' })).toBe('/r/XK7P2M')
     })
 })
 
@@ -64,6 +81,18 @@ describe('navigation', () => {
     it('sends an unknown path home, keeping the query and hash auth redirects ride on', async () => {
         await router.push('/nope?code=abc#type=recovery')
         expect(router.currentRoute.value.fullPath).toBe('/?code=abc#type=recovery')
+    })
+
+    it('sends an old invite link to its room, keeping the rest of the query', async () => {
+        await router.push('/changelog')
+        await router.push('/?join=xk7p2m&ref=x')
+        expect(router.currentRoute.value.fullPath).toBe('/r/XK7P2M?ref=x')
+    })
+
+    it('leaves home alone when ?join holds no room code', async () => {
+        await router.push('/changelog')
+        await router.push('/?join=nope')
+        expect(router.currentRoute.value.fullPath).toBe('/?join=nope')
     })
 
     it('keeps the invite query when navigating', async () => {

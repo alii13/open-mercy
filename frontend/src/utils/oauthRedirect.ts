@@ -34,9 +34,9 @@ const ERROR_PARAMS = ['error', 'error_code', 'error_description']
 /**
  * The same URL with only the OAuth error params removed.
  *
- * Deliberately surgical rather than resetting to the bare path: `?join=<code>`
- * carries multiplayer invites (read in App.vue), so blanking the query string to
- * tidy up an error would silently eat someone's invite link.
+ * Deliberately surgical rather than resetting to `/`: the path and the rest of
+ * the query are other state, such as the room a `/r/CODE` invite names, so
+ * blanking them to tidy up an error would silently eat someone's invite link.
  */
 export function urlWithoutOAuthError(loc: { pathname: string; search: string }): string {
     const params = new URLSearchParams(loc.search.replace(/^\?/, ''))

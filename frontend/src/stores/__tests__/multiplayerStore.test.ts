@@ -575,6 +575,31 @@ describe('the stored room expires', () => {
     })
 })
 
+describe('restoring the room the URL names', () => {
+    it('opens the stored room when the URL names it', async () => {
+        fakeStorage.store['uno_mp_room'] = JSON.stringify({ code: 'DEADRM', at: Date.now() })
+        const mp = useMultiplayerStore()
+        void mp.restoreActiveGame('DEADRM')
+
+        for (let i = 0; i < 60 && FakeWebSocket.instances.length === 0; i++) await Promise.resolve()
+        expect(FakeWebSocket.instances.length).toBeGreaterThan(0)
+    })
+
+    it('leaves a different stored room alone, so the URL room can be joined', async () => {
+        fakeStorage.store['uno_mp_room'] = JSON.stringify({ code: 'DEADRM', at: Date.now() })
+        const mp = useMultiplayerStore()
+
+        expect(await mp.restoreActiveGame('OTHRRM')).toBe(false)
+        expect(FakeWebSocket.instances).toHaveLength(0)
+        expect(fakeStorage.store['uno_mp_room']).toBeDefined()
+    })
+
+    it('says so when nothing is stored', async () => {
+        const mp = useMultiplayerStore()
+        expect(await mp.restoreActiveGame()).toBe(false)
+    })
+})
+
 describe('elimination and spectating', () => {
     const threePlayers = () => [
         { userId: 'me', name: 'TESTER', seat: 0, handCount: 5, isEliminated: false, connected: true, calledUno: false },
