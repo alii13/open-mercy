@@ -3,9 +3,10 @@
  * The public room's waiting room as the 3D table. Everyone connected stands at
  * the table as their own card; moves, flicks and draws go through the room
  * (`lounge` frames, see shared/lounge.ts) and quick chat shows as bubbles over
- * the cards. The room owns the clock: it runs only once all seven seats are
- * taken. At zero the table plays the 3-2-1, the deal and SHOW NO MERCY, then
- * the game view takes over. Loaded on demand, so three.js never weighs on the
+ * the cards. The room owns the clock: 15 seconds from the first person to sit,
+ * with the room filling empty seats on its own. At zero the table plays the
+ * 3-2-1, the deal and SHOW NO MERCY, then the game view takes over. After a
+ * hand everyone comes back here for the next deal. Loaded on demand, so three.js never weighs on the
  * lobby bundle.
  */
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
@@ -199,7 +200,7 @@ function toast(text: string) {
     setTimeout(() => { toasts.value = toasts.value.filter((t) => t.id !== id) }, 3300)
 }
 
-// ---- The start. Seconds left once the table is full, null while it fills.
+// ---- The start. Seconds to the deal, null while the room has no clock running.
 const secs = ref<number | null>(null)
 const slam = ref(0)
 const show = ref<'' | 'on' | 'out'>('')
@@ -373,8 +374,8 @@ onUnmounted(() => {
         <p class="ptl-count"><b>{{ here.length }}</b> AT THE TABLE <small>/ {{ PUBLIC_SEATS }}</small></p>
       </div>
       <div class="ptl-clock" role="timer" aria-live="polite">
-        <p class="ptl-clock-label">{{ secs === null ? 'TABLE FILLING' : 'TABLE FULL · DEALING IN' }}</p>
-        <p v-if="secs === null" class="ptl-time ptl-time--wait">WAITING FOR {{ Math.max(0, PUBLIC_SEATS - here.length) }} MORE</p>
+        <p class="ptl-clock-label">{{ secs === null ? 'NEXT DEAL' : 'DEALING IN' }}</p>
+        <p v-if="secs === null" class="ptl-time ptl-time--wait">SHUFFLING</p>
         <p v-else class="ptl-time" :class="{ 'ptl-time--urgent': secs < 10 }">0:{{ String(secs).padStart(2, '0') }}</p>
       </div>
     </header>

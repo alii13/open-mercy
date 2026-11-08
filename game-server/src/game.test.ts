@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { startGame, applyIntent, forceEliminate, persistResults, timeOutTurn, clearTimeouts, personalView } from './game'
+import { startGame, applyIntent, forceEliminate, persistResults, playHouseTurn, timeOutTurn, clearTimeouts, personalView } from './game'
 import type { Card, CardColor } from '../../shared/engine'
 import * as engine from '../../shared/engine'
 
@@ -265,5 +265,99 @@ describe('turn clock timeouts', () => {
     clearTimeouts(game, 'u1')
     const view = personalView(game, 'playing', 'u1', [], new Set(), null)
     expect(view.players[0]).toMatchObject({ timeouts: 0, timedOut: false })
+  })
+})
+
+describe('house seats', () => {
+  const num = (id: string, color: CardColor, value: number) => ({ id, color, type: 'number', value }) as Card
+  const dials = { id: 'house', name: 'house', aggression: 0.3, wildDiscipline: 0.3, catchRate: 0, targeting: 0, skill: 0.5, search: 0 }
+  const threePlayers = () => startGame(
+    [
+      { userId: 'u1', name: 'Alice' },
+      { userId: 'h1', name: 'RogueFox4821' },
+      { userId: 'u3', name: 'Cara' },
+    ],
+    'official',
+  )
+  const onTurn = (game: ReturnType<typeof startGame>['game'], seat: number, hand: Card[]) => {
+    const s = game.engine
+    s.discardPile.push(num('top', 'red', 3))
+    s.currentColor = 'red'
+    s.drawStack = 0
+    s.turnState = 'WAITING_FOR_ACTION'
+    s.currentPlayerIndex = seat
+    s.players[seat]!.hand = hand
+  }
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('plays its turn like anyone: no timeout notice, no timeout counted', () => {
+    const { game } = threePlayers()
+    onTurn(game, 1, [num('play-me', 'red', 5), num('a', 'green', 8), num('b', 'blue', 2)])
+
+    const events = playHouseTurn(game, 'h1', dials, () => 0.5)
+
+    expect(events).toContainEqual(expect.objectContaining({ t: 'CARD_PLAYED', by: 'h1' }))
+    expect(events.some((e) => e.t === 'TURN_TIMED_OUT')).toBe(false)
+    expect(game.timeouts?.h1).toBeUndefined()
+    expect(engine.currentPlayer(game.engine)?.id).not.toBe('h1')
+  })
+
+  it('calls MERCY on its last card most of the time, and forgets now and then', () => {
+    const called = threePlayers().game
+    onTurn(called, 1, [num('play-me', 'red', 5), num('last', 'green', 8)])
+    expect(playHouseTurn(called, 'h1', dials, () => 0.1)).toContainEqual({ t: 'UNO_CALLED', playerId: 'h1' })
+
+    const forgot = threePlayers().game
+    onTurn(forgot, 1, [num('play-me', 'red', 5), num('last', 'green', 8)])
+    expect(playHouseTurn(forgot, 'h1', dials, () => 0.95).some((e) => e.t === 'UNO_CALLED')).toBe(false)
+  })
+
+  it('never writes a row for a house seat, and counts them on the human rows', async () => {
+    const fetchMock = vi.fn(async (_url: string, _init: RequestInit) => new Response(null, { status: 201 }))
+    vi.stubGlobal('fetch', fetchMock)
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    const { game } = threePlayers()
+    game.house = ['h1']
+    game.engine.gameState = 'GAME_OVER'
+    game.engine.winnerId = 'h1'
+
+    expect(await persistResults(game, 'ABCDEF', { SUPABASE_URL: 'https://example.invalid', SUPABASE_SERVICE_KEY: 'k' })).toBe(true)
+    const rows = JSON.parse(String(fetchMock.mock.calls[0]![1].body)) as { user_id: string; house_count: number; opponent_count: number }[]
+    expect(rows.map((r) => r.user_id)).toEqual(['u1', 'u3'])
+    expect(rows.every((r) => r.house_count === 1 && r.opponent_count === 2)).toBe(true)
+  })
+
+  it('still saves the rows when the house_count column is not there yet', async () => {
+    const fetchMock = vi.fn(async (_url: string, init: RequestInit) => String(init.body).includes('house_count')
+      ? new Response('{"code":"PGRST204","message":"Could not find the \'house_count\' column"}', { status: 400 })
+      : new Response(null, { status: 201 }))
+    vi.stubGlobal('fetch', fetchMock)
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    const { game } = threePlayers()
+    game.house = ['h1']
+    game.engine.gameState = 'GAME_OVER'
+    game.engine.winnerId = 'u1'
+
+    expect(await persistResults(game, 'ABCDEF', { SUPABASE_URL: 'https://example.invalid', SUPABASE_SERVICE_KEY: 'k' })).toBe(true)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    const rows = JSON.parse(String(fetchMock.mock.calls[1]![1].body)) as Record<string, unknown>[]
+    expect(rows.map((r) => r.user_id)).toEqual(['u1', 'u3'])
+    expect(rows.every((r) => !('house_count' in r))).toBe(true)
+  })
+
+  it('writes no house_count on a table with no house seats', async () => {
+    const fetchMock = vi.fn(async (_url: string, _init: RequestInit) => new Response(null, { status: 201 }))
+    vi.stubGlobal('fetch', fetchMock)
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    const { game } = twoPlayers()
+    game.engine.gameState = 'GAME_OVER'
+    game.engine.winnerId = 'u1'
+
+    expect(await persistResults(game, 'ABCDEF', { SUPABASE_URL: 'https://example.invalid', SUPABASE_SERVICE_KEY: 'k' })).toBe(true)
+    const rows = JSON.parse(String(fetchMock.mock.calls[0]![1].body)) as Record<string, unknown>[]
+    expect(rows.every((r) => !('house_count' in r))).toBe(true)
   })
 })

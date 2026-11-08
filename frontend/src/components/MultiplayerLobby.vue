@@ -482,7 +482,7 @@
             </template>
           </div>
 
-          <!-- A public table deals itself 15 s after its seventh player sits;
+          <!-- A public table deals itself 15 s after its first player sits;
                the server owns the clock, this only renders it. -->
           <AutoStartRing
             v-if="mpStore.autoStart"

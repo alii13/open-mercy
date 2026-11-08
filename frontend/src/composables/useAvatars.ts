@@ -17,6 +17,8 @@ import { isFatalSchemaError } from '../utils/supabaseErrors'
 
 /** user id -> photo version; null means the player has no photo. */
 const versions = reactive(new Map<string, number | null>())
+/** Ids the lookup found a profile row for. */
+const profiled = reactive(new Set<string>())
 const asked = new Set<string>()
 const queued = new Set<string>()
 let broken = false
@@ -54,7 +56,13 @@ async function flush() {
         return
     }
     const byId = new Map((data ?? []).map(r => [r.id as string, r.avatar_version as number | null]))
+    for (const id of byId.keys()) profiled.add(id)
     for (const id of ids) versions.set(id, byId.get(id) ?? null)
+}
+
+/** Whether the player has a profile to add as a friend; undefined until the lookup answers. */
+export function hasProfile(id: string): boolean | undefined {
+    return versions.has(id) ? profiled.has(id) : undefined
 }
 
 export function avatarUrlFor(id: string | null | undefined): string | null {

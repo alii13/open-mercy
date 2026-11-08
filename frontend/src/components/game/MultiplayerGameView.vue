@@ -232,6 +232,7 @@
       :is-anonymous="authStore.isAnonymous"
       mode="mp"
       :can-rematch="mpStore.isHost"
+      :at-table="mpStore.isPublicRoom"
       :notice="mpStore.error"
       :is-spectator="amEliminated"
       :placement="mpStore.myPlacement"
@@ -279,6 +280,7 @@ import { useVoiceStore } from '../../stores/voiceStore'
 import { soundEffects } from '../../composables/useSoundEffects'
 import { useCardAnimations } from '../../composables/useCardAnimations'
 import { useBadges } from '../../composables/useBadges'
+import { hasProfile } from '../../composables/useAvatars'
 import { preloadCardImages } from '../../utils/preloadCardImages'
 import CardPile from './CardPile.vue'
 import HandFan from './HandFan.vue'
@@ -495,11 +497,12 @@ const opponentDisplayName = computed(() => {
 
 // Everyone at the table except you, for the game-over ADD chips. Names come
 // from the same roster the scoreboard uses, so a rename mid-match is honoured.
+// A seat with no profile row has nothing to add, so it gets no chip.
 const finishedOpponents = computed(() => {
   const meId = authStore.user?.id
   if (!meId) return []
   return mpStore.gamePlayers
-    .filter(p => p.user_id !== meId && !!p.user_id)
+    .filter(p => p.user_id !== meId && !!p.user_id && hasProfile(p.user_id) !== false)
     .map(p => ({ userId: p.user_id, name: p.name || 'PLAYER' }))
 })
 
@@ -1058,6 +1061,10 @@ async function confirmLeave() {
 // Primary CTA on the game-over modal: the host restarts the same room
 // (server re-deals to everyone still connected); guests leave.
 async function handleGameOverPrimary() {
+  if (mpStore.isPublicRoom) {
+    mpStore.closeResults()
+    return
+  }
   if (mpStore.isHost) {
     await mpStore.startGame()
     return

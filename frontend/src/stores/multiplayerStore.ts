@@ -201,13 +201,19 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
         return !!v && v.status === 'finished' && !!me && !v.players.some(p => p.userId === me)
     })
 
+    // A seated player at a public table who closes the result goes straight
+    // back to the 3D table; the room follows a few seconds later and deals the
+    // next hand to everyone still there.
+    const resultsClosed = ref(false)
+    const seesLobby = computed(() => ghostInFinishedGame.value || (resultsClosed.value && view.value?.status === 'finished'))
+
     const currentGame = computed<GameRow | null>(() => {
         const v = view.value
         if (!v || !roomCodeRef.value) return null
         return {
             id: v.gameId ?? roomCode.value,
             room_code: roomCode.value,
-            status: v.status === 'lobby' || ghostInFinishedGame.value ? 'waiting' : v.status,
+            status: v.status === 'lobby' || seesLobby.value ? 'waiting' : v.status,
             host_id: v.hostUserId ?? hostUserId.value ?? '',
             current_player_id: v.currentPlayerId,
             direction: v.direction,
@@ -229,7 +235,7 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
 
     const gamePlayers = computed<GamePlayerRow[]>(() => {
         const v = view.value
-        if (v && v.status !== 'lobby' && !ghostInFinishedGame.value) {
+        if (v && v.status !== 'lobby' && !seesLobby.value) {
             return v.players.map(p => ({
                 id: p.userId,
                 game_id: roomCodeRef.value ?? '',
@@ -367,6 +373,7 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
                 switch (ev.t) {
                     case 'STARTED':
                         autoStart.value = null
+                        resultsClosed.value = false
                         // Fresh deal (first game or a rematch) — stats are per game.
                         mpStats.value = {
                             peakCards: 0, drawCardsPlayed: 0, wildCardsPlayed: 0, cardsPlayedTotal: 0,
@@ -716,6 +723,7 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
         lastMercyCall.value = null
         autoStart.value = null
         loungeShow.value = false
+        resultsClosed.value = false
         lastChat.value = null
         isPublicRoom.value = false
         loungeSpots.value = {}
@@ -914,6 +922,10 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
         sendMsg({ t: 'voice-join' })
     }
 
+    function closeResults() {
+        resultsClosed.value = true
+    }
+
     async function leaveGame() {
         track('mp_room_left', {
             phase: view.value?.status,
@@ -1055,6 +1067,7 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
         sendBadgeUp,
         eliminationOrder,
         ghostInFinishedGame,
+        closeResults,
         catchableUserId,
         catchPlayer,
         mpStats,

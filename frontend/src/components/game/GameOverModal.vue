@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div class="game-over-overlay" :class="{ 'is-win': isWinner, 'is-loss': !isWinner }" @click.self="$emit('back-to-lobby')">
+    <div class="game-over-overlay" :class="{ 'is-win': isWinner, 'is-loss': !isWinner }" @click.self="atTable ? $emit('rematch') : $emit('back-to-lobby')">
       <!-- Confetti only on win, rendered as CSS particles -->
       <div v-if="isWinner" class="confetti-layer" aria-hidden="true">
         <span v-for="i in 30" :key="i" class="confetti-piece" :style="confettiStyle(i)"></span>
@@ -41,9 +41,10 @@
 
         <!-- Primary CTA: dominant, color-matched to state -->
         <button class="cta-primary" :class="isWinner ? 'cta-win' : 'cta-loss'" @click="$emit('rematch')">
-          {{ mode === 'sp' || canRematch ? 'REMATCH' : 'BACK TO LOBBY' }}
+          {{ atTable ? 'BACK TO THE TABLE' : mode === 'sp' || canRematch ? 'REMATCH' : 'BACK TO LOBBY' }}
         </button>
         <p v-if="notice" class="rematch-hint rematch-notice">{{ notice }}</p>
+        <p v-else-if="atTable" class="rematch-hint">The next hand deals at this table in a few seconds.</p>
         <p v-else-if="mode === 'mp' && !canRematch" class="rematch-hint">The host can start a rematch — stay put.</p>
 
         <!-- The highest-intent moment in the app: you have just played these
@@ -133,7 +134,8 @@
 
         <!-- Footer: small dismissible links, not heavy CTAs -->
         <div class="footer-links">
-          <button v-if="mode === 'sp' || canRematch" class="link-btn" @click="$emit('back-to-lobby')">Back to menu</button>
+          <button v-if="atTable" class="link-btn" @click="$emit('back-to-lobby')">Leave table</button>
+          <button v-else-if="mode === 'sp' || canRematch" class="link-btn" @click="$emit('back-to-lobby')">Back to menu</button>
           <button v-if="isAnonymous && !claimSpotlight" class="link-btn upgrade-link" @click="$emit('upgrade-account')">Save your stats <ArrowRight :size="14" :stroke-width="2" aria-hidden="true" /></button>
         </div>
       </div>
@@ -168,6 +170,8 @@ const props = defineProps<{
   mode: 'sp' | 'mp'
   /** Multiplayer: the host can restart the same room; guests wait. */
   canRematch?: boolean
+  /** A public table: everyone stays seated and the room deals the next hand itself. */
+  atTable?: boolean
   /** One-line status under the CTA (e.g. "need 2 players"). */
   notice?: string | null
   /** The viewer was knocked out and watched the round end. */

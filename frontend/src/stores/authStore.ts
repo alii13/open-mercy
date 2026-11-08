@@ -4,6 +4,7 @@ import { supabase, type UserProfile } from '../lib/supabase'
 import { track, setAnalyticsUser } from '../utils/analytics'
 import { readOAuthError, rememberReturnPath, takeReturnPath, urlWithoutOAuthError, type OAuthRedirectError } from '../utils/oauthRedirect'
 import { router } from '../utils/routes'
+import { randomHandle } from '@handles'
 import type { OAuthResponse, User } from '@supabase/supabase-js'
 
 export const useAuthStore = defineStore('auth', () => {
@@ -183,16 +184,6 @@ export const useAuthStore = defineStore('auth', () => {
 
     function sanitizeName(name: string): string {
         return name.trim().replace(/\s+/g, ' ').slice(0, 20)
-    }
-
-    // A distinct, on-theme handle so blank-nickname guests don't all read as
-    // "Player" — every seat at the table feels like a real person.
-    function randomHandle(): string {
-        const adjectives = ['Red', 'Toxic', 'Savage', 'Brutal', 'Wild', 'Rogue', 'Feral', 'Grim', 'Vicious', 'Reckless', 'Ruthless', 'Lethal']
-        const nouns = ['Fox', 'Wolf', 'Viper', 'Hawk', 'Shark', 'Raven', 'Cobra', 'Jackal', 'Reaper', 'Bandit', 'Phantom', 'Joker']
-        const a = adjectives[Math.floor(Math.random() * adjectives.length)]
-        const n = nouns[Math.floor(Math.random() * nouns.length)]
-        return `${a}${n}${Math.floor(Math.random() * 9000 + 1000)}`
     }
 
     // One repair attempt per session: set by ensureProfile so a sign-in that
