@@ -316,6 +316,24 @@ describe('analytics events', () => {
     })
 })
 
+describe('closing the result at a public table', () => {
+    it('goes straight back to the table, and only for the game it closed', async () => {
+        const mp = useMultiplayerStore()
+        const ws = await joinRoom(mp)
+        ws.receive({ t: 'snapshot', seq: 1, game: playingView({ status: 'finished', winnerId: 'opp' }) })
+        expect(mp.currentGame?.status).toBe('finished')
+
+        mp.closeResults()
+        expect(mp.currentGame?.status).toBe('waiting')
+
+        // The next deal reaches this client only as snapshots (a reconnect
+        // drops STARTED), and its result must still show.
+        ws.receive({ t: 'snapshot', seq: 2, game: playingView({ gameId: 'do-AB12CD-2' }) })
+        ws.receive({ t: 'snapshot', seq: 3, game: playingView({ gameId: 'do-AB12CD-2', status: 'finished', winnerId: 'opp' }) })
+        expect(mp.currentGame?.status).toBe('finished')
+    })
+})
+
 describe('presence skins', () => {
     it('exposes each seat\'s reported skin from the presence frame', async () => {
         const mp = useMultiplayerStore()

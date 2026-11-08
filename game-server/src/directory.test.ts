@@ -35,6 +35,14 @@ describe('dirCodes', () => {
         expect(codes).toEqual(['LIVE', 'GHOSTS'])
     })
 
+    it('sorts on people, not the house seats topping a table up', () => {
+        const codes = dirCodes({
+            HOUSE: { at: NOW, players: 4, connected: 4, humans: 1, status: 'lobby' as const },
+            PEOPLE: { at: NOW + 1000, players: 4, connected: 4, humans: 3, status: 'lobby' as const },
+        })
+        expect(codes).toEqual(['PEOPLE', 'HOUSE'])
+    })
+
     it('fills the fullest room first so players concentrate', () => {
         // One player per room is the failure mode: three lonely lobbies
         // instead of one game about to start.
@@ -195,6 +203,14 @@ describe('dirRegister', () => {
         expect(Object.keys(dir)).toHaveLength(DIR_MAX_ENTRIES)
         expect(dirRegister(dir, code(0), { players: 2 }, NOW + 1)).toBe(true)
         expect(dir[code(0)]).toMatchObject({ at: NOW, updatedAt: NOW + 1, players: 2 })
+    })
+
+    it('keeps the count of people at the table, bounded like the others', () => {
+        const dir: Record<string, DirEntry> = {}
+        dirRegister(dir, 'ABCDEF', { connected: 4, humans: 1 }, NOW)
+        expect(dir.ABCDEF).toMatchObject({ connected: 4, humans: 1 })
+        dirRegister(dir, 'ABCDEF', { humans: 1e9 }, NOW + 1)
+        expect(dir.ABCDEF!.humans).toBe(20)
     })
 
     it('keeps only known, bounded snapshot fields', () => {

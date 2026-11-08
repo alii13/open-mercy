@@ -5,8 +5,10 @@
 -- the table, so retention and leaderboard queries can tell a house game from
 -- an all-human one (`house_count = 0`).
 --
--- Additive only. Run before or after deploying the game server: until this
--- has run, the server saves the rows without the count.
+-- Additive only. Run BEFORE deploying the game server: rows saved while the
+-- column is missing would read as house_count = 0 (all-human) once it exists,
+-- and they cannot be told apart afterwards. The server still saves the rows
+-- without the count if it ever meets the column missing.
 
 alter table public.game_results
     add column if not exists house_count smallint not null default 0;

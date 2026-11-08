@@ -377,10 +377,10 @@ const AUTOPLAY: BotProfile = { id: 'autoplay', name: 'Autoplay', aggression: 0.5
  * All pick. Extra turns it earns are played the same way, and anything the bot
  * cannot answer gets the obvious answer, so the turn always moves on.
  */
-function autoPlayTurn(game: GameRecord, userId: string, profile: BotProfile = AUTOPLAY, rng: () => number = Math.random): GameEvent[] {
+function autoPlayTurn(game: GameRecord, userId: string, profile: BotProfile = AUTOPLAY, rng: () => number = Math.random, maxActions = 10): GameEvent[] {
     const s = game.engine
     const out: GameEvent[] = []
-    for (let sanity = 0; sanity < 10; sanity++) {
+    for (let sanity = 0; sanity < maxActions; sanity++) {
         const me = engine.currentPlayer(s)
         if (s.gameState !== 'PLAYING' || !me || me.id !== userId || me.isEliminated) break
         const opponents = s.players.filter(p => p.id !== userId && !p.isEliminated)
@@ -417,12 +417,14 @@ function autoPlayTurn(game: GameRecord, userId: string, profile: BotProfile = AU
 }
 
 /**
- * A house seat's turn: the bot's pick with the seat's own dials, then a MERCY
- * call on its last card, which a person makes most of the time and forgets now
- * and then. Never a timeout, so nothing on the wire tells it apart.
+ * One action of a house seat's turn: the bot's pick with the seat's own dials,
+ * then a MERCY call on its last card, which a person makes most of the time and
+ * forgets now and then. One action, so an extra turn or a choice inside the
+ * turn (a swap target, a Discard All pick) waits for its own pause. Never a
+ * timeout, so nothing on the wire tells it apart.
  */
 export function playHouseTurn(game: GameRecord, userId: string, dials: BotProfile, rng: () => number = Math.random): GameEvent[] {
-    const out = autoPlayTurn(game, userId, dials, rng)
+    const out = autoPlayTurn(game, userId, dials, rng, 1)
     const me = game.engine.players.find(p => p.id === userId)
     if (me && !me.isEliminated && me.hand.length === 1 && !game.engine.hasCalledUno[userId] && rng() < 0.85) {
         out.push(...applyIntent(game, userId, { kind: 'CALL_UNO' }).events)

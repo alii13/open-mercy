@@ -28,6 +28,8 @@ export interface DirEntry {
      *  abandoned seats until GC — sorting on it funnels quick-matchers into
      *  ghost towns. */
     connected?: number
+    /** People connected; `connected` also counts the house seats (house.ts). */
+    humans?: number
     seatsFree?: number
     inProgress?: boolean
     mode?: string
@@ -90,13 +92,14 @@ export function normalizeDir(raw: Record<string, DirEntry | number> | undefined)
  * drop the joiner into a game under way; a finished one would seat them in
  * front of someone else's game-over.
  */
-const filling = (e: DirEntry) => e.connected ?? e.players ?? 0
+// People, not house seats: a table with three people beats one person and three house seats.
+const filling = (e: DirEntry) => e.humans ?? e.connected ?? e.players ?? 0
 
 export function dirCodes(raw: Record<string, DirEntry | number> | undefined): string[] {
     const dir = normalizeDir(raw)
     return Object.entries(dir)
         .filter(([, e]) => entryStatus(e) === 'lobby')
-        // A full table is counting down: the next player starts a new one.
+        // A table with no seat left for a person: the next player starts a new one.
         .filter(([, e]) => (e.seatsFree ?? 1) > 0)
         .sort((a, b) => filling(b[1]) - filling(a[1]) || a[1].at - b[1].at)
         .map(([code]) => code)
@@ -155,6 +158,8 @@ export function cleanSnapshot(raw: unknown): Partial<DirEntry> {
     if (players !== undefined) out.players = players
     const connected = count(s.connected)
     if (connected !== undefined) out.connected = connected
+    const humans = count(s.humans)
+    if (humans !== undefined) out.humans = humans
     const seatsFree = count(s.seatsFree)
     if (seatsFree !== undefined) out.seatsFree = seatsFree
     if (typeof s.inProgress === 'boolean') out.inProgress = s.inProgress

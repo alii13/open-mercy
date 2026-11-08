@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { HOUSE_FILL, houseStep, houseTarget, leavesTable, newHouseSeat, thinkMs, walkDelayMs } from './house'
+import { HOUSE_FILL, houseClockFor, housePlanAtDeal, houseStep, houseTarget, leavesTable, newHouseSeat, thinkMs, walkDelayMs } from './house'
 
 const seq = (...xs: number[]) => {
     let i = 0
@@ -63,22 +63,65 @@ describe('leavesTable', () => {
 })
 
 describe('thinkMs', () => {
+    const within = (pace: 'brisk' | 'rush', lo: number, hi: number) => {
+        for (const r of [0, 0.05, 0.5, 0.9999]) {
+            const ms = thinkMs(seq(r, r), pace)
+            expect(ms).toBeGreaterThanOrEqual(lo)
+            expect(ms).toBeLessThan(hi)
+        }
+    }
+
     it('takes one to four seconds on most turns', () => {
-        expect(thinkMs(seq(0.5, 0), false)).toBe(1100)
-        expect(thinkMs(seq(0.5, 0.9999), false)).toBe(3899)
+        expect(thinkMs(seq(0.5, 0), 'normal')).toBe(1100)
+        expect(thinkMs(seq(0.5, 0.9999), 'normal')).toBe(3899)
     })
 
     it('now and then takes a long one', () => {
-        expect(thinkMs(seq(0.05, 0), false)).toBe(5000)
-        expect(thinkMs(seq(0.05, 0.9999), false)).toBe(8999)
+        expect(thinkMs(seq(0.05, 0), 'normal')).toBe(5000)
+        expect(thinkMs(seq(0.05, 0.9999), 'normal')).toBe(8999)
     })
 
-    it('rushes when no person is left in the hand', () => {
-        for (const r of [0, 0.05, 0.5, 0.9999]) {
-            const ms = thinkMs(seq(r, r), true)
-            expect(ms).toBeGreaterThanOrEqual(350)
-            expect(ms).toBeLessThan(700)
-        }
+    it('plays briskly, still at a person\'s pace, when the only people left are watching', () => {
+        within('brisk', 800, 1600)
+    })
+
+    it('rushes only when nobody is watching', () => {
+        within('rush', 350, 700)
+    })
+})
+
+describe('houseClockFor', () => {
+    const house = ['h1', 'h2']
+
+    it('runs in the lobby while seats need filling or house seats are there to idle', () => {
+        expect(houseClockFor({ status: 'lobby', humans: 1, houseIds: [] })).toBe('lobby')
+        expect(houseClockFor({ status: 'lobby', humans: 0, houseIds: house })).toBe('lobby')
+        expect(houseClockFor({ status: 'lobby', humans: 0, houseIds: [] })).toBeNull()
+        expect(houseClockFor({ status: 'lobby', humans: 5, houseIds: [] })).toBeNull()
+    })
+
+    it('belongs to the house seat on turn, so a lobby timer never carries into the game', () => {
+        expect(houseClockFor({ status: 'playing', humans: 1, houseIds: house, current: { id: 'h2', isEliminated: false } })).toBe('h2')
+        expect(houseClockFor({ status: 'playing', humans: 1, houseIds: house, current: { id: 'u1', isEliminated: false } })).toBeNull()
+        expect(houseClockFor({ status: 'playing', humans: 1, houseIds: house, current: { id: 'h1', isEliminated: true } })).toBeNull()
+    })
+
+    it('is off once the game is over', () => {
+        expect(houseClockFor({ status: 'finished', humans: 1, houseIds: house, current: { id: 'h1', isEliminated: false } })).toBeNull()
+    })
+})
+
+describe('housePlanAtDeal', () => {
+    it('keeps the earliest arrivals and drops the rest when people took the seats', () => {
+        expect(housePlanAtDeal(['h1', 'h2', 'h3'], 3)).toEqual({ keep: ['h1'], drop: ['h2', 'h3'], add: 0 })
+    })
+
+    it('sits whoever had not walked in yet', () => {
+        expect(housePlanAtDeal(['h1'], 1)).toEqual({ keep: ['h1'], drop: [], add: 2 })
+    })
+
+    it('deals no house seats at a table of four people', () => {
+        expect(housePlanAtDeal(['h1'], 4)).toEqual({ keep: [], drop: ['h1'], add: 0 })
     })
 })
 

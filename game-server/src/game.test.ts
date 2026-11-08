@@ -361,3 +361,33 @@ describe('house seats', () => {
     expect(rows.every((r) => !('house_count' in r))).toBe(true)
   })
 })
+
+describe('house seats take one action per pause', () => {
+  const num = (id: string, color: CardColor, value: number) => ({ id, color, type: 'number', value }) as Card
+  const dials = { id: 'house', name: 'house', aggression: 0.3, wildDiscipline: 0.3, catchRate: 0, targeting: 0, skill: 0, search: 0 }
+
+  it('plays a 7 now and picks who to swap with on its next pause', () => {
+    const { game } = startGame(
+      [
+        { userId: 'u1', name: 'Alice' },
+        { userId: 'h1', name: 'RogueFox4821' },
+        { userId: 'u3', name: 'Cara' },
+      ],
+      'official',
+    )
+    const s = game.engine
+    s.discardPile.push(num('top', 'red', 3))
+    s.currentColor = 'red'
+    s.drawStack = 0
+    s.turnState = 'WAITING_FOR_ACTION'
+    s.currentPlayerIndex = 1
+    s.players[1]!.hand = [num('seven', 'red', 7), num('a', 'green', 8), num('b', 'blue', 2)]
+
+    playHouseTurn(game, 'h1', dials, () => 0.5)
+    expect(s.turnState).toBe('CHOOSING_PLAYER_TO_SWAP')
+    expect(engine.currentPlayer(s)?.id).toBe('h1')
+
+    playHouseTurn(game, 'h1', dials, () => 0.5)
+    expect(engine.currentPlayer(s)?.id).not.toBe('h1')
+  })
+})

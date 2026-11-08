@@ -75,13 +75,45 @@ export function leavesTable(seat: HouseSeat): boolean {
 }
 
 /**
- * The pause before a house turn. One to four seconds, a long think now and
- * then, and a quick one when no person is left in the hand to watch it.
+ * How fast house seats play: at a person's pace while a person is in the hand,
+ * brisk but still plausible while the only people left are watching (knocked
+ * out, or spectating), and a rush once nobody is watching at all.
  */
-export function thinkMs(rng: () => number, rush: boolean): number {
-    if (rush) return 350 + Math.floor(rng() * 350)
+export type HousePace = 'normal' | 'brisk' | 'rush'
+
+/** The pause before a house seat's next action: one to four seconds, a long think now and then. */
+export function thinkMs(rng: () => number, pace: HousePace): number {
+    if (pace === 'rush') return 350 + Math.floor(rng() * 350)
+    if (pace === 'brisk') return 800 + Math.floor(rng() * 800)
     const long = rng() < 0.12
     return long ? 5000 + Math.floor(rng() * 4000) : 1100 + Math.floor(rng() * 2800)
+}
+
+/**
+ * What the house clock is for: 'lobby' (walks in and out, idle acts), the id of
+ * the house seat on turn, or null when it should not run. Keyed, so a lobby
+ * timer still pending at the deal never stands in for a house turn's pause.
+ */
+export function houseClockFor(input: {
+    status: 'lobby' | 'playing' | 'finished'
+    humans: number
+    houseIds: string[]
+    current?: { id: string; isEliminated: boolean } | null
+}): string | null {
+    if (input.status === 'lobby') return input.houseIds.length > 0 || houseTarget(input.humans) > 0 ? 'lobby' : null
+    const c = input.current
+    if (input.status === 'playing' && c && !c.isEliminated && input.houseIds.includes(c.id)) return c.id
+    return null
+}
+
+/**
+ * House seats at the deal, from those already seated in join order: the
+ * earliest arrivals keep their seats, the rest leave for the people who came,
+ * and any that had not walked in yet sit down now.
+ */
+export function housePlanAtDeal(houseIds: string[], humans: number): { keep: string[]; drop: string[]; add: number } {
+    const target = houseTarget(humans)
+    return { keep: houseIds.slice(0, target), drop: houseIds.slice(target), add: Math.max(0, target - houseIds.length) }
 }
 
 /** Gap between one house seat walking in or out and the next. */

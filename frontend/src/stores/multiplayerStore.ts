@@ -203,9 +203,13 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
 
     // A seated player at a public table who closes the result goes straight
     // back to the 3D table; the room follows a few seconds later and deals the
-    // next hand to everyone still there.
-    const resultsClosed = ref(false)
-    const seesLobby = computed(() => ghostInFinishedGame.value || (resultsClosed.value && view.value?.status === 'finished'))
+    // next hand to everyone still there. Keyed to the game closed, because a
+    // reconnect can bring the next deal without its STARTED event.
+    const closedGameId = ref<string | null>(null)
+    const seesLobby = computed(() => {
+        const v = view.value
+        return ghostInFinishedGame.value || (!!v && v.status === 'finished' && !!v.gameId && v.gameId === closedGameId.value)
+    })
 
     const currentGame = computed<GameRow | null>(() => {
         const v = view.value
@@ -373,7 +377,6 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
                 switch (ev.t) {
                     case 'STARTED':
                         autoStart.value = null
-                        resultsClosed.value = false
                         // Fresh deal (first game or a rematch) — stats are per game.
                         mpStats.value = {
                             peakCards: 0, drawCardsPlayed: 0, wildCardsPlayed: 0, cardsPlayedTotal: 0,
@@ -723,7 +726,7 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
         lastMercyCall.value = null
         autoStart.value = null
         loungeShow.value = false
-        resultsClosed.value = false
+        closedGameId.value = null
         lastChat.value = null
         isPublicRoom.value = false
         loungeSpots.value = {}
@@ -923,7 +926,7 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
     }
 
     function closeResults() {
-        resultsClosed.value = true
+        closedGameId.value = view.value?.gameId ?? null
     }
 
     async function leaveGame() {
