@@ -5,6 +5,7 @@ import { PUBLIC_TABLE_RULES } from '../utils/publicTable'
 interface RoomStore {
     currentGame: { room_code: string; status: string } | null
     isPublicRoom: boolean
+    loading: boolean
     leaveGame(): unknown
     restoreActiveGame(urlCode?: string): Promise<boolean>
     joinGame(code: string, via: 'link'): Promise<unknown>
@@ -57,7 +58,9 @@ export function useRoomUrl(mp: RoomStore) {
  * from an invite link, or a seat at the public table. Home when that fails.
  */
 export async function enterRoomUrl(r: Route, mp: RoomStore): Promise<void> {
-    if (!isRoomRoute(r) || mp.currentGame) return
+    // `loading` covers a join still in flight: quickMatch backing out of a dealt
+    // room remounts the lobby on /public, and a second entry would race it.
+    if (!isRoomRoute(r) || mp.currentGame || mp.loading) return
     const code = r.name === 'room' ? r.code : undefined
     if (!(await mp.restoreActiveGame(code))) {
         await (code ? mp.joinGame(code, 'link') : mp.quickMatch(PUBLIC_TABLE_RULES))

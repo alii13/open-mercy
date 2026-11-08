@@ -104,9 +104,9 @@ describe('navigation', () => {
         expect(router.currentRoute.value.fullPath).toBe('/?join=nope')
     })
 
-    it('keeps the invite query when navigating', async () => {
-        await router.push('/?join=ABCDEF')
+    it('keeps the query when navigating', async () => {
+        await router.push('/changelog?ref=x')
         await navigate({ name: 'leaderboard', tab: 'weekly' })
-        expect(router.currentRoute.value.fullPath).toBe('/leaderboard/weekly?join=ABCDEF')
+        expect(router.currentRoute.value.fullPath).toBe('/leaderboard/weekly?ref=x')
     })
 })

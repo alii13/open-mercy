@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
-import { effectScope, nextTick, reactive, type EffectScope } from 'vue'
+import { effectScope, nextTick, reactive, ref, type EffectScope } from 'vue'
 import { router } from '../../utils/routes'
 import { useLocalGameUrl } from '../useLocalGameUrl'
 
@@ -21,16 +21,18 @@ const path = () => router.currentRoute.value.fullPath
 let scope: EffectScope | undefined
 let game: ReturnType<typeof fakeGame>
 let startBot: Mock<() => void>
+const authReady = ref(true)
 
 function install() {
     scope = effectScope()
-    scope.run(() => useLocalGameUrl(game, startBot))
+    scope.run(() => useLocalGameUrl(game, startBot, () => authReady.value))
 }
 
 beforeEach(async () => {
     await router.push('/')
     game = fakeGame()
     startBot = vi.fn(() => { game.gameState = 'PLAYING' })
+    authReady.value = true
 })
 afterEach(() => scope?.stop())
 
@@ -74,6 +76,16 @@ describe('the URL follows the local game', () => {
         await settle()
         expect(path()).toBe('/')
     })
+
+    it("takes over a room's entry rather than stacking on it, so back never rejoins a room just left", async () => {
+        await router.push('/r/XK7P2M')
+        game.gameState = 'PLAYING'
+        await settle()
+        expect(path()).toBe('/bot')
+        router.back()
+        await settle()
+        expect(path()).toBe('/')
+    })
 })
 
 describe('opening /daily or /bot', () => {
@@ -99,6 +111,17 @@ describe('opening /daily or /bot', () => {
         await settle()
         expect(startBot).toHaveBeenCalledOnce()
         expect(path()).toBe('/bot')
+    })
+
+    it('waits for sign-in to settle, so a resumed daily never runs behind the loading screen', async () => {
+        authReady.value = false
+        await router.push('/daily')
+        install()
+        await settle()
+        expect(game.resumeDaily).not.toHaveBeenCalled()
+        authReady.value = true
+        await settle()
+        expect(game.resumeDaily).toHaveBeenCalledOnce()
     })
 
     it('leaves a game already on screen alone, such as a CONTINUE tapped while loading', async () => {

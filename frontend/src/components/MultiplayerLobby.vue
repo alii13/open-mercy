@@ -857,7 +857,7 @@ onMounted(preloadCardImages)
 // reload at the table. Enter it, so friends sharing the link drop straight in
 // instead of copy-pasting the code. A dead link gets the room-ended card.
 watch(currentRoute, async (r) => {
-  if (r.name === 'room') joinCode.value = r.code
+  if (r.name === 'room' && !mpStore.currentGame) joinCode.value = r.code
   await enterRoomUrl(r, mpStore)
   if (r.name === 'room' && !mpStore.currentGame && mpStore.error === 'Room not found') roomEnded.value = true
 }, { immediate: true })

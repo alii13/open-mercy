@@ -44,3 +44,22 @@ export function urlWithoutOAuthError(loc: { pathname: string; search: string }):
     const query = params.toString()
     return query ? `${loc.pathname}?${query}` : loc.pathname
 }
+
+// Google always returns to the site root (`redirectTo` is the origin), so the
+// page it left rides the tab's sessionStorage across the round trip.
+const RETURN_PATH_KEY = 'om_oauth_return'
+
+export function rememberReturnPath(path: string): void {
+    try { sessionStorage.setItem(RETURN_PATH_KEY, path) } catch { /* private mode */ }
+}
+
+/** The page Google was opened from, once; null when there is none. */
+export function takeReturnPath(): string | null {
+    try {
+        const path = sessionStorage.getItem(RETURN_PATH_KEY)
+        sessionStorage.removeItem(RETURN_PATH_KEY)
+        return path
+    } catch {
+        return null
+    }
+}

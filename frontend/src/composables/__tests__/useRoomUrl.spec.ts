@@ -9,6 +9,7 @@ function fakeStore() {
     const mp = reactive({
         currentGame: null as Game | null,
         isPublicRoom: false,
+        loading: false,
         leaveGame: vi.fn(() => { mp.currentGame = null }),
         restoreActiveGame: vi.fn(async (_code?: string) => false),
         joinGame: vi.fn(async (code: string): Promise<Game | null> => { mp.currentGame = { room_code: code, status: 'waiting' }; return mp.currentGame }),
@@ -119,6 +120,13 @@ describe('entering the room the URL names', () => {
         await enterRoomUrl({ name: 'room', code: 'XK7P2M' }, mp)
         expect(mp.restoreActiveGame).not.toHaveBeenCalled()
         expect(mp.joinGame).not.toHaveBeenCalled()
+    })
+
+    it('stays put while a join is already in flight, so one tap is one quick match', async () => {
+        mp.loading = true
+        await enterRoomUrl({ name: 'public' }, mp)
+        expect(mp.restoreActiveGame).not.toHaveBeenCalled()
+        expect(mp.quickMatch).not.toHaveBeenCalled()
     })
 
     it('goes home when the room cannot be entered', async () => {

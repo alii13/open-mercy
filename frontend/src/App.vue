@@ -180,7 +180,8 @@ import { localDateString } from './utils/seededRng'
 import { nextBot } from './utils/botLadder'
 import { WARM_UP_GAMES } from '@engine/bot'
 import { adoptProfileEquip, applyEquipped } from './utils/cosmetics'
-import { currentRoute, navigate } from './utils/routes'
+import { currentRoute, navigate, router } from './utils/routes'
+import { takeReturnPath } from './utils/oauthRedirect'
 import { useRoomUrl } from './composables/useRoomUrl'
 import { useLocalGameUrl } from './composables/useLocalGameUrl'
 import { syncCountryToProfile } from './utils/country'
@@ -229,7 +230,7 @@ usePresenceHeartbeat()
 useRoomUrl(mpStore)
 // A daily cut short by a reload reopens where it was, never dealt again from
 // the top, which would let the player replay a deal they have already seen.
-useLocalGameUrl(localGameStore, startLocalGame)
+useLocalGameUrl(localGameStore, startLocalGame, () => !authStore.loading)
 
 const showAuthView = ref(false)
 const authMode = ref<'login' | 'signup' | 'claim'>('signup')
@@ -300,6 +301,11 @@ onMounted(async () => {
   authSubscription = data.subscription
 
   await authStore.initialize()
+
+  // Google returns to /. Go back to the page it was opened from, such as a
+  // waiting room, which the lobby then rejoins as it does on a reload.
+  const back = takeReturnPath()
+  if (back && currentRoute.value.name === 'home') await router.replace(back)
 
   // A failed Google link redirects back to the home path, where nothing would
   // explain why. Reopen the claim screen so the reason is visible and the

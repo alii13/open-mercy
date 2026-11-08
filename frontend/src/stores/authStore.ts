@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { supabase, type UserProfile } from '../lib/supabase'
 import { track, setAnalyticsUser } from '../utils/analytics'
-import { readOAuthError, urlWithoutOAuthError, type OAuthRedirectError } from '../utils/oauthRedirect'
+import { readOAuthError, rememberReturnPath, takeReturnPath, urlWithoutOAuthError, type OAuthRedirectError } from '../utils/oauthRedirect'
 import { router } from '../utils/routes'
 import type { OAuthResponse, User } from '@supabase/supabase-js'
 
@@ -371,11 +371,13 @@ export const useAuthStore = defineStore('auth', () => {
      * "requested path is invalid".
      */
     async function startGoogleRedirect(call: () => Promise<OAuthResponse>) {
+        rememberReturnPath(router.currentRoute.value.fullPath)
         try {
             const { error: oauthErr } = await call()
             if (oauthErr) throw oauthErr
             return { success: true }
         } catch (err: any) {
+            takeReturnPath()
             error.value = err.message
             return { success: false, error: err.message }
         }
