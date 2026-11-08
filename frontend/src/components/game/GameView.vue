@@ -194,6 +194,8 @@ import { useStackEscalation } from '../../composables/useStackEscalation'
 import { playDealerIntro } from '../../composables/useDealerIntro'
 import { useRetentionStore } from '../../stores/retentionStore'
 import { useGameStore } from '../../stores/gameStore'
+import { router } from '../../utils/routes'
+import { localGamePath } from '../../composables/useLocalGameUrl'
 import { useAuthStore } from '../../stores/authStore'
 import { canPlayCard } from '../../utils/gameRules'
 import { countByColor } from '../../utils/gameHelpers'
@@ -669,6 +671,18 @@ function confirmLeave() {
   showLeaveConfirm.value = false
   store.returnToLobby()
 }
+
+// This view covers every URL, so navigating away is leaving the game: back
+// mid-game asks first, like the exit button, and after the game it just goes.
+onUnmounted(router.beforeEach((to) => {
+  if (store.gameState === 'LOBBY' || to.path === localGamePath(store)) return true
+  if (store.gameState === 'PLAYING') {
+    showLeaveConfirm.value = true
+    return false
+  }
+  store.returnToLobby()
+  return true
+}))
 
 // In-place claim keeps the guest's user id — never sign out here, that
 // orphans their stats. Emit BEFORE leaving: returnToLobby unmounts this

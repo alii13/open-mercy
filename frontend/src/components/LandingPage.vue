@@ -136,7 +136,7 @@ import { useSitePulse } from '../composables/useSitePulse'
 import Card from './game/Card.vue'
 import Button from './ui/Button.vue'
 import { useScreenSize } from '../composables/useScreenSize'
-import { navigate } from '../utils/routes'
+import { currentRoute, navigate } from '../utils/routes'
 import { onFirstScroll } from '../composables/onFirstScroll'
 
 const LandingScrollSections = defineAsyncComponent(() => import('./LandingScrollSections.vue'))
@@ -146,14 +146,10 @@ const props = defineProps<{ loading?: boolean }>()
 const showFeedback = ref(false)
 const showRules = ref(false)
 
-// If the visitor arrived via a shared invite URL (?join=CODE), surface that
+// If the visitor arrived via a shared invite URL (/r/CODE), surface that
 // context instead of a generic landing — the lobby auto-joins the code once
 // they sign in as a guest.
-const inviteCode = (() => {
-  if (typeof window === 'undefined') return ''
-  const c = new URLSearchParams(window.location.search).get('join')?.toUpperCase().trim() || ''
-  return /^[A-Z0-9]{4,8}$/.test(c) ? c : ''
-})()
+const inviteCode = currentRoute.value.name === 'room' ? currentRoute.value.code : ''
 const heroOutOfView = ref(false)
 const footerInView = ref(false)
 const showStickyCta = computed(() => heroOutOfView.value && !footerInView.value)

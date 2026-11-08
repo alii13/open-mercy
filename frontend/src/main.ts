@@ -6,6 +6,7 @@ import './style.css'
 import App from './App.vue'
 import { vFocusRing } from './directives/focusRing'
 import { registerMcpTools } from './mcp/registerTools'
+import { router } from './utils/routes'
 
 // CSSPlugin must be explicitly registered under Vite tree-shaking — without it
 // every x/y/opacity/scale tween logs "Missing plugin?" warnings and no-ops.
@@ -32,8 +33,10 @@ const app = createApp(App)
 const pinia = createPinia()
 
 app.use(pinia)
+app.use(router)
 app.directive('focus-ring', vFocusRing)
-app.mount('#app')
+// Mount on the resolved first route, so App.vue never reads the placeholder start location.
+void router.isReady().then(() => app.mount('#app'))
 
 // Expose the game as WebMCP tools so a visiting agent can play a real seat.
 registerMcpTools(pinia)

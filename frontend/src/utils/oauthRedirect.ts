@@ -34,13 +34,32 @@ const ERROR_PARAMS = ['error', 'error_code', 'error_description']
 /**
  * The same URL with only the OAuth error params removed.
  *
- * Deliberately surgical rather than resetting to the bare path: `?join=<code>`
- * carries multiplayer invites (read in App.vue), so blanking the query string to
- * tidy up an error would silently eat someone's invite link.
+ * Deliberately surgical rather than resetting to `/`: the path and the rest of
+ * the query are other state, such as the room a `/r/CODE` invite names, so
+ * blanking them to tidy up an error would silently eat someone's invite link.
  */
 export function urlWithoutOAuthError(loc: { pathname: string; search: string }): string {
     const params = new URLSearchParams(loc.search.replace(/^\?/, ''))
     for (const key of ERROR_PARAMS) params.delete(key)
     const query = params.toString()
     return query ? `${loc.pathname}?${query}` : loc.pathname
+}
+
+// Google always returns to the site root (`redirectTo` is the origin), so the
+// page it left rides the tab's sessionStorage across the round trip.
+const RETURN_PATH_KEY = 'om_oauth_return'
+
+export function rememberReturnPath(path: string): void {
+    try { sessionStorage.setItem(RETURN_PATH_KEY, path) } catch { /* private mode */ }
+}
+
+/** The page Google was opened from, once; null when there is none. */
+export function takeReturnPath(): string | null {
+    try {
+        const path = sessionStorage.getItem(RETURN_PATH_KEY)
+        sessionStorage.removeItem(RETURN_PATH_KEY)
+        return path
+    } catch {
+        return null
+    }
 }

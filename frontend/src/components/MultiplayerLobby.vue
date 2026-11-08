@@ -662,9 +662,10 @@ const PublicTableLounge = defineAsyncComponent({
 import { publicTableView, PUBLIC_TABLE_RULES } from '../utils/publicTable'
 import { useWhatsNew } from '../composables/useWhatsNew'
 import { nextBot, ladderProgress, isLadderComplete } from '../utils/botLadder'
-import { navigate } from '../utils/routes'
+import { currentRoute, navigate, routePath } from '../utils/routes'
+import { enterRoomUrl } from '../composables/useRoomUrl'
 import { track } from '../utils/analytics'
-import { isRoomCode, normalizeRoomCode, roomCodeProblem } from '@roomCode'
+import { normalizeRoomCode, roomCodeProblem } from '@roomCode'
 import { useBadges } from '../composables/useBadges'
 import { openPhotoSheet } from '../composables/usePhotoSheet'
 import { avatarsAvailable } from '../composables/useAvatars'
@@ -849,34 +850,17 @@ const copied = ref(false)
 // The player's saved pick, not the last game's rules: the daily always plays Official.
 const selectedStackingMode = ref<StackingMode>(gameStore.preferredStackingMode)
 
-// When the page loads with ?join=ABCDEF, pre-fill the join input and
-// fire the join automatically. Friends sharing the invite URL drop
-// straight into the room instead of copy-pasting the code manually.
-onMounted(() => {
-  // Warm the deck art while the player is still in the lobby.
-  preloadCardImages()
-  const params = new URLSearchParams(window.location.search)
-  const code = params.get('join')?.toUpperCase().trim()
-  if (!code) return
+// Warm the deck art while the player is still in the lobby.
+onMounted(preloadCardImages)
 
-  // Strip the param so a reload doesn't re-trigger.
-  params.delete('join')
-  const newSearch = params.toString()
-  const newUrl =
-    window.location.pathname + (newSearch ? `?${newSearch}` : '') + window.location.hash
-  window.history.replaceState({}, '', newUrl)
-
-  // Only auto-join if the user isn't already in a game and the code
-  // shape is plausible. Anything weird falls through to the user
-  // opening the join modal themselves.
-  if (mpStore.currentGame) return
-  if (!isRoomCode(code)) return
-
-  joinCode.value = code
-  void mpStore.joinGame(code, 'link').then((res) => {
-    if (!res && mpStore.error === 'Room not found') roomEnded.value = true
-  })
-})
+// The URL names a room: /r/CODE from an invite link or a reload, /public from a
+// reload at the table. Enter it, so friends sharing the link drop straight in
+// instead of copy-pasting the code. A dead link gets the room-ended card.
+watch(currentRoute, async (r) => {
+  if (r.name === 'room' && !mpStore.currentGame) joinCode.value = r.code
+  await enterRoomUrl(r, mpStore)
+  if (r.name === 'room' && !mpStore.currentGame && mpStore.error === 'Room not found') roomEnded.value = true
+}, { immediate: true })
 
 // Speaker button per seat: host cuts the mic room-wide, others mute locally.
 function canVoiceMute(userId: string): boolean {
@@ -1271,11 +1255,7 @@ async function shareInvite() {
 }
 
 function inviteUrl() {
-  const u = new URL(window.location.href)
-  u.search = ''
-  u.hash = ''
-  u.searchParams.set('join', mpStore.roomCode)
-  return u.toString()
+  return new URL(routePath({ name: 'room', code: mpStore.roomCode }), window.location.origin).toString()
 }
 
 // Copy the full invite link (not just the code) — tapping it opens the join

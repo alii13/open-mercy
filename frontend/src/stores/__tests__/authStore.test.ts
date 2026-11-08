@@ -104,14 +104,18 @@ vi.mock('../../lib/supabase', () => ({
 
 const { track, setAnalyticsUser } = vi.hoisted(() => ({ track: vi.fn(), setAnalyticsUser: vi.fn() }))
 vi.mock('../../utils/analytics', () => ({ track, setAnalyticsUser }))
+// The router owns the URL, so a rewrite is a router.replace.
+vi.mock('../../utils/routes', () => ({
+    router: {
+        replace: async (url: string) => { h.state.replacedUrls.push(url) },
+        currentRoute: { value: { fullPath: '/r/XK7P2M' } },
+    },
+}))
 
 vi.stubGlobal('window', {
     location: Object.assign(h.state.loc, {
         assign: (url: string) => { h.state.navigations.push(url) },
     }),
-    history: {
-        replaceState: (_s: unknown, _t: unknown, url: string) => { h.state.replacedUrls.push(url) },
-    },
 })
 
 // The node test environment has no sessionStorage, and the Google claim marker
@@ -124,6 +128,7 @@ vi.stubGlobal('sessionStorage', {
 })
 
 import { useAuthStore } from '../authStore'
+import { takeReturnPath } from '../../utils/oauthRedirect'
 
 beforeEach(() => {
     setActivePinia(createPinia())
@@ -362,6 +367,29 @@ describe('claiming a guest account with Google', () => {
 
         expect(res.success).toBe(false)
         expect(res.error).toBe('Manual linking is disabled')
+    })
+
+    it('remembers the page it left, since Google always returns to /', async () => {
+        const auth = useAuthStore()
+        seedGuest(auth)
+
+        await auth.linkGoogleIdentity()
+
+        expect(takeReturnPath()).toBe('/r/XK7P2M')
+        expect(takeReturnPath()).toBeNull()
+    })
+
+    it('forgets the page when the browser never left for Google', async () => {
+        const auth = useAuthStore()
+        seedGuest(auth)
+        h.state.oauthResult = {
+            data: { provider: 'google', url: null },
+            error: { message: 'Manual linking is disabled', code: 'manual_linking_disabled' },
+        }
+
+        await auth.linkGoogleIdentity()
+
+        expect(takeReturnPath()).toBeNull()
     })
 
     it('uses a plain OAuth sign-in when there is no guest to preserve', async () => {
