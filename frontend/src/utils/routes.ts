@@ -1,16 +1,18 @@
 /**
- * Minimal URL routing for the two shareable screens (leaderboard, profiles).
- * The app is a screen state machine in App.vue, not a router SPA — this shim
- * only translates between location.pathname and a reactive route so shared
- * links land on the right screen and browser back works.
+ * The app's URLs. vue-router owns the address bar and history; App.vue's v-if
+ * chain still picks the screen, because a game in progress must cover any URL.
  */
 
-import { ref, readonly } from 'vue'
+import { computed } from 'vue'
+import {
+    createMemoryHistory,
+    createRouter,
+    createWebHistory,
+    type RouteLocationGeneric,
+} from 'vue-router'
 
 /** Which board /leaderboard opens on. Absent means the daily deal. */
 export type LeaderboardTab = 'daily' | 'weekly' | 'alltime'
-
-const LEADERBOARD_TABS: LeaderboardTab[] = ['daily', 'weekly', 'alltime']
 
 export type Route =
     | { name: 'home' }
@@ -19,22 +21,30 @@ export type Route =
     | { name: 'changelog' }
     | { name: 'profile'; code: string }
 
-const SHARE_CODE = /^[A-Za-z0-9]{4,32}$/
+// ponytail: every route renders nothing. App.vue draws the screen from the route's name.
+const Screen = { render: () => null }
 
-export function parseRoute(pathname: string): Route {
-    if (pathname === '/leaderboard') return { name: 'leaderboard' }
-    // /leaderboard/alltime — so a deep link can name the board it means, and
-    // so a board is shareable rather than always opening on today's deal.
-    if (pathname.startsWith('/leaderboard/')) {
-        const tab = pathname.slice('/leaderboard/'.length) as LeaderboardTab
-        if (LEADERBOARD_TABS.includes(tab)) return { name: 'leaderboard', tab }
-    }
-    if (pathname === '/badges') return { name: 'badges' }
-    if (pathname === '/changelog') return { name: 'changelog' }
-    if (pathname.startsWith('/p/')) {
-        const code = pathname.slice(3)
-        if (SHARE_CODE.test(code)) return { name: 'profile', code }
-    }
+export const router = createRouter({
+    // No window under the unit tests.
+    history: typeof window === 'undefined' ? createMemoryHistory() : createWebHistory(),
+    routes: [
+        { path: '/', name: 'home', component: Screen },
+        // /leaderboard/alltime, so a deep link can name the board it means.
+        { path: '/leaderboard/:tab(daily|weekly|alltime)?', name: 'leaderboard', component: Screen },
+        { path: '/badges', name: 'badges', component: Screen },
+        { path: '/changelog', name: 'changelog', component: Screen },
+        { path: '/p/:code([A-Za-z0-9]{4,32})', name: 'profile', component: Screen },
+        // Keeps the query and hash, where invite codes and auth redirects ride.
+        { path: '/:rest(.*)*', redirect: '/' },
+    ],
+})
+
+export function toRoute(r: Pick<RouteLocationGeneric, 'name' | 'params'>): Route {
+    const p = r.params as Record<string, string | undefined>
+    if (r.name === 'leaderboard') return p.tab ? { name: 'leaderboard', tab: p.tab as LeaderboardTab } : { name: 'leaderboard' }
+    if (r.name === 'badges') return { name: 'badges' }
+    if (r.name === 'changelog') return { name: 'changelog' }
+    if (r.name === 'profile') return { name: 'profile', code: p.code! }
     return { name: 'home' }
 }
 
@@ -49,23 +59,9 @@ export function routePath(route: Route): string {
     return '/'
 }
 
-const current = ref<Route>(
-    typeof window === 'undefined' ? { name: 'home' } : parseRoute(window.location.pathname),
-)
-
-if (typeof window !== 'undefined') {
-    window.addEventListener('popstate', () => {
-        current.value = parseRoute(window.location.pathname)
-    })
-}
-
-export const currentRoute = readonly(current)
+export const currentRoute = computed(() => toRoute(router.currentRoute.value))
 
 /** Navigate to a route, preserving the query string (invite links ride on it). */
-export function navigate(route: Route): void {
-    current.value = route
-    const path = routePath(route) + window.location.search
-    if (window.location.pathname !== routePath(route)) {
-        window.history.pushState({}, '', path)
-    }
+export function navigate(route: Route): Promise<unknown> {
+    return router.push({ path: routePath(route), query: router.currentRoute.value.query })
 }

@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { supabase, type UserProfile } from '../lib/supabase'
 import { track, setAnalyticsUser } from '../utils/analytics'
 import { readOAuthError, urlWithoutOAuthError, type OAuthRedirectError } from '../utils/oauthRedirect'
+import { router } from '../utils/routes'
 import type { OAuthResponse, User } from '@supabase/supabase-js'
 
 export const useAuthStore = defineStore('auth', () => {
@@ -352,7 +353,7 @@ export const useAuthStore = defineStore('auth', () => {
         // The claim died here. Leaving the marker set would attribute the next
         // successful Google sign-in in this tab to a claim that never completed.
         clearPendingClaim()
-        window.history.replaceState({}, '', urlWithoutOAuthError(window.location))
+        void router.replace(urlWithoutOAuthError(window.location))
     }
 
     function clearOAuthError() {

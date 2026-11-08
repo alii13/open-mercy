@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { parseRoute, routePath } from '../routes'
+import { router, toRoute, routePath, navigate } from '../routes'
+
+const parseRoute = (path: string) => toRoute(router.resolve(path))
 
 describe('parseRoute', () => {
     it('maps / to home', () => {
@@ -8,6 +10,7 @@ describe('parseRoute', () => {
 
     it('maps /leaderboard to the leaderboard', () => {
         expect(parseRoute('/leaderboard')).toEqual({ name: 'leaderboard' })
+        expect(parseRoute('/leaderboard/')).toEqual({ name: 'leaderboard' })
     })
 
     it('maps /leaderboard/<tab> to that board', () => {
@@ -18,10 +21,10 @@ describe('parseRoute', () => {
 
     it('rejects a board name that does not exist', () => {
         expect(parseRoute('/leaderboard/nonsense')).toEqual({ name: 'home' })
-        expect(parseRoute('/leaderboard/')).toEqual({ name: 'home' })
     })
 
-    it('maps /changelog to the changelog', () => {
+    it('maps /badges and /changelog to their pages', () => {
+        expect(parseRoute('/badges')).toEqual({ name: 'badges' })
         expect(parseRoute('/changelog')).toEqual({ name: 'changelog' })
     })
 
@@ -51,8 +54,21 @@ describe('routePath', () => {
         // daily is the default, so it keeps the bare path rather than
         // minting a second URL for the same board.
         expect(routePath({ name: 'leaderboard', tab: 'daily' })).toBe('/leaderboard')
+        expect(routePath({ name: 'badges' })).toBe('/badges')
         expect(routePath({ name: 'changelog' })).toBe('/changelog')
         expect(routePath({ name: 'profile', code: '9f3ac21b' })).toBe('/p/9f3ac21b')
     })
 })
 
+describe('navigation', () => {
+    it('sends an unknown path home, keeping the query and hash auth redirects ride on', async () => {
+        await router.push('/nope?code=abc#type=recovery')
+        expect(router.currentRoute.value.fullPath).toBe('/?code=abc#type=recovery')
+    })
+
+    it('keeps the invite query when navigating', async () => {
+        await router.push('/?join=ABCDEF')
+        await navigate({ name: 'leaderboard', tab: 'weekly' })
+        expect(router.currentRoute.value.fullPath).toBe('/leaderboard/weekly?join=ABCDEF')
+    })
+})

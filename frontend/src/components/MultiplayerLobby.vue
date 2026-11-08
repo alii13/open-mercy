@@ -662,7 +662,7 @@ const PublicTableLounge = defineAsyncComponent({
 import { publicTableView, PUBLIC_TABLE_RULES } from '../utils/publicTable'
 import { useWhatsNew } from '../composables/useWhatsNew'
 import { nextBot, ladderProgress, isLadderComplete } from '../utils/botLadder'
-import { navigate } from '../utils/routes'
+import { navigate, router } from '../utils/routes'
 import { track } from '../utils/analytics'
 import { isRoomCode, normalizeRoomCode, roomCodeProblem } from '@roomCode'
 import { useBadges } from '../composables/useBadges'
@@ -864,7 +864,7 @@ onMounted(() => {
   const newSearch = params.toString()
   const newUrl =
     window.location.pathname + (newSearch ? `?${newSearch}` : '') + window.location.hash
-  window.history.replaceState({}, '', newUrl)
+  void router.replace(newUrl)
 
   // Only auto-join if the user isn't already in a game and the code
   // shape is plausible. Anything weird falls through to the user

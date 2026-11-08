@@ -104,14 +104,15 @@ vi.mock('../../lib/supabase', () => ({
 
 const { track, setAnalyticsUser } = vi.hoisted(() => ({ track: vi.fn(), setAnalyticsUser: vi.fn() }))
 vi.mock('../../utils/analytics', () => ({ track, setAnalyticsUser }))
+// The router owns the URL, so a rewrite is a router.replace.
+vi.mock('../../utils/routes', () => ({
+    router: { replace: async (url: string) => { h.state.replacedUrls.push(url) } },
+}))
 
 vi.stubGlobal('window', {
     location: Object.assign(h.state.loc, {
         assign: (url: string) => { h.state.navigations.push(url) },
     }),
-    history: {
-        replaceState: (_s: unknown, _t: unknown, url: string) => { h.state.replacedUrls.push(url) },
-    },
 })
 
 // The node test environment has no sessionStorage, and the Google claim marker

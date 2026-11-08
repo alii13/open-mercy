@@ -247,7 +247,7 @@ const resetError = ref('')
 const resetSuccess = ref('')
 const resetLoading = ref(false)
 
-// Virtual page views: this SPA has no router, so GA otherwise sees one
+// Virtual page views: most screens share the / URL, so GA otherwise sees one
 // eternal page. One page_view per screen gives time-per-screen for free
 // in GA's standard engagement reports. Mirrors the template's v-if chain.
 const inMpMatch = computed(() => {
