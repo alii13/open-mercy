@@ -117,8 +117,8 @@
 
     <!-- Friends: its own screen, reachable from the account menu -->
     <FriendsPage
-      v-else-if="showFriends"
-      @back="showFriends = false"
+      v-else-if="currentRoute.name === 'friends'"
+      @back="navigate({ name: 'home' })"
     />
 
     <!-- Authenticated - show lobby -->
@@ -127,7 +127,7 @@
       @playLocal="startLocalGame"
       @playDaily="startDailyGame('lobby')"
       @showAuth="handleShowAuth('claim')"
-      @showFriends="showFriends = true"
+      @showFriends="navigate({ name: 'friends' })"
     />
 
     <!-- Always-mounted global settings drawer (Teleport'd to body) -->
@@ -182,6 +182,7 @@ import { WARM_UP_GAMES } from '@engine/bot'
 import { adoptProfileEquip, applyEquipped } from './utils/cosmetics'
 import { currentRoute, navigate } from './utils/routes'
 import { useRoomUrl } from './composables/useRoomUrl'
+import { useLocalGameUrl } from './composables/useLocalGameUrl'
 import { syncCountryToProfile } from './utils/country'
 import LandingPage from './components/LandingPage.vue'
 import AuthView from './components/AuthView.vue'
@@ -226,6 +227,9 @@ const retention = useRetentionStore()
 // covers every screen and outlives any single one of them.
 usePresenceHeartbeat()
 useRoomUrl(mpStore)
+// A daily cut short by a reload reopens where it was, never dealt again from
+// the top, which would let the player replay a deal they have already seen.
+useLocalGameUrl(localGameStore, startLocalGame)
 
 const showAuthView = ref(false)
 const authMode = ref<'login' | 'signup' | 'claim'>('signup')
@@ -240,7 +244,6 @@ const authMode = ref<'login' | 'signup' | 'claim'>('signup')
 watch(() => authStore.isAuthenticated, (is, was) => {
   if (is && !was) showAuthView.value = false
 })
-const showFriends = ref(false)
 const showPasswordReset = ref(false)
 const newPassword = ref('')
 const confirmPassword = ref('')
@@ -267,7 +270,7 @@ const currentScreen = computed(() => {
   if (inMpMatch.value) return 'mp_game'
   if (showAuthView.value) return 'claim_account'
   if (mpStore.currentGame?.status === 'waiting') return 'waiting_room'
-  if (showFriends.value) return 'friends'
+  if (currentRoute.value.name === 'friends') return 'friends'
   return 'lobby'
 })
 watch(currentScreen, (screen) => {
@@ -312,17 +315,6 @@ onMounted(async () => {
   // here — it counts real CTA clicks. Failure falls back to the landing page,
   // where the invite banner and the retry toast still apply.
   if (!authStore.isAuthenticated && currentRoute.value.name === 'room') await attemptGuestSignin()
-
-  // Same for a daily cut short by a reload: dealing it again from the top
-  // would let the player replay a deal they have already seen. Only on a
-  // plain visit to the lobby: the game view sits above every other screen,
-  // so it would cover a restored room, an invite link or the claim screen.
-  // Only if this tab was still in the game, too: a player who left for the
-  // lobby stays there. The lobby's CONTINUE resumes it in all these cases.
-  // Called on every boot, blocked or not, so the tab's flag is always used up.
-  localGameStore.resumeDailyAfterReload(
-    !!mpStore.currentGame || showAuthView.value || currentRoute.value.name !== 'home',
-  )
 })
 
 // App remounts (HMR) would otherwise stack PASSWORD_RECOVERY listeners.

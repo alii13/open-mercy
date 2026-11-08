@@ -23,6 +23,9 @@ export type Route =
     | { name: 'profile'; code: string }
     | { name: 'public' }
     | { name: 'room'; code: string }
+    | { name: 'daily' }
+    | { name: 'bot' }
+    | { name: 'friends' }
 
 // ponytail: every route renders nothing. App.vue draws the screen from the route's name.
 const Screen = { render: () => null }
@@ -44,6 +47,9 @@ export const router = createRouter({
             },
         },
         { path: '/public', name: 'public', component: Screen },
+        { path: '/daily', name: 'daily', component: Screen },
+        { path: '/bot', name: 'bot', component: Screen },
+        { path: '/friends', name: 'friends', component: Screen },
         // Matching ignores case, so a hand-typed /r/xk7p2m lands too.
         { path: `/r/:code([${ROOM_CODE_ALPHABET}]{${ROOM_CODE_MIN},${ROOM_CODE_MAX}})`, name: 'room', component: Screen },
         // /leaderboard/alltime, so a deep link can name the board it means.
@@ -62,7 +68,7 @@ export function toRoute(r: Pick<RouteLocationGeneric, 'name' | 'params'>): Route
     if (r.name === 'badges') return { name: 'badges' }
     if (r.name === 'changelog') return { name: 'changelog' }
     if (r.name === 'profile') return { name: 'profile', code: p.code! }
-    if (r.name === 'public') return { name: 'public' }
+    if (r.name === 'public' || r.name === 'daily' || r.name === 'bot' || r.name === 'friends') return { name: r.name }
     if (r.name === 'room') return { name: 'room', code: normalizeRoomCode(p.code!) }
     return { name: 'home' }
 }
@@ -72,12 +78,10 @@ export function routePath(route: Route): string {
     if (route.name === 'leaderboard') {
         return route.tab && route.tab !== 'daily' ? `/leaderboard/${route.tab}` : '/leaderboard'
     }
-    if (route.name === 'badges') return '/badges'
-    if (route.name === 'changelog') return '/changelog'
     if (route.name === 'profile') return `/p/${route.code}`
-    if (route.name === 'public') return '/public'
     if (route.name === 'room') return `/r/${route.code}`
-    return '/'
+    if (route.name === 'home') return '/'
+    return `/${route.name}`
 }
 
 export const currentRoute = computed(() => toRoute(router.currentRoute.value))

@@ -40,6 +40,12 @@ describe('parseRoute', () => {
         expect(parseRoute('/public')).toEqual({ name: 'public' })
     })
 
+    it('maps /daily, /bot and /friends to their screens', () => {
+        expect(parseRoute('/daily')).toEqual({ name: 'daily' })
+        expect(parseRoute('/bot')).toEqual({ name: 'bot' })
+        expect(parseRoute('/friends')).toEqual({ name: 'friends' })
+    })
+
     it('maps /r/<code> to that room, upper-casing a typed code', () => {
         expect(parseRoute('/r/ABCD')).toEqual({ name: 'room', code: 'ABCD' })
         expect(parseRoute('/r/xk7p2m')).toEqual({ name: 'room', code: 'XK7P2M' })
@@ -74,6 +80,9 @@ describe('routePath', () => {
         expect(routePath({ name: 'profile', code: '9f3ac21b' })).toBe('/p/9f3ac21b')
         expect(routePath({ name: 'public' })).toBe('/public')
         expect(routePath({ name: 'room', code: 'XK7P2M' })).toBe('/r/XK7P2M')
+        expect(routePath({ name: 'daily' })).toBe('/daily')
+        expect(routePath({ name: 'bot' })).toBe('/bot')
+        expect(routePath({ name: 'friends' })).toBe('/friends')
     })
 })
 
