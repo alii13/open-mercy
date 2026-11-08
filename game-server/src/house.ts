@@ -1,0 +1,122 @@
+/**
+ * House players: seats the room fills itself so nobody at the public table
+ * waits alone. They walk in one at a time while the deal counts down, take
+ * their turns after a human-sized pause, and leave after a few hands. Humans
+ * always come first: the room only tops a table up to HOUSE_FILL, and a person
+ * sitting down sends one of them away.
+ *
+ * Nothing on the wire marks a house seat. The room keeps them apart from the
+ * roster, never writes a game_results row for one, and counts them in the
+ * human rows' house_count so the numbers stay honest.
+ *
+ * Pure rules here; index.ts owns the clock and the storage.
+ */
+
+import { BOT_LADDER, type BotProfile } from '../../shared/engine/bot'
+import { randomHandle } from '../../shared/handles'
+
+/** A table with people at it is topped up to this many seats. */
+export const HOUSE_FILL = 4
+
+export interface HouseSeat {
+    name: string
+    skin: string
+    joinedAt: number
+    /** Hands this seat has been dealt into. */
+    hands: number
+    /** It leaves at the first return to the table after this many hands. */
+    leaveAfter: number
+    dials: BotProfile
+}
+
+/** How many house seats a table with `humans` people at it should have. */
+export function houseTarget(humans: number): number {
+    return humans < 1 ? 0 : Math.max(0, HOUSE_FILL - humans)
+}
+
+/** One seat at a time, so arrivals and departures read as people. */
+export function houseStep(humans: number, house: number): 1 | -1 | 0 {
+    const target = houseTarget(humans)
+    return house < target ? 1 : house > target ? -1 : 0
+}
+
+// The card backs a newish player owns; the rare ones would stand out on an unranked seat.
+const SKINS: [string, number][] = [['ember', 0.55], ['toxic', 0.2], ['ice', 0.15], ['hazard', 0.1]]
+
+function pickSkin(r: number): string {
+    for (const [id, w] of SKINS) {
+        if (r < w) return id
+        r -= w
+    }
+    return 'ember'
+}
+
+export function newHouseSeat(rng: () => number, now: number): { id: string; seat: HouseSeat } {
+    const rung = BOT_LADDER[Math.floor(rng() * 4)]!
+    return {
+        // Shaped like a Supabase user id, so the wire says nothing.
+        id: crypto.randomUUID(),
+        seat: {
+            name: randomHandle(rng),
+            skin: pickSkin(rng()),
+            joinedAt: now,
+            hands: 0,
+            leaveAfter: 2 + Math.floor(rng() * 4),
+            // ponytail: loose ladder dials with no lookahead keep a turn cheap
+            // and a newcomer's odds near a coin flip; retune with sim.ts if
+            // house tables win or lose too often.
+            dials: { ...rung, id: 'house', skill: 0.2 + rng() * 0.5, search: 0 },
+        },
+    }
+}
+
+export function leavesTable(seat: HouseSeat): boolean {
+    return seat.hands >= seat.leaveAfter
+}
+
+/**
+ * How fast house seats play: at a person's pace while a person is in the hand,
+ * brisk but still plausible while the only people left are watching (knocked
+ * out, or spectating), and a rush once nobody is watching at all.
+ */
+export type HousePace = 'normal' | 'brisk' | 'rush'
+
+/** The pause before a house seat's next action: one to four seconds, a long think now and then. */
+export function thinkMs(rng: () => number, pace: HousePace): number {
+    if (pace === 'rush') return 350 + Math.floor(rng() * 350)
+    if (pace === 'brisk') return 800 + Math.floor(rng() * 800)
+    const long = rng() < 0.12
+    return long ? 5000 + Math.floor(rng() * 4000) : 1100 + Math.floor(rng() * 2800)
+}
+
+/**
+ * What the house clock is for: 'lobby' (walks in and out, idle acts), the id of
+ * the house seat on turn, or null when it should not run. Keyed, so a lobby
+ * timer still pending at the deal never stands in for a house turn's pause.
+ */
+export function houseClockFor(input: {
+    status: 'lobby' | 'playing' | 'finished'
+    humans: number
+    houseIds: string[]
+    current?: { id: string; isEliminated: boolean } | null
+}): string | null {
+    if (input.status === 'lobby') return input.houseIds.length > 0 || houseTarget(input.humans) > 0 ? 'lobby' : null
+    const c = input.current
+    if (input.status === 'playing' && c && !c.isEliminated && input.houseIds.includes(c.id)) return c.id
+    return null
+}
+
+/**
+ * House seats at the deal, from those already seated in join order: the
+ * earliest arrivals keep their seats, the rest leave for the people who came,
+ * and any that had not walked in yet sit down now.
+ */
+export function housePlanAtDeal(houseIds: string[], humans: number): { keep: string[]; drop: string[]; add: number } {
+    const target = houseTarget(humans)
+    return { keep: houseIds.slice(0, target), drop: houseIds.slice(target), add: Math.max(0, target - houseIds.length) }
+}
+
+/** Gap between one house seat walking in or out and the next. */
+export function walkDelayMs(rng: () => number): number {
+    return 2500 + Math.floor(rng() * 2000)
+}

@@ -44,6 +44,8 @@ export interface GameRecord {
      *  saved, so idling a second account cannot farm a win; the timed-out
      *  seat's loss still is, so closing the tab cannot erase one. */
     timeoutWalkover?: boolean
+    /** House seats dealt into this game (house.ts). They get no game_results row. */
+    house?: string[]
 }
 
 export function statsFor(game: GameRecord, userId: string): PlayerGameStats {
@@ -375,10 +377,10 @@ const AUTOPLAY: BotProfile = { id: 'autoplay', name: 'Autoplay', aggression: 0.5
  * All pick. Extra turns it earns are played the same way, and anything the bot
  * cannot answer gets the obvious answer, so the turn always moves on.
  */
-function autoPlayTurn(game: GameRecord, userId: string): GameEvent[] {
+function autoPlayTurn(game: GameRecord, userId: string, profile: BotProfile = AUTOPLAY, rng: () => number = Math.random, maxActions = 10): GameEvent[] {
     const s = game.engine
     const out: GameEvent[] = []
-    for (let sanity = 0; sanity < 10; sanity++) {
+    for (let sanity = 0; sanity < maxActions; sanity++) {
         const me = engine.currentPlayer(s)
         if (s.gameState !== 'PLAYING' || !me || me.id !== userId || me.isEliminated) break
         const opponents = s.players.filter(p => p.id !== userId && !p.isEliminated)
@@ -386,19 +388,19 @@ function autoPlayTurn(game: GameRecord, userId: string): GameEvent[] {
         if (s.turnState === 'WAITING_FOR_ACTION') {
             const top = engine.topCard(s)
             const playable = top ? me.hand.filter(c => engine.canPlayCard(c, top, s.currentColor, s.drawStack, s.stackingMode)) : []
-            const card = chooseCard({ playable, drawStack: s.drawStack, opponents, self: me }, AUTOPLAY, Math.random)
+            const card = chooseCard({ playable, drawStack: s.drawStack, opponents, self: me }, profile, rng)
             // Color Roulette's colour is the victim's call, so it carries none.
             const color = card?.color === 'wild' && card.type !== 'wildColorRoulette'
-                ? chooseWildColor(me.hand.filter(c => c.id !== card.id), AUTOPLAY, Math.random)
+                ? chooseWildColor(me.hand.filter(c => c.id !== card.id), profile, rng)
                 : undefined
             action = card ? { kind: 'PLAY_CARD', cardId: card.id, chosenColor: color } : { kind: 'DRAW' }
         } else if (s.turnState === 'CHOOSING_PLAYER_TO_SWAP') {
-            const target = chooseSwapTarget({ playable: [], drawStack: 0, opponents, self: me }, AUTOPLAY, Math.random)
-            action = target && wantsSwap(me, target, AUTOPLAY, Math.random)
+            const target = chooseSwapTarget({ playable: [], drawStack: 0, opponents, self: me }, profile, rng)
+            action = target && wantsSwap(me, target, profile, rng)
                 ? { kind: 'SWAP_HANDS', targetUserId: target.id }
                 : { kind: 'SKIP_SWAP' }
         } else if (s.turnState === 'CHOOSING_DISCARD_ALL_TOP' && s.pendingDiscardAllCards.length) {
-            action = { kind: 'PICK_DISCARD_ALL_TOP', cardId: chooseDiscardAllTop(s.pendingDiscardAllCards, AUTOPLAY, Math.random).id }
+            action = { kind: 'PICK_DISCARD_ALL_TOP', cardId: chooseDiscardAllTop(s.pendingDiscardAllCards, profile, rng).id }
         } else {
             action = obviousChoice(game, me.hand)
         }
@@ -410,6 +412,22 @@ function autoPlayTurn(game: GameRecord, userId: string): GameEvent[] {
         }
         out.push(...res.events)
         if (!res.ok) break
+    }
+    return out
+}
+
+/**
+ * One action of a house seat's turn: the bot's pick with the seat's own dials,
+ * then a MERCY call on its last card, which a person makes most of the time and
+ * forgets now and then. One action, so an extra turn or a choice inside the
+ * turn (a swap target, a Discard All pick) waits for its own pause. Never a
+ * timeout, so nothing on the wire tells it apart.
+ */
+export function playHouseTurn(game: GameRecord, userId: string, dials: BotProfile, rng: () => number = Math.random): GameEvent[] {
+    const out = autoPlayTurn(game, userId, dials, rng, 1)
+    const me = game.engine.players.find(p => p.id === userId)
+    if (me && !me.isEliminated && me.hand.length === 1 && !game.engine.hasCalledUno[userId] && rng() < 0.85) {
+        out.push(...applyIntent(game, userId, { kind: 'CALL_UNO' }).events)
     }
     return out
 }
@@ -462,7 +480,8 @@ export async function persistResults(
 
     const gameId = `do-${roomCode}-${game.startedAt}`
     const duration = Math.max(0, Math.round((Date.now() - game.startedAt) / 1000))
-    const rows = s.players.filter(p => !(game.timeoutWalkover && p.id === s.winnerId)).map(p => {
+    const house = new Set(game.house ?? [])
+    const rows = s.players.filter(p => !house.has(p.id) && !(game.timeoutWalkover && p.id === s.winnerId)).map(p => {
         const st = statsFor(game, p.id)
         const result = s.winnerId === p.id ? 'won' : p.isEliminated ? 'eliminated' : 'lost'
         return {
@@ -483,21 +502,31 @@ export async function persistResults(
             uno_penalties: st.unoPenalties,
             game_duration_secs: duration,
             is_bot_game: false,
+            ...(house.size ? { house_count: house.size } : {}),
         }
     })
+    if (!rows.length) return false
 
-    const res = await fetch(`${env.SUPABASE_URL}/rest/v1/game_results`, {
+    const insert = (body: object[]) => fetch(`${env.SUPABASE_URL}/rest/v1/game_results`, {
         method: 'POST',
         headers: {
-            apikey: env.SUPABASE_SERVICE_KEY,
+            apikey: env.SUPABASE_SERVICE_KEY!,
             Authorization: `Bearer ${env.SUPABASE_SERVICE_KEY}`,
             'content-type': 'application/json',
             Prefer: 'return=minimal',
         },
-        body: JSON.stringify(rows),
+        body: JSON.stringify(body),
     })
+    let res = await insert(rows)
+    let failure = res.ok ? '' : (await res.text()).slice(0, 200)
+    // supabase/house-players.sql adds the column. Until it has run, a game with
+    // house seats still saves its rows, just without the count.
+    if (failure.includes('house_count')) {
+        res = await insert(rows.map(({ house_count: _drop, ...row }) => row))
+        failure = res.ok ? '' : (await res.text()).slice(0, 200)
+    }
     if (!res.ok) {
-        console.log('game_results insert failed', res.status, (await res.text()).slice(0, 200))
+        console.log('game_results insert failed', res.status, failure)
         return false
     }
     console.log('game_results insert ok', rows.length, gameId)

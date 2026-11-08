@@ -16,9 +16,9 @@ export function canSeat(roster: Record<string, unknown>, userId: string, cap = M
 
 /**
  * Who sits down at the door. A seated player always gets back in. A public
- * table counting down is locked to strangers. A full public table that is
- * still filling hands the seat of someone gone longer than the grace period
- * to the newcomer: otherwise one closed tab would keep it from ever dealing,
+ * table stays open to strangers right up to its deal. A full public table in
+ * its lobby hands the seat of someone gone longer than the grace period to the
+ * newcomer: otherwise one closed tab would hold a seat a person could use,
  * while a phone that only blinked keeps its seat. A seat with no record of
  * when it emptied (the room hibernated since) counts as long gone.
  */
@@ -29,12 +29,10 @@ export function doorVerdict(input: {
     goneAt: Record<string, number>
     isPublic: boolean
     phase: 'lobby' | 'playing' | 'finished'
-    locked: boolean
     now: number
 }): { seat: true; evict?: string } | { seat: false } {
     const roster = Object.fromEntries(input.rosterIds.map((id) => [id, true]))
     if (input.userId in roster) return { seat: true }
-    if (input.isPublic && input.locked) return { seat: false }
     if (canSeat(roster, input.userId, input.isPublic ? PUBLIC_SEATS : MAX_PLAYERS)) return { seat: true }
     if (!input.isPublic || input.phase !== 'lobby') return { seat: false }
     const live = new Set(input.liveIds)

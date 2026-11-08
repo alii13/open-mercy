@@ -30,14 +30,14 @@ describe('public table card', () => {
         expect(publicTableView([table('AAAAAA', 6)], true).status).toBe('1 SEAT LEFT')
     })
 
-    it('never points at a full table: it is dealing, and the next player starts a new one', () => {
+    it('never points at a full table: the next player starts a new one', () => {
         const view = publicTableView([table('FULL', 7)], true)
 
         expect(view.target).toBeNull()
         expect(view.headline).toBe('OPEN TABLE')
     })
 
-    it('never points at a locked table, even after someone left its countdown', () => {
+    it('never points at a table the room says has no seat left', () => {
         const locked = { ...table('LOCKED', 7), connected: 6, seatsFree: 0 }
         expect(publicTableView([locked], true).target).toBeNull()
     })
@@ -53,7 +53,7 @@ describe('public table card', () => {
         expect(view.target).toBeNull()
         expect(view.headline).toBe('OPEN TABLE')
         expect(view.status).toBe('')
-        expect(view.body).toBe('Take a seat. It deals itself when all 7 are in.')
+        expect(view.body).toBe('Take a seat. The cards are dealt 15 seconds after you sit down.')
     })
 
     it('claims nothing about who is waiting before the first fetch succeeds', () => {

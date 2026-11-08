@@ -24,15 +24,11 @@ describe('canSeat', () => {
 describe('doorVerdict', () => {
     const NOW = 1_700_000_000_000
     const seven = Object.keys(rosterOf(7))
-    const base = { isPublic: true, phase: 'lobby' as const, locked: false, now: NOW, goneAt: {} as Record<string, number> }
+    const base = { isPublic: true, phase: 'lobby' as const, now: NOW, goneAt: {} as Record<string, number> }
     const live = (except: string[] = []) => seven.filter((id) => !except.includes(id))
 
-    it('lets a seated player back in, even at a locked table', () => {
-        expect(doorVerdict({ ...base, locked: true, userId: 'u-3', rosterIds: seven, liveIds: live(['u-3']) })).toEqual({ seat: true })
-    })
-
-    it('turns a stranger away from a locked table, even with an empty seat', () => {
-        expect(doorVerdict({ ...base, locked: true, userId: 'new', rosterIds: seven.slice(0, 6), liveIds: seven.slice(0, 6) })).toEqual({ seat: false })
+    it('lets a seated player back in, even at a full table', () => {
+        expect(doorVerdict({ ...base, userId: 'u-3', rosterIds: seven, liveIds: seven })).toEqual({ seat: true })
     })
 
     it('seats a stranger while the table has room', () => {

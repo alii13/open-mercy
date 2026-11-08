@@ -3,8 +3,8 @@
  *
  * The card describes the table quick match will seat you at: the fullest open
  * public room by connected players, the same measure the directory sorts on.
- * A table seats seven and deals itself once all seven are in, so a full one is
- * never shown: the next player starts a new House table.
+ * A table seats seven people and deals itself 15 seconds after the first one
+ * sits, so a full one is never shown: the next player starts a new House table.
  */
 
 import { PUBLIC_SEATS } from '@lounge'
@@ -29,7 +29,7 @@ const present = (t: LiveTable) => t.connected ?? t.players
 
 export function publicTableView(joinable: LiveTable[], loaded: boolean): PublicTableView {
     const target = joinable
-        // A full table is locked into its countdown, even once someone leaves it.
+        // seatsFree is the room's count of seats a person can still take.
         .filter((t) => present(t) > 0 && present(t) < PUBLIC_SEATS && t.seatsFree > 0)
         .reduce<LiveTable | null>((best, t) => (!best || present(t) > present(best) ? t : best), null)
     if (target) {
@@ -49,7 +49,7 @@ export function publicTableView(joinable: LiveTable[], loaded: boolean): PublicT
         target: null,
         headline: 'OPEN TABLE',
         status: '',
-        body: `Take a seat. It deals itself when all ${PUBLIC_SEATS} are in.`,
+        body: 'Take a seat. The cards are dealt 15 seconds after you sit down.',
         rules,
     }
 }

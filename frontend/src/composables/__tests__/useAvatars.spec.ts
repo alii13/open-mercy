@@ -88,6 +88,16 @@ describe('photo lookup', () => {
         expect(avatarUrlFor(PHOTO)).toBe(`https://x.supabase.co/storage/v1/object/public/avatars/${PHOTO}/42`)
     })
 
+    it('knows which seats have a profile once the lookup answers', async () => {
+        const { requestAvatars, hasProfile } = await fresh()
+        lookup.mockImplementation(async () => ({ data: [{ id: A, avatar_version: null }], error: null }))
+        requestAvatars([A, B])
+        expect(hasProfile(A)).toBeUndefined()
+        await tick()
+        expect(hasProfile(A)).toBe(true)
+        expect(hasProfile(B)).toBe(false)
+    })
+
     it('stops asking, and hides uploads, when the column is not there yet', async () => {
         lookup.mockResolvedValue({ data: null, error: { message: 'column profiles.avatar_version does not exist', code: '42703' } })
         const { requestAvatars, avatarUrlFor, avatarsAvailable } = await fresh()

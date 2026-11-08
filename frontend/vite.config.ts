@@ -14,6 +14,7 @@ export default defineConfig({
       '@roomCode': path.resolve(__dirname, '../shared/roomCode.ts'),
       '@quickChat': path.resolve(__dirname, '../shared/quickChat.ts'),
       '@lounge': path.resolve(__dirname, '../shared/lounge.ts'),
+      '@handles': path.resolve(__dirname, '../shared/handles.ts'),
     },
   },
   assetsInclude: ['**/*.png', '**/*.jpg', '**/*.jpeg'],
