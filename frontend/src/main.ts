@@ -33,6 +33,17 @@ window.addEventListener('uno:motion-override', ((e: CustomEvent<{ reduced: boole
 // that is a separate decision, so it stays off.
 window.addEventListener('beforeinstallprompt', (e) => e.preventDefault())
 
+// A tab opened before a deploy asks for chunk names the new deploy no longer
+// has. Reload only when the server now has a different build: a chunk broken
+// in this build stays broken after a reload, so it is left to fail, never loop.
+window.addEventListener('vite:preloadError', () => {
+    const entry = document.querySelector('script[type="module"][src]')?.getAttribute('src')
+    void fetch('/', { cache: 'no-store' })
+        .then((r) => r.text())
+        .then((html) => { if (entry && !html.includes(entry)) location.reload() })
+        .catch(() => { /* offline: no newer build to reach */ })
+})
+
 const app = createApp(App)
 const pinia = createPinia()
 
@@ -43,4 +54,6 @@ app.directive('focus-ring', vFocusRing)
 void router.isReady().then(() => app.mount('#app'))
 
 // Expose the game as WebMCP tools so a visiting agent can play a real seat.
-void import('./mcp/registerTools').then(({ registerMcpTools }) => registerMcpTools(pinia))
+void import('./mcp/registerTools')
+    .then(({ registerMcpTools }) => registerMcpTools(pinia))
+    .catch((err) => console.warn('agent tools failed to load', err))
