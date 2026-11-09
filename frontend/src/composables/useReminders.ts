@@ -9,6 +9,7 @@
 import { ref } from 'vue'
 import { useRetentionStore } from '../stores/retentionStore'
 import { track } from '../utils/analytics'
+import { needsHomeScreen } from '../utils/reminderAsk'
 
 const GAME_SERVER = (import.meta.env.VITE_GAME_SERVER_URL as string | undefined) || 'https://uno-game-server.shekhaliul44.workers.dev'
 
@@ -16,6 +17,13 @@ const GAME_SERVER = (import.meta.env.VITE_GAME_SERVER_URL as string | undefined)
 export function remindersSupported(): boolean {
     return typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window
 }
+
+/** An iPhone or iPad tab, where reminders need Add to Home Screen first. */
+export const reminderNeedsHomeScreen = typeof navigator !== 'undefined' && needsHomeScreen({
+    userAgent: navigator.userAgent,
+    maxTouchPoints: navigator.maxTouchPoints,
+    standalone: (navigator as Navigator & { standalone?: boolean }).standalone,
+})
 
 /** null where push is unsupported. */
 export const reminderPermission = ref<NotificationPermission | null>(remindersSupported() ? Notification.permission : null)

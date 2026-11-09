@@ -49,7 +49,7 @@ describe('sendNudges', () => {
         expect(claimed.every(r => r.last_sent_on === '2026-07-24' && r.last_variant)).toBe(true)
     })
 
-    it('stops at the cap however many sends fail, inside the free plan\'s 50 requests', async () => {
+    it('stops at the cap however many sends fail', async () => {
         const { env, calls } = await setup(60, i => (i % 3 === 0 ? 403 : 201))
         await sendNudges(env, NOW)
         expect(calls.filter(c => c.kind === 'push')).toHaveLength(MAX_SENDS_PER_RUN)

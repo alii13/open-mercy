@@ -101,6 +101,12 @@
               </p>
             </section>
 
+            <!-- iPhone tab: no push here, only in the home-screen app -->
+            <section v-if="reminderPermission === null && reminderNeedsHomeScreen && reminderAvailable" class="settings-section">
+              <h3 class="section-title">REMINDERS</h3>
+              <p class="hint">On iPhone, reminders live in the home-screen app: tap Share, then Add to Home Screen, and turn them on there.</p>
+            </section>
+
             <!-- Reminders: hidden where the browser cannot take push, or the game server has it off -->
             <section v-if="reminderPermission !== null && reminderAvailable" class="settings-section">
               <h3 class="section-title">REMINDERS</h3>
@@ -167,7 +173,7 @@ import { useSettingsStore } from '../stores/settingsStore'
 import { soundEffects } from '../composables/useSoundEffects'
 import { music as musicComposable } from '../composables/useMusic'
 import RulesModal from './RulesModal.vue'
-import { disableReminders, enableReminders, reminderKey, reminderPermission, remindersOn } from '../composables/useReminders'
+import { disableReminders, enableReminders, reminderKey, reminderNeedsHomeScreen, reminderPermission, remindersOn } from '../composables/useReminders'
 import { markReminderAnswered } from '../utils/reminderAsk'
 
 const settings = useSettingsStore()

@@ -48,7 +48,9 @@
  * opt-in rate; opened per `variant` over push_sends.sent per variant is the
  * click rate of each wording, and push_sends 'unsubscribed' is the turn-off
  * count. `variant` must be a registered custom dimension to split by wording.
- *   reminder_ask_shown { mode: sp|mp }  - the game-over card asked
+ *   reminder_ask_shown { mode: sp|mp, kind: ask|ios }  - the game-over card
+ *                        asked, or (ios) told an iPhone tab to Add to Home Screen
+ *   reminder_ios_noted {}               - "Got it" on the iPhone note
  *   reminder_on        {}               - subscribed (card or settings)
  *   reminder_denied    {}               - the browser prompt was refused
  *   reminder_skipped   {}               - "No thanks" on the card
