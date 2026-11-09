@@ -478,7 +478,21 @@ function runHeroChoreography() {
 
 <style scoped>
 .story-placeholder {
-  height: 100vh;
+  /* The story's full scroll length (its stage plus the pin), so the guide
+     below stays out of reach until the story is pinned. */
+  height: 720vh;
+}
+
+@media (max-width: 768px) {
+  .story-placeholder {
+    height: 640vh;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .story-placeholder {
+    height: 100vh;
+  }
 }
 
 /* The main landmark for screen readers; contents keeps the flex layout unchanged. */

@@ -1,5 +1,5 @@
 <template>
-  <div class="scrolly" :class="{ 'is-static': reduced }" ref="rootEl">
+  <div class="scrolly" :class="{ 'is-static': reduced, 'is-waiting': waiting }" ref="rootEl">
     <div class="stage" ref="stageEl">
       <div class="stage-vignette" aria-hidden="true"></div>
 
@@ -151,7 +151,7 @@ import { Code, Heart, HelpCircle, MessageSquare } from 'lucide-vue-next'
  * feedback finale. Scrubbing backwards rewinds the story — every beat is a
  * tween (no callbacks mutating state), so reverse is always coherent.
  */
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import gsap from 'gsap'
 import type { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { onFirstScroll } from '../composables/onFirstScroll'
@@ -165,6 +165,9 @@ defineEmits<{
 }>()
 
 const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+// Holds the pinned story's scroll length until the pin exists, so a long
+// flick cannot reach the guide below while ScrollTrigger is still loading.
+const waiting = ref(!reduced)
 
 const isMobile = ref(window.innerWidth <= 768)
 function onResize() { isMobile.value = window.innerWidth <= 768 }
@@ -257,9 +260,20 @@ onMounted(() => {
   // The story sits below the fold: its plugin and pinned timeline load on the
   // first scroll instead of during startup, where PageSpeed counted them.
   cancelWait = onFirstScroll(async () => {
-    ST = (await import('gsap/ScrollTrigger')).ScrollTrigger
+    try {
+      ST = (await import('gsap/ScrollTrigger')).ScrollTrigger
+    } catch (err) {
+      console.warn('landing story: ScrollTrigger failed to load', err)
+      waiting.value = false
+      return
+    }
     gsap.registerPlugin(ST)
-    if (alive) requestAnimationFrame(() => requestAnimationFrame(init))
+    if (alive) requestAnimationFrame(() => requestAnimationFrame(async () => {
+      // The held space leaves in the same frame the pin's own spacing arrives.
+      waiting.value = false
+      await nextTick()
+      if (alive) init()
+    }))
   })
 })
 
@@ -353,6 +367,7 @@ function init() {
     scrollTrigger: {
       trigger: rootEl.value,
       start: 'top top',
+      // Keep in step with .is-waiting below and .story-placeholder in LandingPage.vue.
       end: () => '+=' + Math.round(window.innerHeight * (mob() ? 5.4 : 6.2)),
       pin: true,
       // The landing container is display: flex, where ScrollTrigger defaults
@@ -583,6 +598,17 @@ function init() {
 .scrolly {
   position: relative;
   z-index: 5;
+}
+
+/* The pin's end distance in init(): 6.2 screens, 5.4 on phones. */
+.is-waiting {
+  padding-bottom: 620vh;
+}
+
+@media (max-width: 768px) {
+  .is-waiting {
+    padding-bottom: 540vh;
+  }
 }
 
 .stage {
