@@ -12,6 +12,9 @@
 
 export const AUTO_START_MS = 30_000
 
+/** Between hands everyone is already seated, so the next deal comes sooner (index.ts nextHand). */
+export const NEXT_DEAL_MS = 15_000
+
 export interface AutoStartState {
     /** Deadline while the countdown runs. */
     at?: number

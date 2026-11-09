@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { AUTO_START_MS, autoStartTick, canDeal } from './autoStart'
+import { AUTO_START_MS, NEXT_DEAL_MS, autoStartTick, canDeal } from './autoStart'
 
 const NOW = 1_700_000_000_000
 const lobby = { isPublic: true, phase: 'lobby' as const, now: NOW }
@@ -12,6 +12,11 @@ describe('autoStartTick', () => {
     it('starts a 30 second countdown when the first person sits', () => {
         expect(AUTO_START_MS).toBe(30_000)
         expect(autoStartTick(undefined, { ...lobby, humans: 1 }).at).toBe(NOW + 30_000)
+    })
+
+    it('keeps the shorter deadline the room sets between hands, when everyone is already seated', () => {
+        expect(NEXT_DEAL_MS).toBe(15_000)
+        expect(autoStartTick({ at: NOW + NEXT_DEAL_MS }, { ...lobby, humans: 2 }).at).toBe(NOW + 15_000)
     })
 
     it('keeps the deadline as people come and go', () => {

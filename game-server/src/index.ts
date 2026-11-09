@@ -12,7 +12,7 @@ import { addParticipant, createMeeting, deactivateMeeting, voiceConfigured, type
 import { gcWindowMs } from './roomGc'
 import { ROOM_CODE_ALPHABET, isRoomCode, normalizeRoomCode } from '../../shared/roomCode'
 import { doorVerdict, PUBLIC_SEATS } from './seats'
-import { autoStartTick, canDeal } from './autoStart'
+import { NEXT_DEAL_MS, autoStartTick, canDeal } from './autoStart'
 import { houseClockFor, housePlanAtDeal, houseStep, leavesTable, newHouseSeat, thinkMs, walkDelayMs, type HouseSeat } from './house'
 import { chatAllowed, loungeAllowed } from './chatLimit'
 import { cleanLoungeAct, LOUNGE_FACES, LOUNGE_TABLE, type LoungeAct } from '../../shared/lounge'
@@ -586,8 +586,9 @@ export class GameRoomDO {
     /**
      * A finished public game goes back to the lounge: the result clears,
      * whoever is still connected keeps their seat, people who left give theirs
-     * up, and house seats that have played their hands leave. The presence
-     * frame starts the next 30 seconds.
+     * up, and house seats that have played their hands leave. The next deal
+     * is NEXT_DEAL_MS away: the 30-second wait is for people sitting down,
+     * and everyone here already has.
      */
     private async nextHand(): Promise<void> {
         this.game = null
@@ -605,6 +606,10 @@ export class GameRoomDO {
             }
         }
         await this.ctx.storage.put('house', house)
+        // The presence frame's tick keeps this deadline, or drops it if nobody stayed.
+        const t = await this.getTimers()
+        t.startAt = Date.now() + NEXT_DEAL_MS
+        await this.putTimers(t)
         for (const { ws, userId } of this.roomSockets()) this.send(ws, await this.snapshotFor(userId))
         await this.broadcastPresence(roster)
     }
