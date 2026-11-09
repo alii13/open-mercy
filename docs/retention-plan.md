@@ -127,7 +127,7 @@ Not doing: lives or energy, paywalls, fake "3 people are watching", padded wait 
 - No reminder ever claims people are waiting at a table.
   
 
-Deferred: iPhone (no web app manifest yet, so the card stays hidden there), item 3 (the claim prompt) and item 4 (friend pings).
+iPhone (2026-11-09, follow-up PR): a web app manifest and home-screen icons. An iPhone tab gets a "tap Share, then Add to Home Screen" note on the card and in settings, telling guests to save their stats first, because the home-screen app starts with its own storage. Chrome's install banner is suppressed. Deferred: item 3 (the claim prompt) and item 4 (friend pings).
 ## Phase 4: mobile's first click
 **Goal.** A phone visitor presses play as often as a desktop one.
 

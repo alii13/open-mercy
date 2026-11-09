@@ -101,6 +101,15 @@
               </p>
             </section>
 
+            <!-- iPhone tab: no push here, only in the home-screen app -->
+            <section v-if="reminderPermission === null && reminderNeedsHomeScreen && reminderAvailable" class="settings-section">
+              <h3 class="section-title">REMINDERS</h3>
+              <p class="hint">
+                On iPhone, reminders work from the home-screen app: tap Share, then Add to Home Screen. It starts fresh, so
+                {{ auth.isAnonymous ? 'save your stats first and sign in there' : 'sign in there' }} to keep your account.
+              </p>
+            </section>
+
             <!-- Reminders: hidden where the browser cannot take push, or the game server has it off -->
             <section v-if="reminderPermission !== null && reminderAvailable" class="settings-section">
               <h3 class="section-title">REMINDERS</h3>
@@ -164,13 +173,15 @@
 import { X } from 'lucide-vue-next'
 import { onMounted, ref } from 'vue'
 import { useSettingsStore } from '../stores/settingsStore'
+import { useAuthStore } from '../stores/authStore'
 import { soundEffects } from '../composables/useSoundEffects'
 import { music as musicComposable } from '../composables/useMusic'
 import RulesModal from './RulesModal.vue'
-import { disableReminders, enableReminders, reminderKey, reminderPermission, remindersOn } from '../composables/useReminders'
+import { disableReminders, enableReminders, reminderKey, reminderNeedsHomeScreen, reminderPermission, remindersOn } from '../composables/useReminders'
 import { markReminderAnswered } from '../utils/reminderAsk'
 
 const settings = useSettingsStore()
+const auth = useAuthStore()
 const showRules = ref(false)
 
 const reminderAvailable = ref(false)

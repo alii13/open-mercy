@@ -126,12 +126,20 @@
               DON'T BREAK THE STREAK
             </span>
             <span v-if="reminderAsk === 'on'" class="daily-nudge-sub">You're set. One reminder a day, only if you haven't played yet.</span>
+            <!-- iPhone tab: push exists only in the home-screen app, which starts
+                 with empty storage (no session, no day streak), so the player
+                 signs in there; a guest has to save their stats first to have
+                 an account to sign in to. -->
+            <span v-else-if="reminderAsk === 'ios'" class="daily-nudge-sub">
+              On iPhone, reminders work from the home-screen app: tap Share, then Add to Home Screen. It starts fresh, so <template v-if="isAnonymous">save your stats first and </template>sign in there to keep your account.
+            </span>
             <template v-else>
               <span class="daily-nudge-sub">One ping a day when the new deal is ready, at the hour you usually play. Off anytime in settings.</span>
               <button v-if="reminderAsk === 'ask'" class="link-btn reminder-skip" type="button" @click="skipReminder">No thanks</button>
             </template>
           </div>
-          <button v-if="reminderAsk !== 'on'" class="daily-nudge-btn" type="button" :disabled="reminderAsk === 'busy'" @click="remindMe">
+          <button v-if="reminderAsk === 'ios'" class="daily-nudge-btn" type="button" @click="iosNoted">GOT IT</button>
+          <button v-else-if="reminderAsk !== 'on'" class="daily-nudge-btn" type="button" :disabled="reminderAsk === 'busy'" @click="remindMe">
             {{ reminderAsk === 'busy' ? 'ONE MOMENT' : 'REMIND ME' }}
           </button>
         </div>
@@ -172,8 +180,8 @@ import Avatar from '../Avatar.vue'
 import { generateShareImage, shareOrDownload } from '../../utils/shareImage'
 import { shouldSpotlightClaim, markClaimSpotlightShown } from '../../utils/claimSpotlight'
 import { track } from '../../utils/analytics'
-import { markReminderAnswered, markReminderAsked, shouldAskReminder } from '../../utils/reminderAsk'
-import { enableReminders, reminderKey, reminderPermission } from '../../composables/useReminders'
+import { markReminderAnswered, markReminderAsked, reminderAskKind } from '../../utils/reminderAsk'
+import { enableReminders, reminderKey, reminderNeedsHomeScreen, reminderPermission } from '../../composables/useReminders'
 
 interface Stats {
   cardsPlayed: number
@@ -235,15 +243,24 @@ onMounted(() => {
 
 // The reminder ask waits behind the claim spotlight, and only shows on a
 // deploy whose game server has reminders on.
-// 'busy': subscribing can take several seconds on a slow link.
-const reminderAsk = ref<'ask' | 'busy' | 'on' | null>(null)
+// 'busy': subscribing can take several seconds on a slow link. 'ios': an
+// iPhone tab, where the only route to reminders is the home-screen app.
+const reminderAsk = ref<'ask' | 'ios' | 'busy' | 'on' | null>(null)
 onMounted(async () => {
-    if (claimSpotlight.value || !shouldAskReminder(reminderPermission.value)) return
+    const kind = reminderAskKind(reminderPermission.value, reminderNeedsHomeScreen)
+    if (claimSpotlight.value || !kind) return
     if (!(await reminderKey())) return
-    reminderAsk.value = 'ask'
+    reminderAsk.value = kind
     markReminderAsked()
-    track('reminder_ask_shown', { mode: props.mode })
+    // Separate events, so the opt-in rate's denominator holds only real asks.
+    track(kind === 'ios' ? 'reminder_ios_shown' : 'reminder_ask_shown', { mode: props.mode })
 })
+
+function iosNoted() {
+    markReminderAnswered()
+    reminderAsk.value = null
+    track('reminder_ios_noted', {})
+}
 
 async function remindMe() {
     markReminderAnswered()

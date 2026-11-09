@@ -25,12 +25,11 @@ interface SubscriptionRow extends NudgeRow {
 
 const VAPID_SUBJECT = 'https://open-mercy.com'
 
-// ponytail: one run sends at most this many. Each send is a few ms of
-// encryption and signing, and the free plan stops a run at 10 ms of CPU and
-// 50 subrequests; 10 sends fit both. Whoever is left over is still due next
-// hour (until 21:59), so this caps throughput at about 130 a day. On the paid
-// plan raise it toward 40, and watch the "capped" flag in the run log.
-export const MAX_SENDS_PER_RUN = 10
+// ponytail: one run sends at most this many, about 520 a day across the
+// 09:00-21:59 window; whoever is left over is still due next hour. The account
+// is on Workers Paid (30 s CPU, 1000 subrequests a run), so 40 is far inside
+// both. Raise it when the run log's "capped" flag shows up most hours.
+export const MAX_SENDS_PER_RUN = 40
 
 export function pushConfigured(env: PushEnv): boolean {
     return !!(env.SUPABASE_SERVICE_KEY && env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY)

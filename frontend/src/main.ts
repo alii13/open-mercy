@@ -29,6 +29,11 @@ window.addEventListener('uno:motion-override', ((e: CustomEvent<{ reduced: boole
     applyMotionPreference(e.detail.reduced)
 }) as EventListener)
 
+// The manifest (public/manifest.webmanifest) exists so iPhones can get push
+// from a home-screen app. It also makes Chrome offer its own install banner;
+// that is a separate decision, so it stays off.
+window.addEventListener('beforeinstallprompt', (e) => e.preventDefault())
+
 const app = createApp(App)
 const pinia = createPinia()
 
