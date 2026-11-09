@@ -171,14 +171,15 @@
 
 <script setup lang="ts">
 import { X } from 'lucide-vue-next'
-import { onMounted, ref } from 'vue'
+import { defineAsyncComponent, onMounted, ref } from 'vue'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useAuthStore } from '../stores/authStore'
 import { soundEffects } from '../composables/useSoundEffects'
 import { music as musicComposable } from '../composables/useMusic'
-import RulesModal from './RulesModal.vue'
 import { disableReminders, enableReminders, reminderKey, reminderNeedsHomeScreen, reminderPermission, remindersOn } from '../composables/useReminders'
 import { markReminderAnswered } from '../utils/reminderAsk'
+
+const RulesModal = defineAsyncComponent(() => import('./RulesModal.vue'))
 
 const settings = useSettingsStore()
 const auth = useAuthStore()
