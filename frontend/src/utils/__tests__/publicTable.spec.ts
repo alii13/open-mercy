@@ -53,7 +53,7 @@ describe('public table card', () => {
         expect(view.target).toBeNull()
         expect(view.headline).toBe('OPEN TABLE')
         expect(view.status).toBe('')
-        expect(view.body).toBe('Take a seat. The cards are dealt 15 seconds after you sit down.')
+        expect(view.body).toBe('Take a seat. The cards are dealt 30 seconds after you sit down.')
     })
 
     it('claims nothing about who is waiting before the first fetch succeeds', () => {

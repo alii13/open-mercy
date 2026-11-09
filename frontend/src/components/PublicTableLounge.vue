@@ -3,7 +3,7 @@
  * The public room's waiting room as the 3D table. Everyone connected stands at
  * the table as their own card; moves, flicks and draws go through the room
  * (`lounge` frames, see shared/lounge.ts) and quick chat shows as bubbles over
- * the cards. The room owns the clock: 15 seconds from the first person to sit,
+ * the cards. The room owns the clock: 30 seconds from the first person to sit,
  * with the room filling empty seats on its own. At zero the table plays the
  * 3-2-1, the deal and SHOW NO MERCY, then the game view takes over. After a
  * hand everyone comes back here for the next deal. Loaded on demand, so three.js never weighs on the

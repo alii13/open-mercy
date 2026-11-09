@@ -14,6 +14,11 @@ interface RoomStore {
 
 const isRoomRoute = (r: Route) => r.name === 'public' || r.name === 'room'
 
+// Leaving clears the room at once, but the trip home is a navigation that
+// lands a moment later. Leaving a hand swaps the game view for the lobby, which
+// mounts in between and would read the stale /public as "take a seat".
+let headingHome = false
+
 /** The URL of the room you are in, or null. */
 function roomPath(mp: RoomStore): string | null {
     const g = mp.currentGame
@@ -32,7 +37,8 @@ export function useRoomUrl(mp: RoomStore) {
         if (path && router.currentRoute.value.path !== path) {
             void (isRoomRoute(here) ? router.replace(path) : router.push(path))
         } else if (!path && isRoomRoute(here)) {
-            void router.replace('/')
+            headingHome = true
+            void router.replace('/').finally(() => { headingHome = false })
         }
     })
 
@@ -60,7 +66,7 @@ export function useRoomUrl(mp: RoomStore) {
 export async function enterRoomUrl(r: Route, mp: RoomStore): Promise<void> {
     // `loading` covers a join still in flight: quickMatch backing out of a dealt
     // room remounts the lobby on /public, and a second entry would race it.
-    if (!isRoomRoute(r) || mp.currentGame || mp.loading) return
+    if (headingHome || !isRoomRoute(r) || mp.currentGame || mp.loading) return
     const code = r.name === 'room' ? r.code : undefined
     if (!(await mp.restoreActiveGame(code))) {
         await (code ? mp.joinGame(code, 'link') : mp.quickMatch(PUBLIC_TABLE_RULES))
