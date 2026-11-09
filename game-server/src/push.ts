@@ -7,7 +7,7 @@
  */
 
 import { buildPushPayload } from '@block65/webcrypto-web-push'
-import { cleanSubscription, localClock, nudgeFor, type DailyStats, type NudgeRow } from './nudge'
+import { cleanSubscription, localClock, nudgeFor, type DailyStats, type Nudge, type NudgeRow } from './nudge'
 
 export interface PushEnv {
     SUPABASE_URL: string
@@ -25,11 +25,12 @@ interface SubscriptionRow extends NudgeRow {
 
 const VAPID_SUBJECT = 'https://open-mercy.com'
 
-// ponytail: one run sends at most this many, which keeps a run inside the
-// free plan's 50 subrequests (plus a read, a write, a prune, a send count and
-// up to two days of stats). Raise it toward 900 on the paid plan. Whoever is
-// left over goes out next hour.
-const MAX_SENDS_PER_RUN = 43
+// ponytail: one run sends at most this many. Each send is a few ms of
+// encryption and signing, and the free plan stops a run at 10 ms of CPU and
+// 50 subrequests; 10 sends fit both. Whoever is left over is still due next
+// hour (until 21:59), so this caps throughput at about 130 a day. On the paid
+// plan raise it toward 40, and watch the "capped" flag in the run log.
+export const MAX_SENDS_PER_RUN = 10
 
 export function pushConfigured(env: PushEnv): boolean {
     return !!(env.SUPABASE_SERVICE_KEY && env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY)
@@ -50,6 +51,12 @@ export async function saveSubscription(env: PushEnv, userId: string, raw: unknow
     const row = cleanSubscription(raw)
     if (!row) return 400
     if (!env.SUPABASE_SERVICE_KEY) return 503
+    // One subscription per player, on the device they last played on: one
+    // reminder a day means one buzz, not one per device. It also stops a single
+    // session from filling the sender's page with rows.
+    const others = `user_id=eq.${encodeURIComponent(userId)}&endpoint=neq.${encodeURIComponent(row.endpoint)}`
+    const del = await rest(env, `push_subscriptions?${others}`, { method: 'DELETE' })
+    if (!del.ok) return 502
     const res = await rest(env, 'push_subscriptions?on_conflict=endpoint', {
         method: 'POST',
         headers: UPSERT,
@@ -91,19 +98,36 @@ export async function sendNudges(env: PushEnv, now = new Date()): Promise<void> 
     }
     const rows = await res.json<SubscriptionRow[]>()
     const vapid = { subject: VAPID_SUBJECT, publicKey: env.VAPID_PUBLIC_KEY!, privateKey: env.VAPID_PRIVATE_KEY! }
-    const sent: SubscriptionRow[] = []
-    const gone: string[] = []
-    const perVariant: Record<string, number> = {}
-    // One read per local day in play, usually one or two a run.
+    // One stats read per local day in play, usually one or two a run.
     const statsByDay = new Map<string, Promise<DailyStats | null>>()
-
+    const due: { row: SubscriptionRow; nudge: Nudge }[] = []
     for (const row of rows) {
-        if (sent.length + gone.length >= MAX_SENDS_PER_RUN) break
+        if (due.length >= MAX_SENDS_PER_RUN) break
         if (!nudgeFor(row, now)) continue
         const { day } = localClock(row.tz, now)
         if (!statsByDay.has(day)) statsByDay.set(day, dailyStats(env, day))
         const nudge = nudgeFor(row, now, await statsByDay.get(day)!)
-        if (!nudge) continue
+        if (nudge) due.push({ row, nudge })
+    }
+    if (!due.length) return
+
+    // Claim first. A run the platform cuts short (CPU or subrequests) then
+    // skips a player's reminder for the day instead of sending it every hour.
+    // Full rows, because an upsert's insert half must satisfy NOT NULL.
+    // ponytail: a game synced between the read above and this write loses its
+    // streak update until the next one; that window is a few hundred ms.
+    const claim = await rest(env, 'push_subscriptions?on_conflict=endpoint', {
+        method: 'POST', headers: UPSERT,
+        body: JSON.stringify(due.map(d => ({ ...d.row, last_sent_on: d.nudge.day, last_variant: d.nudge.variant }))),
+    })
+    if (!claim.ok) {
+        console.log('push claim failed', claim.status, (await claim.text()).slice(0, 200))
+        return
+    }
+
+    const gone: string[] = []
+    const perVariant: Record<string, number> = {}
+    for (const { row, nudge } of due) {
         try {
             const payload = await buildPushPayload(
                 // A day's reminder is stale by evening; `topic` replaces an unread one instead of stacking.
@@ -113,35 +137,27 @@ export async function sendNudges(env: PushEnv, now = new Date()): Promise<void> 
             )
             const sendRes = await fetch(row.endpoint, payload)
             if (sendRes.status === 404 || sendRes.status === 410) gone.push(row.endpoint)
-            else if (sendRes.ok) {
-                sent.push({ ...row, last_sent_on: nudge.day })
-                perVariant[nudge.variant] = (perVariant[nudge.variant] ?? 0) + 1
-            }
+            else if (sendRes.ok) perVariant[nudge.variant] = (perVariant[nudge.variant] ?? 0) + 1
             else console.log('push send failed', sendRes.status, new URL(row.endpoint).hostname)
         } catch (err) {
             console.error('push send threw:', err)
         }
     }
 
-    // Full rows back, because an upsert's insert half must satisfy NOT NULL.
-    // ponytail: a game synced between the read above and this write loses its
-    // streak update until the next one; one hourly run makes that window seconds.
-    if (sent.length) {
-        const w = await rest(env, 'push_subscriptions?on_conflict=endpoint', { method: 'POST', headers: UPSERT, body: JSON.stringify(sent) })
-        if (!w.ok) console.log('push mark-sent failed', w.status, (await w.text()).slice(0, 200))
-    }
     // The browser dropped these subscriptions (unsubscribed, cleared data, expired).
     if (gone.length) {
         const list = encodeURIComponent(`(${gone.map(e => `"${e}"`).join(',')})`)
         const d = await rest(env, `push_subscriptions?endpoint=in.${list}`, { method: 'DELETE' })
         if (!d.ok) console.log('push prune failed', d.status)
     }
-    // Sends per wording, so taps per wording (reminder_opened in GA) can become a click rate.
-    if (sent.length) {
+    // Sends per wording, so taps per wording (reminder_opened in GA) can become
+    // a click rate; 'unsubscribed' counts browsers that turned reminders off.
+    if (gone.length) perVariant.unsubscribed = gone.length
+    if (Object.keys(perVariant).length) {
         const c = await rest(env, 'rpc/push_count_sends', {
             method: 'POST', body: JSON.stringify({ p_day: now.toISOString().slice(0, 10), p_counts: perVariant }),
         })
         if (!c.ok) console.log('push count failed', c.status)
     }
-    console.log('push run', { due: sent.length + gone.length, sent: sent.length, gone: gone.length, perVariant })
+    console.log('push run', { due: due.length, capped: due.length >= MAX_SENDS_PER_RUN, perVariant })
 }

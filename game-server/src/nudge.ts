@@ -27,6 +27,8 @@ export interface NudgeRow {
     last_played: string | null
     shield_used_on: string | null
     last_sent_on: string | null
+    /** Yesterday's wording, never sent twice in a row. */
+    last_variant?: string | null
 }
 
 /** How today's daily deal is going, for the challenge wording. */
@@ -66,48 +68,76 @@ function fromStats(st: DailyStats | null): Wording[] {
     if (!st) return []
     const out: Wording[] = []
     if (st.won === 0 && st.players >= 10) {
-        out.push({ variant: 'none-beat', title: 'Nobody has beaten today\'s deal yet', body: `${st.players} players tried. Be the first.` })
+        out.push(
+            { variant: 'none-beat', title: 'Nobody has beaten today\'s deal yet', body: `${st.players} players tried. Be the first.` },
+            { variant: 'none-first', title: '🏆 Be the first to beat today\'s deal', body: `${st.players} players tried. Nobody has won yet.` },
+        )
     } else if (isDare(st)) {
-        out.push({ variant: 'beat-rate', title: `Only ${st.won} of ${st.players} beat today's deal`, body: 'Can you? One scored attempt.' })
+        out.push(
+            { variant: 'beat-rate', title: `Only ${st.won} of ${st.players} beat today's deal`, body: 'Can you? One scored attempt.' },
+            { variant: 'beat-most', title: 'Today\'s deal is beating most players', body: `${st.won} wins out of ${st.players} so far. Want a shot?` },
+        )
     }
     if (st.players >= 30) {
-        out.push({ variant: 'crowd', title: `${st.players} players took on today's deal`, body: 'Your turn. One scored attempt.' })
+        out.push(
+            { variant: 'crowd', title: `${st.players} players took on today's deal`, body: 'Your turn. One scored attempt.' },
+            { variant: 'crowd-join', title: `Join ${st.players} players on today's deal`, body: 'Same shuffle, one scored attempt.' },
+        )
     }
     return out
 }
 
+/**
+ * The pool, by situation. Every line must stay true for anyone who can get
+ * it, and the shield set may never suggest the streak is ending tonight.
+ */
 function wordings(n: number, gap: number, holding: boolean, shield: boolean, st: DailyStats | null): Wording[] {
-    const dare = isDare(st) ? `Only ${st.won} of ${st.players} beat today's deal so far. Can you?` : null
+    const dare = isDare(st) ? `Only ${st.won} of ${st.players} beat today's deal so far.` : null
     if (holding) {
         return [
             { variant: 'shield-holding', title: `🛡️ Shield is holding your ${n}-day streak`, body: 'It breaks at midnight unless you play today.' },
             { variant: 'shield-last', title: `🛡️ Last chance for your ${n}-day streak`, body: 'Your shield bought you a day. Play today or it resets.' },
+            { variant: 'shield-covering', title: 'Your shield is covering yesterday', body: `Play today and your ${n}-day streak lives. Skip it and it resets.` },
+            { variant: 'shield-oneday', title: '🛡️ Your shield gave you one more day', body: `Use it: one game today keeps your ${n}-day streak.` },
+            { variant: 'shield-waste', title: 'Don\'t waste your streak shield', body: `It's holding your ${n}-day streak until midnight.` },
         ]
     }
     if (n >= 2 && MILESTONES.includes(n + 1)) {
-        return [{
-            variant: 'milestone',
-            title: `🏆 One game to a ${n + 1}-day streak`,
-            body: shield ? 'Today\'s deal is ready.' : 'Miss today and it resets at midnight.',
-        }]
+        const m = n + 1
+        const body = shield ? 'Today\'s deal is ready.' : 'Miss today and it resets at midnight.'
+        return [
+            { variant: 'milestone-one', title: `🏆 One game to a ${m}-day streak`, body },
+            { variant: 'milestone-away', title: `🏆 A ${m}-day streak is one game away`, body },
+            { variant: 'milestone-big', title: `Day ${m} is a big one`, body: shield ? 'One game today gets you there.' : 'One game today gets you there. Miss it and the streak resets at midnight.' },
+        ]
     }
     if (n >= 2 && shield) {
         // The shield would carry a missed day, so nothing here may say the streak is ending.
         return [
-            { variant: 'streak-next', title: `🔥 Day ${n + 1} is waiting`, body: `Keep your ${n}-day streak going. Today's deal is ready.` },
-            { variant: 'streak-row', title: `Make it ${n + 1} days in a row`, body: 'Today\'s deal is ready.' },
-            { variant: 'streak-alive', title: `Keep your ${n}-day streak alive`, body: 'One game today does it.' },
-            { variant: 'streak-count', title: `🔥 ${n} days and counting`, body: `Play today's deal to make it ${n + 1}.` },
-            ...(dare ? [{ variant: 'streak-dare', title: `🔥 Day ${n + 1} is waiting`, body: dare }] : []),
+            { variant: 'keep-next', title: `🔥 Day ${n + 1} is waiting`, body: `Keep your ${n}-day streak going. Today's deal is ready.` },
+            { variant: 'keep-row', title: `Make it ${n + 1} days in a row`, body: 'Today\'s deal is ready.' },
+            { variant: 'keep-alive', title: `Keep your ${n}-day streak alive`, body: 'One game today does it.' },
+            { variant: 'keep-count', title: `🔥 ${n} days and counting`, body: `Play today's deal to make it ${n + 1}.` },
+            { variant: 'keep-roll', title: `You're on a ${n}-day roll`, body: `Today's deal is ready for day ${n + 1}.` },
+            { variant: 'keep-starts', title: `Day ${n + 1} starts with one game`, body: 'Today\'s deal is shuffled and ready.' },
+            { variant: 'keep-grow', title: `🔥 Grow your streak to ${n + 1}`, body: 'Today\'s deal is ready when you are.' },
+            { variant: 'keep-terminator', title: `Terminator is shuffling for day ${n + 1}`, body: `Your ${n}-day streak vs today's deal. Play when you're ready.` },
+            { variant: 'keep-board', title: `Day ${n + 1}, and a fresh leaderboard`, body: `Today's deal is ready. Keep the ${n}-day run going.` },
+            ...(dare ? [{ variant: 'keep-dare', title: `🔥 Day ${n + 1} is waiting`, body: `${dare} Can you?` }] : []),
         ]
     }
     if (n >= 2) {
         return [
-            { variant: 'streak-ends', title: `🔥 Your ${n}-day streak ends at midnight`, body: 'One game keeps it alive.' },
-            { variant: 'streak-lose', title: `Don't lose your ${n}-day streak`, body: 'One game before midnight keeps it.' },
-            { variant: 'streak-saves', title: `One game saves your ${n}-day streak`, body: 'Today\'s deal is ready. The clock runs out at midnight.' },
-            { variant: 'streak-reset', title: '⏳ Your streak resets at midnight', body: `Keep all ${n} days with one game.` },
-            ...(dare ? [{ variant: 'streak-dare', title: `Your ${n}-day streak is on the line`, body: dare }] : []),
+            { variant: 'end-midnight', title: `🔥 Your ${n}-day streak ends at midnight`, body: 'One game keeps it alive.' },
+            { variant: 'end-lose', title: `Don't lose your ${n}-day streak`, body: 'One game before midnight keeps it.' },
+            { variant: 'end-save', title: `One game saves your ${n}-day streak`, body: 'Today\'s deal is ready. The clock runs out at midnight.' },
+            { variant: 'end-reset', title: '⏳ Your streak resets at midnight', body: `Keep all ${n} days with one game.` },
+            { variant: 'end-tonight', title: `${n} days, gone tonight?`, body: 'Not if you play one game before midnight.' },
+            { variant: 'end-hours', title: `⏳ Hours left on your ${n}-day streak`, body: 'It resets at midnight. One game saves it.' },
+            { variant: 'end-break', title: `Don't break a ${n}-day streak now`, body: 'One game before midnight keeps it going.' },
+            { variant: 'end-line', title: `🔥 ${n} days on the line tonight`, body: 'Play today\'s deal before midnight.' },
+            { variant: 'end-quick', title: `Quick game? Your ${n}-day streak needs one`, body: 'It resets at midnight otherwise.' },
+            ...(dare ? [{ variant: 'end-dare', title: `Your ${n}-day streak is on the line`, body: `${dare} Play before midnight.` }] : []),
         ]
     }
     if (gap === 1) {
@@ -115,15 +145,29 @@ function wordings(n: number, gap: number, holding: boolean, shield: boolean, st:
             { variant: 'two-row', title: 'Make it 2 days in a row', body: 'Today\'s deal is ready. One game starts a streak.' },
             { variant: 'two-back', title: 'Back for day 2?', body: 'New shuffle today. One game starts your streak.' },
             { variant: 'two-start', title: '🔥 Start a streak today', body: 'You played yesterday. One game today makes it 2 days.' },
+            { variant: 'two-day1', title: 'Yesterday was day 1', body: 'Today\'s deal makes it a streak.' },
+            { variant: 'two-new', title: 'New day, new shuffle', body: 'Play today\'s deal and your streak begins.' },
+            { variant: 'two-terminator', title: 'Terminator is back with a new shuffle', body: 'One game today makes it 2 days in a row.' },
+            { variant: 'two-board', title: '🏆 Today\'s leaderboard is open', body: 'One scored attempt, and day 2 of your streak.' },
+            { variant: 'two-one', title: 'One game, day 2', body: 'Today\'s deal is ready when you are.' },
             ...fromStats(st),
         ]
     }
     return [
         ...fromStats(st),
-        { variant: 'new-shuffle', title: 'Today\'s deal is live', body: 'Same shuffle for every player in the world. One shot.' },
-        { variant: 'terminator', title: 'Terminator is waiting at today\'s deal', body: 'One scored attempt. Make it count.' },
-        { variant: 'fresh', title: 'Fresh shuffle, one shot', body: 'Today\'s deal is ready. Can you win it first try?' },
+        { variant: 'back-live', title: 'Today\'s deal is live', body: 'Same shuffle for every player in the world. One shot.' },
+        { variant: 'back-terminator', title: 'Terminator is waiting at today\'s deal', body: 'One scored attempt. Make it count.' },
+        { variant: 'back-fresh', title: 'Fresh shuffle, one shot', body: 'Today\'s deal is ready. Can you win it first try?' },
+        { variant: 'back-streak', title: 'Start a new streak today', body: 'One game is day 1. Today\'s deal is ready.' },
+        { variant: 'back-miss', title: 'The cards miss you', body: 'Today\'s deal is shuffled and waiting.' },
+        { variant: 'back-board', title: '🏆 A fresh leaderboard every day', body: 'Today\'s is open. One scored attempt.' },
+        { variant: 'back-nomercy', title: 'No mercy today?', body: 'Today\'s deal is ready, and so is Terminator.' },
+        { variant: 'back-world', title: 'Same deal for the whole world', body: 'Play it once and see where you rank.' },
     ]
+}
+
+function nextDay(day: string): string {
+    return new Date(Date.UTC(+day.slice(0, 4), +day.slice(5, 7) - 1, +day.slice(8, 10) + 1)).toISOString().slice(0, 10)
 }
 
 /** A stable number per browser, so players start the rotation at different points. */
@@ -145,10 +189,16 @@ export function nudgeFor(row: NudgeRow, now: Date, stats: DailyStats | null = nu
 
     const s = { streak: row.streak, lastPlayed: row.last_played, shieldUsedOn: row.shield_used_on }
     const live = liveStreak(s, day)
-    const options = wordings(live.streak, gap, live.holding, shieldReady(s, day), stats)
-    // Next day, next wording: a list of two or more never repeats on consecutive days.
-    const pick = options[(daysBetween('1970-01-01', day) + seedOf(row.endpoint)) % options.length]!
-    return { ...pick, url: `/daily?src=push&v=${pick.variant}`, day }
+    // Missing today means tomorrow's game spends the shield, so ask about tomorrow.
+    const shield = shieldReady(s, nextDay(day))
+    const options = wordings(live.streak, gap, live.holding, shield, stats)
+    // Rotate by day from a per-player start, and step past yesterday's wording
+    // in case the pool changed size overnight.
+    let i = (daysBetween('1970-01-01', day) + seedOf(row.endpoint)) % options.length
+    if (options.length > 1 && options[i]!.variant === row.last_variant) i = (i + 1) % options.length
+    const pick = options[i]!
+    // Home, not /daily: /daily only resumes a run in progress. The app starts today's deal on arrival (App.vue).
+    return { ...pick, url: `/?src=push&v=${pick.variant}`, day }
 }
 
 /**

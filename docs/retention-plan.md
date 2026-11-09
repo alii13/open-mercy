@@ -120,7 +120,7 @@ Not doing: lives or energy, paywalls, fake "3 people are watching", padded wait 
 
 - The ask comes after any finished game, not on day two, because most players never have a day two.
   
-- 22 wordings rotate per player, so no one gets the same one two days running.
+- 50 wordings rotate per player, so no one gets the same one two days running. Notifications carry "Play now" and "Turn off" buttons.
   
 - Taps and sends are counted per wording (`reminder_opened`, `push_sends`).
   

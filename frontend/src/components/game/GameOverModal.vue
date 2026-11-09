@@ -125,7 +125,7 @@
               <Bell :size="14" :stroke-width="2" aria-hidden="true" />
               DON'T BREAK THE STREAK
             </span>
-            <span v-if="reminderAsk === 'on'" class="daily-nudge-sub">You're set. See you tomorrow, same time.</span>
+            <span v-if="reminderAsk === 'on'" class="daily-nudge-sub">You're set. One reminder a day, only if you haven't played yet.</span>
             <template v-else>
               <span class="daily-nudge-sub">One ping a day when the new deal is ready, at the hour you usually play. Off anytime in settings.</span>
               <button v-if="reminderAsk === 'ask'" class="link-btn reminder-skip" type="button" @click="skipReminder">No thanks</button>

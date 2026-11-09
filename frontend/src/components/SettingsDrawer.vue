@@ -101,8 +101,8 @@
               </p>
             </section>
 
-            <!-- Reminders: hidden where the browser cannot take push at all -->
-            <section v-if="reminderPermission !== null" class="settings-section">
+            <!-- Reminders: hidden where the browser cannot take push, or the game server has it off -->
+            <section v-if="reminderPermission !== null && reminderAvailable" class="settings-section">
               <h3 class="section-title">REMINDERS</h3>
               <div class="row">
                 <span class="row-label row-label--wide">TODAY'S DEAL</span>
@@ -121,7 +121,9 @@
               <p class="hint">
                 {{ reminderPermission === 'denied'
                   ? 'Notifications are blocked for this site in your browser settings.'
-                  : 'One reminder a day, at the hour you usually play.' }}
+                  : reminderFailed
+                    ? 'Could not turn reminders on. Try again in a moment.'
+                    : 'One reminder a day, at the hour you usually play.' }}
               </p>
             </section>
 
@@ -160,24 +162,29 @@
 
 <script setup lang="ts">
 import { X } from 'lucide-vue-next'
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useSettingsStore } from '../stores/settingsStore'
 import { soundEffects } from '../composables/useSoundEffects'
 import { music as musicComposable } from '../composables/useMusic'
 import RulesModal from './RulesModal.vue'
-import { disableReminders, enableReminders, reminderPermission, remindersOn } from '../composables/useReminders'
+import { disableReminders, enableReminders, reminderKey, reminderPermission, remindersOn } from '../composables/useReminders'
 import { markReminderAnswered } from '../utils/reminderAsk'
 
 const settings = useSettingsStore()
 const showRules = ref(false)
 
+const reminderAvailable = ref(false)
+onMounted(async () => { reminderAvailable.value = !!(await reminderKey()) })
+
 const reminderBusy = ref(false)
+const reminderFailed = ref(false)
 async function toggleReminders() {
   reminderBusy.value = true
+  reminderFailed.value = false
   // A choice made here answers the game-over ask too.
   markReminderAnswered()
   if (remindersOn.value) await disableReminders()
-  else await enableReminders()
+  else reminderFailed.value = (await enableReminders()) === 'failed'
   reminderBusy.value = false
 }
 const sfx = soundEffects

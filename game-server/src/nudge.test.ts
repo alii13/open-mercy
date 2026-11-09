@@ -46,61 +46,93 @@ describe('nudgeFor', () => {
         expect(seen.size).toBeGreaterThanOrEqual(3)
     })
 
+    it('has a deep pool for every situation, and runs through all of it before repeating', () => {
+        const pool = (seq: { variant: string }[]) => new Set(variants(seq)).size
+        expect(pool(run({ shield_used_on: '2026-07-24' }, 1, 6))).toBe(6)
+        expect(pool(run({ shield_used_on: null }, 1, 9))).toBe(9)
+        expect(pool(run({ streak: 1 }, 1, 8))).toBe(8)
+        expect(pool(run({ streak: 1 }, 2, 8))).toBe(8)
+        expect(pool(run({ shield_used_on: null }, 2, 5))).toBe(5)
+    })
+
     it('warns a streak with no shield left that it ends tonight, every way it says it', () => {
         // Spent on day 0, so the shield stays away for the whole run.
         for (const n of run({ shield_used_on: '2026-07-24' }, 1, 6)) {
-            expect(n.variant).toMatch(/^streak-(ends|lose|saves|reset)$/)
+            expect(n.variant).toMatch(/^end-/)
             expect(`${n.title} ${n.body}`).toContain('4')
-            expect(`${n.title} ${n.body}`).toMatch(/midnight|resets|saves|lose/)
+            expect(`${n.title} ${n.body}`).toMatch(/midnight|tonight/)
         }
     })
 
     it('never says the streak is ending while the shield would save it', () => {
-        for (const n of run({ shield_used_on: null }, 1, 8, { players: 52, won: 12 })) {
-            expect(`${n.title} ${n.body}`).not.toMatch(/midnight|resets|saves|lose/i)
+        for (const n of run({ shield_used_on: null }, 1, 12, { players: 52, won: 12 })) {
+            expect(n.variant).toMatch(/^keep-/)
+            expect(`${n.title} ${n.body}`).not.toMatch(/midnight|tonight|reset|save|lose|break|line|ends/i)
         }
     })
 
-    it('marks a milestone day instead of rotating', () => {
-        expect(nudgeFor(row({ streak: 6 }), NOW)).toMatchObject({ variant: 'milestone', title: '🏆 One game to a 7-day streak' })
-        expect(nudgeFor(row({ streak: 6 }), NOW)?.body).toContain('midnight')
-        expect(nudgeFor(row({ streak: 6, shield_used_on: null }), NOW)?.body).not.toContain('midnight')
+    it('asks whether the shield would save a miss tomorrow, not whether it is ready today', () => {
+        // Spent 6 days ago: not ready today, ready tomorrow, so missing today is covered.
+        const n = nudgeFor(row({ shield_used_on: '2026-07-18' }), NOW)!
+        expect(n.variant).toMatch(/^keep-/)
+        expect(nudgeFor(row({ shield_used_on: '2026-07-19' }), NOW)!.variant).toMatch(/^end-/)
+    })
+
+    it('never repeats yesterday\'s wording, even when the pool changes size', () => {
+        for (let i = 0; i < 40; i++) {
+            const endpoint = `https://fcm.googleapis.com/fcm/send/q${i}`
+            const yesterday = nudgeFor(row({ endpoint, streak: 1, last_played: '2026-07-22' }), NOW, { players: 52, won: 12 })!
+            const today = nudgeFor(row({ endpoint, streak: 1, last_played: '2026-07-22', last_variant: yesterday.variant }), at(1), null)!
+            expect(today.variant).not.toBe(yesterday.variant)
+        }
+    })
+
+    it('marks a milestone day instead of the usual rotation', () => {
+        for (const n of run({ streak: 6, shield_used_on: '2026-07-24' }, 1, 3)) {
+            expect(n.variant).toMatch(/^milestone-/)
+            expect(n.title).toContain('7')
+            expect(n.body).toContain('midnight')
+        }
+        for (const n of run({ streak: 6, shield_used_on: null }, 1, 3)) expect(n.body).not.toContain('midnight')
     })
 
     it('says so when the shield is holding the streak over a missed day', () => {
-        for (const n of run({ shield_used_on: null }, 2, 4)) expect(n.variant).toMatch(/^shield-(holding|last)$/)
-        expect(variants(run({ shield_used_on: null }, 2, 4))).toContain('shield-holding')
+        for (const n of run({ shield_used_on: null }, 2, 5)) {
+            expect(n.variant).toMatch(/^shield-/)
+            expect(`${n.title} ${n.body}`).toMatch(/shield/i)
+        }
     })
 
     it('dares players with the real share who beat today\'s deal', () => {
-        const seq = run({ streak: 1 }, 2, 8, { players: 52, won: 12 })
+        const seq = run({ streak: 1 }, 2, 16, { players: 52, won: 12 })
         expect(seq.find(n => n.variant === 'beat-rate')?.title).toBe('Only 12 of 52 beat today\'s deal')
         expect(seq.find(n => n.variant === 'crowd')?.title).toBe('52 players took on today\'s deal')
     })
 
     it('mixes today\'s numbers into a streak reminder\'s body', () => {
-        const bodies = run({}, 1, 8, { players: 52, won: 12 }).map(n => n.body)
+        const bodies = run({ shield_used_on: null }, 1, 12, { players: 52, won: 12 }).map(n => n.body)
         expect(bodies.some(b => b.includes('Only 12 of 52'))).toBe(true)
     })
 
     it('says nobody has won yet only when that is true and enough have tried', () => {
-        expect(variants(run({ streak: 1 }, 2, 6, { players: 14, won: 0 }))).toContain('none-beat')
-        for (const v of variants(run({ streak: 1 }, 2, 6, { players: 6, won: 0 }))) expect(v).not.toMatch(/none-beat|beat-rate|crowd/)
+        expect(variants(run({ streak: 1 }, 2, 12, { players: 14, won: 0 }))).toContain('none-beat')
+        for (const v of variants(run({ streak: 1 }, 2, 12, { players: 6, won: 0 }))) expect(v).not.toMatch(/none|beat|crowd/)
     })
 
-    it('does not say "only" when most players win', () => {
-        expect(variants(run({ streak: 1 }, 2, 8, { players: 40, won: 30 }))).not.toContain('beat-rate')
+    it('does not say "only" or "beating most" when most players win', () => {
+        for (const v of variants(run({ streak: 1 }, 2, 16, { players: 40, won: 30 }))) expect(v).not.toMatch(/^beat-/)
     })
 
     it('asks a one-day player for a second day in a row', () => {
-        for (const n of run({ streak: 1 }, 1, 4)) expect(n.variant).toMatch(/^two-(row|back|start)$/)
+        for (const n of run({ streak: 1 }, 1, 8)) expect(n.variant).toMatch(/^two-/)
     })
 
     it('keeps titles short enough not to be cut off', () => {
         const all = [
-            ...run({ streak: 999 }, 1, 8, { players: 999, won: 499 }), ...run({ streak: 999, shield_used_on: null }, 1, 8),
-            ...run({ streak: 999, shield_used_on: null }, 2, 4), ...run({ streak: 1 }, 2, 8, { players: 999, won: 0 }),
-            ...run({ streak: 1 }, 1, 4, { players: 999, won: 400 }), nudgeFor(row({ streak: 99 }), NOW)!,
+            ...run({ streak: 999, shield_used_on: '2026-07-24' }, 1, 7, { players: 999, won: 499 }),
+            ...run({ streak: 999, shield_used_on: null }, 1, 10, { players: 999, won: 499 }),
+            ...run({ streak: 999, shield_used_on: null }, 2, 5), ...run({ streak: 1 }, 2, 16, { players: 999, won: 0 }),
+            ...run({ streak: 1 }, 1, 16, { players: 999, won: 400 }), ...run({ streak: 99 }, 1, 3),
         ]
         for (const n of all) expect(n.title.length).toBeLessThanOrEqual(45)
     })
@@ -126,9 +158,9 @@ describe('nudgeFor', () => {
         expect(nudgeFor(row({ play_hour: 23 }), new Date('2026-07-24T15:40:00Z'))).not.toBeNull()
     })
 
-    it('opens today\'s deal and says which wording brought the player back', () => {
+    it('links home with the wording that brought the player back; the app opens today\'s deal', () => {
         const n = nudgeFor(row(), NOW)!
-        expect(n.url).toBe(`/daily?src=push&v=${n.variant}`)
+        expect(n.url).toBe(`/?src=push&v=${n.variant}`)
     })
 })
 

@@ -19,6 +19,8 @@ create table if not exists public.push_subscriptions (
     last_played date,
     shield_used_on date,
     last_sent_on date,
+    -- The wording sent on last_sent_on; never sent twice in a row.
+    last_variant text,
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now()
 );
@@ -47,6 +49,8 @@ grant execute on function public.push_daily_stats(text) to service_role;
 
 -- Reminders sent per wording per UTC day. Taps per wording are the GA event
 -- reminder_opened (parameter `variant`); the two together are the click rate.
+-- The variant 'unsubscribed' counts browsers found turned off that day (the
+-- notification's Turn off button, blocked notifications, cleared site data).
 create table if not exists public.push_sends (
     day date not null,
     variant text not null,
