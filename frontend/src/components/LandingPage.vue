@@ -139,7 +139,8 @@ import { useScreenSize } from '../composables/useScreenSize'
 import { currentRoute, navigate } from '../utils/routes'
 import { onFirstScroll } from '../composables/onFirstScroll'
 
-const LandingScrollSections = defineAsyncComponent(() => import('./LandingScrollSections.vue'))
+const loadStory = () => import('./LandingScrollSections.vue')
+const LandingScrollSections = defineAsyncComponent(loadStory)
 
 const props = defineProps<{ loading?: boolean }>()
 
@@ -216,7 +217,10 @@ const reducedMotion =
   window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 onMounted(() => {
-  cancelStory = onFirstScroll(() => { storyReady.value = true })
+  // Fetch the story's code first and swap it in once it is here. Swapping
+  // first left the async component rendering nothing while it downloaded, so
+  // the page below jumped up under the hero and back (visible on phones).
+  cancelStory = onFirstScroll(() => { void loadStory().then(() => { storyReady.value = true }) })
   if (heroSentinel.value) {
     observer = new IntersectionObserver(
       (entries) => {
