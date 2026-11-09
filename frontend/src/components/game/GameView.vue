@@ -193,6 +193,7 @@ import { music } from '../../composables/useMusic'
 import { useStackEscalation } from '../../composables/useStackEscalation'
 import { playDealerIntro } from '../../composables/useDealerIntro'
 import { useRetentionStore } from '../../stores/retentionStore'
+import { syncReminders } from '../../composables/useReminders'
 import { useGameStore } from '../../stores/gameStore'
 import { router } from '../../utils/routes'
 import { localGamePath } from '../../composables/useLocalGameUrl'
@@ -409,6 +410,7 @@ watch(() => store.gameState, (now, prev) => {
         peakHand: s.peakCards || 0,
         mode: 'sp',
       })
+      void syncReminders()
       // Badge-up: did this game push the player into a new tier? (crossed reads
       // the retention tally we just updated, so it must run after record.)
       const nb = badgeUp.crossed({

@@ -32,3 +32,9 @@ SUPABASE_ANON_KEY = "sb_publishable_YcRHugf7xAe9xGCquvAxyQ_85sBcPsi"
 REALTIMEKIT_ACCOUNT_ID = "1d8c38c6c9efdd5a2d4bf620eb058f9d"
 REALTIMEKIT_PRESET = "group_call_participant"
 REALTIMEKIT_HOST_PRESET = "group_call_host"
+
+# Daily reminders (src/push.ts): every hour, send the reminders that are due.
+# Needs the VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY secrets (scripts/vapid-keys.mjs)
+# and SUPABASE_SERVICE_KEY; without them the run does nothing and /health says push:false.
+[triggers]
+crons = ["0 * * * *"]

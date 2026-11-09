@@ -15,6 +15,7 @@
 
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
+import { afterGame, liveStreak, shieldReady as shieldIsReady, type StreakState } from '@streak'
 
 const STORAGE_KEY = 'uno_retention_v1'
 
@@ -37,7 +38,13 @@ interface PersistedRetention {
     currentStreak: number
     longestStreak: number
     lastPlayedDate: string | null  // YYYY-MM-DD in local tz
+    /** The day the weekly shield last carried the streak over a missed day. */
+    shieldUsedOn: string | null
+    /** Local hours of the last few finished games; the reminder goes out at the usual one. */
+    playHours: number[]
 }
+
+const PLAY_HOURS_KEPT = 10
 
 function emptyState(): PersistedRetention {
     return {
@@ -50,6 +57,8 @@ function emptyState(): PersistedRetention {
         currentStreak: 0,
         longestStreak: 0,
         lastPlayedDate: null,
+        shieldUsedOn: null,
+        playHours: [],
     }
 }
 
@@ -79,11 +88,15 @@ function todayDate(): string {
     return `${y}-${m}-${day}`
 }
 
-function daysBetween(a: string, b: string): number {
-    // Both YYYY-MM-DD. Returns whole days from a to b.
-    const da = new Date(`${a}T00:00:00`)
-    const db = new Date(`${b}T00:00:00`)
-    return Math.round((db.getTime() - da.getTime()) / (1000 * 60 * 60 * 24))
+/** The most frequent hour; a tie goes to the most recent. */
+function mostCommonHour(hours: number[]): number | null {
+    let best: number | null = null
+    let bestCount = 0
+    for (let i = hours.length - 1; i >= 0; i--) {
+        const count = hours.filter(h => h === hours[i]).length
+        if (count > bestCount) { best = hours[i]!; bestCount = count }
+    }
+    return best
 }
 
 export const useRetentionStore = defineStore('retention', () => {
@@ -97,6 +110,12 @@ export const useRetentionStore = defineStore('retention', () => {
     const currentStreak = ref(initial.currentStreak)
     const longestStreak = ref(initial.longestStreak)
     const lastPlayedDate = ref<string | null>(initial.lastPlayedDate)
+    const shieldUsedOn = ref<string | null>(initial.shieldUsedOn)
+    const playHours = ref<number[]>(initial.playHours)
+
+    const streakState = (): StreakState => ({
+        streak: currentStreak.value, lastPlayed: lastPlayedDate.value, shieldUsedOn: shieldUsedOn.value,
+    })
 
     const winRate = computed(() => {
         if (gamesPlayed.value === 0) return 0
@@ -105,15 +124,11 @@ export const useRetentionStore = defineStore('retention', () => {
 
     // Re-evaluate the streak on read — covers the "checked the page but didn't
     // play" case where the user opens the landing but never finishes a game.
-    // If lastPlayedDate is older than yesterday, the streak is broken regardless.
-    const effectiveStreak = computed(() => {
-        if (!lastPlayedDate.value || currentStreak.value === 0) return 0
-        const gap = daysBetween(lastPlayedDate.value, todayDate())
-        // gap 0 = played today, 1 = played yesterday (streak still alive),
-        // 2+ = broken.
-        if (gap >= 2) return 0
-        return currentStreak.value
-    })
+    // Older than yesterday is broken, unless the weekly shield is holding it.
+    const effectiveStreak = computed(() => liveStreak(streakState(), todayDate()).streak)
+    const shieldHolding = computed(() => liveStreak(streakState(), todayDate()).holding)
+    const shieldReady = computed(() => shieldIsReady(streakState(), todayDate()))
+    const usualHour = computed(() => mostCommonHour(playHours.value))
 
     // Drives the lobby nudge: a live streak that hasn't been fed today is at
     // risk, and saying so is the whole retention mechanic.
@@ -122,7 +137,7 @@ export const useRetentionStore = defineStore('retention', () => {
     // Persist on any change.
     watch(
         [gamesPlayed, gamesWon, totalCardsPlayed, totalUnos, biggestStackEver,
-            peakHandEver, currentStreak, longestStreak, lastPlayedDate],
+            peakHandEver, currentStreak, longestStreak, lastPlayedDate, shieldUsedOn, playHours],
         () => {
             saveState({
                 gamesPlayed: gamesPlayed.value,
@@ -134,6 +149,8 @@ export const useRetentionStore = defineStore('retention', () => {
                 currentStreak: currentStreak.value,
                 longestStreak: longestStreak.value,
                 lastPlayedDate: lastPlayedDate.value,
+                shieldUsedOn: shieldUsedOn.value,
+                playHours: playHours.value,
             })
         }
     )
@@ -152,21 +169,11 @@ export const useRetentionStore = defineStore('retention', () => {
 
         // Streak logic. The "play" counts when a game finishes, not when
         // it starts — so quitting mid-game doesn't pad the streak.
-        const today = todayDate()
-        if (lastPlayedDate.value === null) {
-            currentStreak.value = 1
-        } else {
-            const gap = daysBetween(lastPlayedDate.value, today)
-            if (gap === 0) {
-                // Played again today — streak unchanged
-            } else if (gap === 1) {
-                currentStreak.value += 1
-            } else {
-                // gap >= 2 → streak broken, reset
-                currentStreak.value = 1
-            }
-        }
-        lastPlayedDate.value = today
+        const next = afterGame(streakState(), todayDate())
+        currentStreak.value = next.streak
+        lastPlayedDate.value = next.lastPlayed
+        shieldUsedOn.value = next.shieldUsedOn
+        playHours.value = [...playHours.value, new Date().getHours()].slice(-PLAY_HOURS_KEPT)
         if (currentStreak.value > longestStreak.value) {
             longestStreak.value = currentStreak.value
         }
@@ -183,6 +190,8 @@ export const useRetentionStore = defineStore('retention', () => {
         currentStreak.value = e.currentStreak
         longestStreak.value = e.longestStreak
         lastPlayedDate.value = e.lastPlayedDate
+        shieldUsedOn.value = e.shieldUsedOn
+        playHours.value = e.playHours
     }
 
     return {
@@ -195,8 +204,12 @@ export const useRetentionStore = defineStore('retention', () => {
         currentStreak,
         longestStreak,
         lastPlayedDate,
+        shieldUsedOn,
         winRate,
         effectiveStreak,
+        shieldHolding,
+        shieldReady,
+        usualHour,
         playedToday,
         recordGameResult,
         reset,

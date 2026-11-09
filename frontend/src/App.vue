@@ -176,6 +176,7 @@
 import { X } from 'lucide-vue-next'
 import { ref, computed, watch, onMounted, onUnmounted, defineAsyncComponent } from 'vue'
 import { track, trackScreen } from './utils/analytics'
+import { syncReminders } from './composables/useReminders'
 import { localDateString } from './utils/seededRng'
 import { nextBot } from './utils/botLadder'
 import { WARM_UP_GAMES } from '@engine/bot'
@@ -321,6 +322,14 @@ onMounted(async () => {
   // here — it counts real CTA clicks. Failure falls back to the landing page,
   // where the invite banner and the retry toast still apply.
   if (!authStore.isAuthenticated && currentRoute.value.name === 'room') await attemptGuestSignin()
+
+  // A tap on a daily reminder arrives as ?src=push&v=<wording> (public/sw.js, game-server/src/nudge.ts).
+  const { src, v, ...query } = router.currentRoute.value.query
+  if (src === 'push') {
+    track('reminder_opened', { variant: typeof v === 'string' ? v.slice(0, 32) : 'unknown' })
+    await router.replace({ query })
+  }
+  void syncReminders({ checkKey: true })
 })
 
 // App remounts (HMR) would otherwise stack PASSWORD_RECOVERY listeners.

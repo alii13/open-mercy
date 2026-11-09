@@ -101,6 +101,30 @@
               </p>
             </section>
 
+            <!-- Reminders: hidden where the browser cannot take push at all -->
+            <section v-if="reminderPermission !== null" class="settings-section">
+              <h3 class="section-title">REMINDERS</h3>
+              <div class="row">
+                <span class="row-label row-label--wide">TODAY'S DEAL</span>
+                <button
+                  class="mute-btn"
+                  type="button"
+                  :class="{ muted: !remindersOn }"
+                  :disabled="reminderPermission === 'denied' || reminderBusy"
+                  :aria-pressed="remindersOn"
+                  aria-label="Daily reminder"
+                  @click="toggleReminders"
+                >
+                  {{ remindersOn ? 'ON' : 'OFF' }}
+                </button>
+              </div>
+              <p class="hint">
+                {{ reminderPermission === 'denied'
+                  ? 'Notifications are blocked for this site in your browser settings.'
+                  : 'One reminder a day, at the hour you usually play.' }}
+              </p>
+            </section>
+
             <!-- Help -->
             <section class="settings-section">
               <h3 class="section-title">HELP</h3>
@@ -141,9 +165,21 @@ import { useSettingsStore } from '../stores/settingsStore'
 import { soundEffects } from '../composables/useSoundEffects'
 import { music as musicComposable } from '../composables/useMusic'
 import RulesModal from './RulesModal.vue'
+import { disableReminders, enableReminders, reminderPermission, remindersOn } from '../composables/useReminders'
+import { markReminderAnswered } from '../utils/reminderAsk'
 
 const settings = useSettingsStore()
 const showRules = ref(false)
+
+const reminderBusy = ref(false)
+async function toggleReminders() {
+  reminderBusy.value = true
+  // A choice made here answers the game-over ask too.
+  markReminderAnswered()
+  if (remindersOn.value) await disableReminders()
+  else await enableReminders()
+  reminderBusy.value = false
+}
 const sfx = soundEffects
 const music = musicComposable
 
@@ -240,6 +276,10 @@ function onMusicVolume(e: Event) {
   align-items: center;
   gap: 0.75rem;
   margin-bottom: 0.85rem;
+}
+
+.row-label--wide {
+  grid-column: 1 / 3;
 }
 
 .row-label {

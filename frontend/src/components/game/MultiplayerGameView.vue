@@ -308,6 +308,7 @@ import { countByColor } from '../../utils/gameHelpers'
 import { useStackEscalation } from '../../composables/useStackEscalation'
 import { playDealerIntro } from '../../composables/useDealerIntro'
 import { useRetentionStore } from '../../stores/retentionStore'
+import { syncReminders } from '../../composables/useReminders'
 import { animateOpponentThrow, skipEveryoneShockwave, showTurnBanner, pulseSeat } from '../../composables/useGameFeel'
 import { useGameFx, type FxColor } from '../../composables/fx/useGameFx'
 import { useHeatWiring, useWildFloodWiring, useStackCamWiring, slamMagnitude, STACK_CAM_THRESHOLD } from '../../composables/fx/useFxWiring'
@@ -908,6 +909,7 @@ watch(gameStatus, (now, prev) => {
         peakHand: s.peakCards || 0,
         mode: 'mp',
       })
+      void syncReminders()
       // Badge-up: if this game crossed a tier, celebrate here and tell the room.
       const nb = badgeUp.crossed({
         won: isMpWinner.value,

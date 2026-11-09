@@ -115,6 +115,19 @@ Not doing: lives or energy, paywalls, fake "3 people are watching", padded wait 
 **Verify.** Tests for the shield rules and the claim trigger rules. In a browser: opt in on day two, receive a test push from a local cron run, unsubscribe. A real Google claim from the new prompt on a phone.
 
 **Cost and risk.** Two to three days. Risk: push on iOS Safari needs the site added to the home screen; the opt-in copy says so instead of failing silently.
+
+**Status (2026-11-09).** Items 1 and 2 built. The shield is one free shield every 7 days, for streaks of 2 or more (`shared/streak.ts`, shared with the game server). Push uses `@block65/webcrypto-web-push` on the game server and an hourly cron. Changes from the plan:
+
+- The ask comes after any finished game, not on day two, because most players never have a day two.
+  
+- 22 wordings rotate per player, so no one gets the same one two days running.
+  
+- Taps and sends are counted per wording (`reminder_opened`, `push_sends`).
+  
+- No reminder ever claims people are waiting at a table.
+  
+
+Deferred: iPhone (no web app manifest yet, so the card stays hidden there), item 3 (the claim prompt) and item 4 (friend pings).
 ## Phase 4: mobile's first click
 **Goal.** A phone visitor presses play as often as a desktop one.
 
