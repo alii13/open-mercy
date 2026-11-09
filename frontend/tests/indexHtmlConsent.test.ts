@@ -13,6 +13,7 @@ const ENGAGE = ['scroll', 'pointerdown', 'keydown', 'touchstart']
 
 function openPage(hostname: string) {
     const listeners = new Map<string, Set<() => void>>()
+    const docListeners = new Map<string, Set<() => void>>()
     const requested: { src: string; async: boolean; queuedBefore: unknown[][] }[] = []
     const calls = () => (win.dataLayer ?? []).map((a: ArrayLike<unknown>) => Array.from(a))
     const win: Record<string, any> = {
@@ -25,6 +26,10 @@ function openPage(hostname: string) {
         },
         removeEventListener: (type: string, fn: () => void) => listeners.get(type)?.delete(fn),
         document: {
+            addEventListener: (type: string, fn: () => void) => {
+                if (!docListeners.has(type)) docListeners.set(type, new Set())
+                docListeners.get(type)!.add(fn)
+            },
             createElement: () => ({}),
             head: { appendChild: (el: any) => requested.push({ src: el.src, async: el.async, queuedBefore: calls() }) },
             body: { appendChild: (el: any) => { if (el.name) win.frames[el.name] = el } },
@@ -38,6 +43,8 @@ function openPage(hostname: string) {
         calls,
         loads: (src: string) => requested.filter((r) => r.src === src),
         interact: (type: string) => [...(listeners.get(type) ?? [])].forEach((fn) => fn()),
+        // The app's module script has run.
+        ready: () => [...(docListeners.get('DOMContentLoaded') ?? [])].forEach((fn) => fn()),
     }
 }
 
@@ -45,8 +52,10 @@ describe('index.html consent and analytics loading', () => {
     beforeEach(() => vi.useFakeTimers())
     afterEach(() => vi.useRealTimers())
 
-    it('requests the consent message on arrival, async, after the denied Consent Mode defaults', () => {
+    it("requests the consent message once the app's code has run, async, after the denied Consent Mode defaults", () => {
         const page = openPage('open-mercy.com')
+        expect(page.loads(CONSENT)).toHaveLength(0)
+        page.ready()
         const consent = page.loads(CONSENT)
         expect(consent).toHaveLength(1)
         expect(consent[0].async).toBe(true)
@@ -68,6 +77,7 @@ describe('index.html consent and analytics loading', () => {
 
     it('loads gtag.js once on the first interaction, never again after more interactions or the fallback', () => {
         const page = openPage('open-mercy.com')
+        page.ready()
         page.interact('pointerdown')
         expect(page.loads(GTAG)).toHaveLength(1)
         ENGAGE.forEach(page.interact)
@@ -100,6 +110,7 @@ describe('index.html consent and analytics loading', () => {
         'keeps analytics off on %s while the consent message still loads',
         (host) => {
             const page = openPage(host)
+            page.ready()
             ENGAGE.forEach(page.interact)
             vi.advanceTimersByTime(20_000)
             expect(page.loads(GTAG)).toHaveLength(0)
