@@ -210,16 +210,17 @@
         wait_for_update: 500
       });
 
-      // The consent message loads async on arrival, so a visitor who has to answer
-      // it sees it while the landing page settles. Waiting for the first tap put it
-      // on top of the game, because that tap was usually Play. An immediate click on
-      // a slow connection can still beat it.
-      (function () {
+      // The consent message loads once the app's code has run, so a visitor who has
+      // to answer it sees it while the landing page settles. Waiting for the first
+      // tap put it on top of the game, because that tap was usually Play. Loading it
+      // before the app's code cost slow phones about 0.5 s of startup, and the hero
+      // intro still keeps PLAY NOW hidden for 3 s after this point.
+      document.addEventListener('DOMContentLoaded', function () {
         var s = document.createElement('script');
         s.async = true;
         s.src = 'https://fundingchoicesmessages.google.com/i/pub-5481263585202262?ers=1';
         document.head.appendChild(s);
-      })();
+      });
 
       // gtag.js for GA and Ads was most of the page's remaining blocking time in
       // PageSpeed, so it still waits for the first scroll, tap or key press, or
