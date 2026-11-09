@@ -1,6 +1,6 @@
 /**
  * The auto-start clock for public tables. It starts when the first person
- * sits: 15 seconds, then the deal. People coming and going never move it, and
+ * sits: 30 seconds, then the deal. People coming and going never move it, and
  * the table stays open to strangers until it deals. The last person leaving
  * stops it; the next one to sit starts it over. House players (house.ts) fill
  * the empty seats, so a table with one person still deals.
@@ -10,7 +10,7 @@
  * alarm off `at`. All timestamps are epoch ms supplied by the caller.
  */
 
-export const AUTO_START_MS = 15_000
+export const AUTO_START_MS = 30_000
 
 export interface AutoStartState {
     /** Deadline while the countdown runs. */

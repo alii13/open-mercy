@@ -9,21 +9,21 @@ describe('autoStartTick', () => {
         expect(autoStartTick(undefined, { ...lobby, humans: 0 })).toEqual({})
     })
 
-    it('starts a 15 second countdown when the first person sits', () => {
-        expect(AUTO_START_MS).toBe(15_000)
-        expect(autoStartTick(undefined, { ...lobby, humans: 1 }).at).toBe(NOW + 15_000)
+    it('starts a 30 second countdown when the first person sits', () => {
+        expect(AUTO_START_MS).toBe(30_000)
+        expect(autoStartTick(undefined, { ...lobby, humans: 1 }).at).toBe(NOW + 30_000)
     })
 
     it('keeps the deadline as people come and go', () => {
         const s = autoStartTick(undefined, { ...lobby, humans: 1 })
-        expect(autoStartTick(s, { ...lobby, humans: 4, now: NOW + 9_000 }).at).toBe(NOW + 15_000)
-        expect(autoStartTick(s, { ...lobby, humans: 2, now: NOW + 12_000 }).at).toBe(NOW + 15_000)
+        expect(autoStartTick(s, { ...lobby, humans: 4, now: NOW + 9_000 }).at).toBe(NOW + 30_000)
+        expect(autoStartTick(s, { ...lobby, humans: 2, now: NOW + 24_000 }).at).toBe(NOW + 30_000)
     })
 
     it('stops when the last person leaves, and starts over for the next one', () => {
         const s = autoStartTick(undefined, { ...lobby, humans: 1 })
         expect(autoStartTick(s, { ...lobby, humans: 0, now: NOW + 5_000 })).toEqual({})
-        expect(autoStartTick({}, { ...lobby, humans: 1, now: NOW + 6_000 }).at).toBe(NOW + 21_000)
+        expect(autoStartTick({}, { ...lobby, humans: 1, now: NOW + 6_000 }).at).toBe(NOW + 36_000)
     })
 
     it('never runs in a private room or outside the lobby', () => {

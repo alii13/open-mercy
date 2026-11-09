@@ -3,7 +3,7 @@
  *
  * The card describes the table quick match will seat you at: the fullest open
  * public room by connected players, the same measure the directory sorts on.
- * A table seats seven people and deals itself 15 seconds after the first one
+ * A table seats seven people and deals itself 30 seconds after the first one
  * sits, so a full one is never shown: the next player starts a new House table.
  */
 
@@ -49,7 +49,7 @@ export function publicTableView(joinable: LiveTable[], loaded: boolean): PublicT
         target: null,
         headline: 'OPEN TABLE',
         status: '',
-        body: 'Take a seat. The cards are dealt 15 seconds after you sit down.',
+        body: 'Take a seat. The cards are dealt 30 seconds after you sit down.',
         rules,
     }
 }

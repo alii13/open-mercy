@@ -587,7 +587,7 @@ export class GameRoomDO {
      * A finished public game goes back to the lounge: the result clears,
      * whoever is still connected keeps their seat, people who left give theirs
      * up, and house seats that have played their hands leave. The presence
-     * frame starts the next 15 seconds.
+     * frame starts the next 30 seconds.
      */
     private async nextHand(): Promise<void> {
         this.game = null

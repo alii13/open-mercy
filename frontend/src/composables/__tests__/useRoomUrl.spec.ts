@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { effectScope, nextTick, reactive, type EffectScope } from 'vue'
-import { router } from '../../utils/routes'
+import { router, toRoute } from '../../utils/routes'
 import { useRoomUrl, enterRoomUrl } from '../useRoomUrl'
 
 type Game = { room_code: string; status: 'waiting' | 'playing' | 'finished' }
@@ -54,6 +54,24 @@ describe('the URL follows the room', () => {
         await settle()
         mp.currentGame = null
         await settle()
+        expect(path()).toBe('/')
+    })
+})
+
+describe('leaving the public table', () => {
+    it('does not take a fresh seat while the URL is still on its way home', async () => {
+        mp.isPublicRoom = true
+        mp.currentGame = { room_code: 'PUBRM', status: 'playing' }
+        await settle()
+        expect(path()).toBe('/public')
+        // Leaving a hand swaps the game view for the lobby, which mounts and
+        // reads the URL before the trip home has landed.
+        mp.currentGame = null
+        await nextTick()
+        expect(path()).toBe('/public')
+        await enterRoomUrl(toRoute(router.currentRoute.value), mp)
+        await settle()
+        expect(mp.quickMatch).not.toHaveBeenCalled()
         expect(path()).toBe('/')
     })
 })
