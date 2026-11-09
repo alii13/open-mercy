@@ -262,7 +262,8 @@ onMounted(() => {
   cancelWait = onFirstScroll(async () => {
     try {
       ST = (await import('gsap/ScrollTrigger')).ScrollTrigger
-    } catch {
+    } catch (err) {
+      console.warn('landing story: ScrollTrigger failed to load', err)
       waiting.value = false
       return
     }
@@ -366,6 +367,7 @@ function init() {
     scrollTrigger: {
       trigger: rootEl.value,
       start: 'top top',
+      // Keep in step with .is-waiting below and .story-placeholder in LandingPage.vue.
       end: () => '+=' + Math.round(window.innerHeight * (mob() ? 5.4 : 6.2)),
       pin: true,
       // The landing container is display: flex, where ScrollTrigger defaults
