@@ -124,13 +124,11 @@
 
 <script setup lang="ts">
 import { ArrowRight } from 'lucide-vue-next'
-import { ref, shallowRef, onMounted, onUnmounted, computed, type Component } from 'vue'
+import { ref, shallowRef, onMounted, onUnmounted, computed, defineAsyncComponent, type Component } from 'vue'
 import gsap from 'gsap'
 import LandingGuide from './LandingGuide.vue'
 import LandingFAQ from './LandingFAQ.vue'
 import SiteFooter from './SiteFooter.vue'
-import FeedbackModal from './FeedbackModal.vue'
-import RulesModal from './RulesModal.vue'
 import LandingStatsBadge from './LandingStatsBadge.vue'
 import { useSitePulse } from '../composables/useSitePulse'
 import Card from './game/Card.vue'
@@ -138,6 +136,9 @@ import Button from './ui/Button.vue'
 import { useScreenSize } from '../composables/useScreenSize'
 import { currentRoute, navigate } from '../utils/routes'
 import { onFirstScroll } from '../composables/onFirstScroll'
+
+const FeedbackModal = defineAsyncComponent(() => import('./FeedbackModal.vue'))
+const RulesModal = defineAsyncComponent(() => import('./RulesModal.vue'))
 
 
 const props = defineProps<{ loading?: boolean }>()

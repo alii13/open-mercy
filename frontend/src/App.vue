@@ -153,7 +153,7 @@
 
     <!-- A player on the home screen holds no game socket, so an invite
          arrives over Realtime and lands here, above every screen. -->
-    <InviteToast />
+    <InviteToast v-if="authStore.isAuthenticated" />
 
     <!-- Friend requests and "they accepted", live. Never over a game: the
          count on the username chip and the Friends page keep the request
@@ -188,12 +188,16 @@ import { useRoomUrl } from './composables/useRoomUrl'
 import { useLocalGameUrl } from './composables/useLocalGameUrl'
 import { syncCountryToProfile } from './utils/country'
 import LandingPage from './components/LandingPage.vue'
-import AuthView from './components/AuthView.vue'
 import SettingsDrawer from './components/SettingsDrawer.vue'
 import Button from './components/ui/Button.vue'
 // The gameplay surfaces are code-split: a first-time visitor who only sees the
 // landing page shouldn't download the whole game engine + dashboard. They load
 // on demand when the view is first shown.
+// Loaded when first shown, so a first visit downloads the landing page and little else.
+const AuthView = defineAsyncComponent(() => import('./components/AuthView.vue'))
+const InviteToast = defineAsyncComponent(() => import('./components/InviteToast.vue'))
+const FriendToast = defineAsyncComponent(() => import('./components/FriendToast.vue'))
+const ReleaseCard = defineAsyncComponent(() => import('./components/ReleaseCard.vue'))
 const MultiplayerLobby = defineAsyncComponent(() => import('./components/MultiplayerLobby.vue'))
 const FriendsPage = defineAsyncComponent(() => import('./components/FriendsPage.vue'))
 const LeaderboardPage = defineAsyncComponent(() => import('./components/LeaderboardPage.vue'))
@@ -217,9 +221,6 @@ import {
   rememberPhotoAfterClaim,
   takePhotoAfterClaim,
 } from './composables/usePhotoSheet'
-import InviteToast from './components/InviteToast.vue'
-import FriendToast from './components/FriendToast.vue'
-import ReleaseCard from './components/ReleaseCard.vue'
 
 const authStore = useAuthStore()
 const mpStore = useMultiplayerStore()
