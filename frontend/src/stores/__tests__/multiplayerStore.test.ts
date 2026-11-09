@@ -12,13 +12,10 @@ import { createPinia, setActivePinia } from 'pinia'
 import type { PersonalView, ServerMsg } from '@protocol'
 import type { Card } from '../../types/card'
 
-vi.mock('../../lib/supabase', () => ({
-    supabase: {
-        auth: {
-            getSession: async () => ({ data: { session: { access_token: 'test-token' } } }),
-        },
-    },
+const { getSession } = vi.hoisted(() => ({
+    getSession: vi.fn(async () => ({ data: { session: { access_token: 'test-token' } as { access_token: string } | null }, error: null as Error | null })),
 }))
+vi.mock('../../lib/supabase', () => ({ supabase: { auth: { getSession } } }))
 
 vi.mock('../authStore', () => ({
     useAuthStore: () => ({ username: 'TESTER', user: { id: 'me' } }),
@@ -110,6 +107,8 @@ async function joinRoom(mp: ReturnType<typeof useMultiplayerStore>) {
 }
 
 beforeEach(() => {
+    getSession.mockReset()
+    getSession.mockResolvedValue({ data: { session: { access_token: 'test-token' } }, error: null })
     setActivePinia(createPinia())
     FakeWebSocket.instances = []
     fakeStorage.store = {}
@@ -400,6 +399,45 @@ describe('join failure reasons and retry', () => {
             expect(track).toHaveBeenCalledWith('mp_join_failed', { reason: 'ws_closed_1011', attempt: 2 , method: 'code' })
             // A transport failure has no server message — the user still needs one.
             expect(mp.error).toBe('Could not reach the game server')
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
+    // An expired token whose refresh fails on the network (a phone waking up)
+    // comes back as no session plus an error, while the session stays stored.
+    it('waits out a sign-in refresh that failed on the network, then joins', async () => {
+        vi.useFakeTimers()
+        try {
+            getSession.mockResolvedValueOnce({ data: { session: null }, error: new Error('Load failed') })
+            const mp = useMultiplayerStore()
+            const joining = mp.joinGame('DEADCD')
+            await vi.advanceTimersByTimeAsync(1_000)
+
+            const ws = await nextSocket(1)
+            ws.open()
+            ws.receive({ t: 'hello', roomCode: 'DEADCD', userId: 'me', hostUserId: 'me' })
+            ws.receive({ t: 'snapshot', seq: 0, game: playingView({ status: 'lobby', you: null, currentPlayerId: null, players: [] }) })
+
+            expect(await joining).not.toBeNull()
+            expect(track).not.toHaveBeenCalledWith('mp_join_failed', expect.anything())
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
+    it('blames the connection, not the sign-in, when the refresh keeps failing', async () => {
+        vi.useFakeTimers()
+        try {
+            getSession.mockResolvedValue({ data: { session: null }, error: new Error('Load failed') })
+            const mp = useMultiplayerStore()
+            const joining = mp.joinGame('DEADCD')
+            await vi.advanceTimersByTimeAsync(10_000)
+
+            expect(await joining).toBeNull()
+            expect(FakeWebSocket.instances.length).toBe(0)
+            expect(mp.error).toBe("Couldn't reach the server. Check your connection.")
+            expect(track).toHaveBeenCalledWith('mp_join_failed', { reason: "Couldn't reach the server. Check your connection.", attempt: 1, method: 'code' })
         } finally {
             vi.useRealTimers()
         }

@@ -505,9 +505,22 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
         return GAME_SERVER.replace(/^http/, 'ws') + `/room/${code}/ws`
     }
 
-    async function accessToken(): Promise<string | null> {
-        const { data } = await supabase.auth.getSession()
-        return data.session?.access_token ?? null
+    /**
+     * The session's access token, or null with `error` set. An expired token
+     * whose refresh failed on the network (a phone waking up) comes back as no
+     * session plus an error while the session stays stored, so that is retried
+     * before a signed-in player is told to log in.
+     */
+    async function accessToken(signedOutMessage: string): Promise<string | null> {
+        for (const wait of [1_000, 2_000, 0]) {
+            const { data, error: authError } = await supabase.auth.getSession()
+            if (data.session) return data.session.access_token
+            if (!authError) break
+            if (!wait) { error.value = "Couldn't reach the server. Check your connection."; return null }
+            await new Promise(r => setTimeout(r, wait))
+        }
+        error.value = signedOutMessage
+        return null
     }
 
     function myNickname(): string {
@@ -519,8 +532,8 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
      *  newer connect() replaced this attempt mid-flight (callers must treat
      *  that as "stand down", never as a failure to clean up after). */
     async function connect(code: string): Promise<boolean | 'superseded'> {
-        const token = await accessToken()
-        if (!token) { error.value = 'You must be logged in to play online'; return false }
+        const token = await accessToken('You must be logged in to play online')
+        if (!token) return false
 
         closedByUs = false
         connectFailReason = null
@@ -741,8 +754,8 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
     }
 
     async function createRoom(mode: StackingMode, isPublic: boolean): Promise<string | null> {
-        const token = await accessToken()
-        if (!token) { error.value = 'You must be logged in to create a game'; return null }
+        const token = await accessToken('You must be logged in to create a game')
+        if (!token) return null
         try {
             const res = await fetch(`${GAME_SERVER}/rooms`, {
                 method: 'POST',
