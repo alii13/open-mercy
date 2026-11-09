@@ -111,7 +111,13 @@ let cancelWait = () => {}
 onMounted(() => {
   // Below the fold: the reveal animations load on the first scroll.
   cancelWait = onFirstScroll(async () => {
-    gsap.registerPlugin((await import('gsap/ScrollTrigger')).ScrollTrigger)
+    try {
+      gsap.registerPlugin((await import('gsap/ScrollTrigger')).ScrollTrigger)
+    } catch (err) {
+      // The rows only hide inside initFaq, so they stay visible, unanimated.
+      console.warn('landing FAQ: ScrollTrigger failed to load', err)
+      return
+    }
     if (alive) requestAnimationFrame(() => requestAnimationFrame(initFaq))
   })
 })
