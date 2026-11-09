@@ -426,6 +426,23 @@ describe('join failure reasons and retry', () => {
         }
     })
 
+    it('stays out of a room the player left while the join waited on its token', async () => {
+        vi.useFakeTimers()
+        try {
+            getSession.mockResolvedValueOnce({ data: { session: null }, error: new Error('Load failed') })
+            const mp = useMultiplayerStore()
+            const joining = mp.joinGame('DEADCD')
+            await vi.advanceTimersByTimeAsync(0)
+            await mp.leaveGame()
+            await vi.advanceTimersByTimeAsync(1_000)
+
+            expect(FakeWebSocket.instances.length).toBe(0)
+            expect(await joining).toBeNull()
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
     it('blames the connection, not the sign-in, when the refresh keeps failing', async () => {
         vi.useFakeTimers()
         try {
