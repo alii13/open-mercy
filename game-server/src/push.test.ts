@@ -1,20 +1,18 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MAX_SENDS_PER_RUN, saveSubscription, sendNudges } from './push'
 
+// CI installs only the frontend's packages, so the push library is stubbed.
+// These tests are about the run's own logic; encryption is the library's job.
+vi.mock('@block65/webcrypto-web-push', () => ({
+    buildPushPayload: async () => ({ method: 'POST', headers: {}, body: new Uint8Array(0) }),
+}))
+
 const NOW = new Date('2026-07-24T12:00:00Z')
-const b64u = (b: ArrayBuffer | Uint8Array) => Buffer.from(b as ArrayBuffer).toString('base64url')
 
 async function setup(rowCount: number, statusFor: (i: number) => number) {
-    const vapid = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify'])
-    const browser = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits'])
-    const p256dh = b64u(await crypto.subtle.exportKey('raw', browser.publicKey))
-    const env = {
-        SUPABASE_URL: 'https://db.test', SUPABASE_SERVICE_KEY: 'service',
-        VAPID_PUBLIC_KEY: b64u(await crypto.subtle.exportKey('raw', vapid.publicKey)),
-        VAPID_PRIVATE_KEY: (await crypto.subtle.exportKey('jwk', vapid.privateKey)).d!,
-    }
+    const env = { SUPABASE_URL: 'https://db.test', SUPABASE_SERVICE_KEY: 'service', VAPID_PUBLIC_KEY: 'pub', VAPID_PRIVATE_KEY: 'priv' }
     const rows = Array.from({ length: rowCount }, (_, i) => ({
-        endpoint: `https://fcm.googleapis.com/fcm/send/e${i}`, p256dh, auth: b64u(crypto.getRandomValues(new Uint8Array(16))),
+        endpoint: `https://fcm.googleapis.com/fcm/send/e${i}`, p256dh: 'B'.repeat(87), auth: 'a'.repeat(22),
         tz: 'UTC', play_hour: 0, streak: 4, last_played: '2026-07-23', shield_used_on: '2026-07-20', last_sent_on: null, last_variant: null,
     }))
     const calls: { kind: string; url: string; body?: unknown }[] = []
