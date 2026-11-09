@@ -34,6 +34,9 @@ export function needsHomeScreen(nav: { userAgent: string; maxTouchPoints?: numbe
     const ua = nav.userAgent
     const ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && (nav.maxTouchPoints ?? 0) > 1)
     if (!ios || nav.standalone === true) return false
+    // Instagram, Facebook, TikTok and LINE open links in their own browser,
+    // which has no Add to Home Screen. Chrome, Edge and Firefox on iOS do.
+    if (/Instagram|FBAN|FBAV|musical_ly|BytedanceWebview|Line\//.test(ua)) return false
     const v = ua.match(/OS (\d+)_(\d+)/) ?? ua.match(/Version\/(\d+)\.(\d+)/)
     if (!v) return false
     const [major, minor] = [Number(v[1]), Number(v[2])]

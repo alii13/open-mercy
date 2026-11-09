@@ -127,9 +127,11 @@
             </span>
             <span v-if="reminderAsk === 'on'" class="daily-nudge-sub">You're set. One reminder a day, only if you haven't played yet.</span>
             <!-- iPhone tab: push exists only in the home-screen app, which starts
-                 with its own storage, so a guest saves their stats first. -->
+                 with empty storage (no session, no day streak), so the player
+                 signs in there; a guest has to save their stats first to have
+                 an account to sign in to. -->
             <span v-else-if="reminderAsk === 'ios'" class="daily-nudge-sub">
-              On iPhone, reminders live in the home-screen app: tap Share, then Add to Home Screen, and turn them on there.<template v-if="isAnonymous"> Save your stats first so your streak comes with you.</template>
+              On iPhone, reminders work from the home-screen app: tap Share, then Add to Home Screen. It starts fresh, so <template v-if="isAnonymous">save your stats first and </template>sign in there to keep your account.
             </span>
             <template v-else>
               <span class="daily-nudge-sub">One ping a day when the new deal is ready, at the hour you usually play. Off anytime in settings.</span>
@@ -250,7 +252,8 @@ onMounted(async () => {
     if (!(await reminderKey())) return
     reminderAsk.value = kind
     markReminderAsked()
-    track('reminder_ask_shown', { mode: props.mode, kind })
+    // Separate events, so the opt-in rate's denominator holds only real asks.
+    track(kind === 'ios' ? 'reminder_ios_shown' : 'reminder_ask_shown', { mode: props.mode })
 })
 
 function iosNoted() {

@@ -54,6 +54,12 @@ describe('needsHomeScreen', () => {
         expect(needsHomeScreen({ userAgent: ANDROID, maxTouchPoints: 5 })).toBe(false)
         expect(needsHomeScreen({ userAgent: IPHONE_17, maxTouchPoints: 5, standalone: true })).toBe(false)
     })
+
+    it('is false inside an app\'s own browser, which has no Add to Home Screen', () => {
+        for (const app of ['Instagram 312.0.0', 'FBAN/FBIOS;FBAV/450.0', 'musical_ly_34.1 BytedanceWebview', 'Line/13.0.0']) {
+            expect(needsHomeScreen({ userAgent: `${IPHONE_17} ${app}`, maxTouchPoints: 5 })).toBe(false)
+        }
+    })
 })
 
 describe('reminderAskKind', () => {
