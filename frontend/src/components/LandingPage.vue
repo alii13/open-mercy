@@ -93,8 +93,8 @@
     <!-- Scroll sections (kept from Phase 1). Mounted on the first scroll: the
          story renders ~40 cards, which PageSpeed counted as startup work. The
          placeholder holds the same 100vh so nothing shifts when it arrives. -->
-    <LandingScrollSections v-if="storyReady" @openFeedback="showFeedback = true" />
-    <div v-else class="story-placeholder" aria-hidden="true"></div>
+    <component :is="story" v-if="story" @openFeedback="showFeedback = true" />
+    <div v-else-if="!storyFailed" class="story-placeholder" aria-hidden="true"></div>
 
     <LandingGuide />
 
@@ -124,7 +124,7 @@
 
 <script setup lang="ts">
 import { ArrowRight } from 'lucide-vue-next'
-import { ref, onMounted, onUnmounted, computed, defineAsyncComponent } from 'vue'
+import { ref, shallowRef, onMounted, onUnmounted, computed, type Component } from 'vue'
 import gsap from 'gsap'
 import LandingGuide from './LandingGuide.vue'
 import LandingFAQ from './LandingFAQ.vue'
@@ -139,7 +139,6 @@ import { useScreenSize } from '../composables/useScreenSize'
 import { currentRoute, navigate } from '../utils/routes'
 import { onFirstScroll } from '../composables/onFirstScroll'
 
-const LandingScrollSections = defineAsyncComponent(() => import('./LandingScrollSections.vue'))
 
 const props = defineProps<{ loading?: boolean }>()
 
@@ -163,7 +162,13 @@ const strikeRef = ref<SVGSVGElement>()
 const taglineRef = ref<HTMLElement>()
 const heroCtaRef = ref<HTMLElement>()
 const pulse = useSitePulse()
-const storyReady = ref(false)
+// The story's component once its code has loaded. Rendered directly, not via
+// defineAsyncComponent: that wrapper renders nothing until its own load
+// settles, a frame Chrome can paint, and then the page below jumps up under
+// the hero and back. If the code never arrives (offline, or a deploy replaced
+// the chunk), the placeholder goes too, so no blank screen is left behind.
+const story = shallowRef<Component | null>(null)
+const storyFailed = ref(false)
 let cancelStory = () => {}
 
 const emit = defineEmits<{
@@ -216,7 +221,12 @@ const reducedMotion =
   window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 onMounted(() => {
-  cancelStory = onFirstScroll(() => { storyReady.value = true })
+  cancelStory = onFirstScroll(() => {
+    import('./LandingScrollSections.vue').then(
+      (m) => { story.value = m.default },
+      () => { storyFailed.value = true },
+    )
+  })
   if (heroSentinel.value) {
     observer = new IntersectionObserver(
       (entries) => {
