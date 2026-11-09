@@ -88,6 +88,9 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
     const realtimeStatus = ref<'CONNECTING' | 'SUBSCRIBED' | 'CLOSED'>('CLOSED')
     let ws: WebSocket | null = null
     let closedByUs = false
+    // Bumped by every connect() and by leaving, so a connect still waiting on
+    // its token stands down instead of replacing a newer socket or rejoining.
+    let connectSeq = 0
     let reconnectAttempts = 0
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null
     // Why the last connect() failed when the server never said (for mp_join_failed).
@@ -505,9 +508,21 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
         return GAME_SERVER.replace(/^http/, 'ws') + `/room/${code}/ws`
     }
 
-    async function accessToken(): Promise<string | null> {
-        const { data } = await supabase.auth.getSession()
-        return data.session?.access_token ?? null
+    /**
+     * The session's access token, or the message to show instead. An expired
+     * token whose refresh failed on the network (a phone waking up) comes back
+     * as no session plus an error while the session stays stored, so that is
+     * retried before a signed-in player is told to log in.
+     */
+    async function accessToken(signedOutMessage: string): Promise<string | { failure: string }> {
+        for (const wait of [1_000, 2_000, 0]) {
+            const { data, error: authError } = await supabase.auth.getSession()
+            if (data.session) return data.session.access_token
+            if (!authError) break
+            if (!wait) return { failure: "Couldn't reach the server. Check your connection." }
+            await new Promise(r => setTimeout(r, wait))
+        }
+        return { failure: signedOutMessage }
     }
 
     function myNickname(): string {
@@ -519,8 +534,10 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
      *  newer connect() replaced this attempt mid-flight (callers must treat
      *  that as "stand down", never as a failure to clean up after). */
     async function connect(code: string): Promise<boolean | 'superseded'> {
-        const token = await accessToken()
-        if (!token) { error.value = 'You must be logged in to play online'; return false }
+        const seq = ++connectSeq
+        const token = await accessToken('You must be logged in to play online')
+        if (seq !== connectSeq) return 'superseded'
+        if (typeof token !== 'string') { error.value = token.failure; return false }
 
         closedByUs = false
         connectFailReason = null
@@ -633,6 +650,7 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
     /** Drop the socket and forget the room, without the leave ceremony —
      *  for backing out of a room we should never have sat down in. */
     function quietDisconnect() {
+        connectSeq++
         closedByUs = true
         if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null }
         const prev = ws
@@ -741,8 +759,8 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
     }
 
     async function createRoom(mode: StackingMode, isPublic: boolean): Promise<string | null> {
-        const token = await accessToken()
-        if (!token) { error.value = 'You must be logged in to create a game'; return null }
+        const token = await accessToken('You must be logged in to create a game')
+        if (typeof token !== 'string') { error.value = token.failure; return null }
         try {
             const res = await fetch(`${GAME_SERVER}/rooms`, {
                 method: 'POST',
@@ -943,6 +961,7 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
         }
         // Leaving the room leaves its voice channel; rematches keep it.
         void useVoiceStore().leaveVoice()
+        connectSeq++
         closedByUs = true
         if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null }
         sendMsg({ t: 'leave' })
