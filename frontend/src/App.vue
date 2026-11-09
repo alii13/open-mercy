@@ -176,7 +176,9 @@
 import { X } from 'lucide-vue-next'
 import { ref, computed, watch, onMounted, onUnmounted, defineAsyncComponent } from 'vue'
 import { track, trackScreen } from './utils/analytics'
+import { syncReminders } from './composables/useReminders'
 import { localDateString } from './utils/seededRng'
+import { getDailyRecord } from './utils/dailyChallenge'
 import { nextBot } from './utils/botLadder'
 import { WARM_UP_GAMES } from '@engine/bot'
 import { adoptProfileEquip, applyEquipped } from './utils/cosmetics'
@@ -321,6 +323,22 @@ onMounted(async () => {
   // here — it counts real CTA clicks. Failure falls back to the landing page,
   // where the invite banner and the retry toast still apply.
   if (!authStore.isAuthenticated && currentRoute.value.name === 'room') await attemptGuestSignin()
+
+  // A tap on a daily reminder arrives as ?src=push&v=<wording> (public/sw.js, game-server/src/nudge.ts).
+  const { src, v, ...query } = router.currentRoute.value.query
+  if (src === 'push') {
+    await router.replace({ query })
+    openFromReminder(typeof v === 'string' ? v : null)
+  }
+  // ...or, with the game already open, as a message: the tab is focused, not reloaded.
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', (e) => {
+      if (e.data?.type !== 'reminder-open' || typeof e.data.url !== 'string') return
+      openFromReminder(new URL(e.data.url, location.origin).searchParams.get('v'))
+    })
+    navigator.serviceWorker.startMessages()
+  }
+  void syncReminders({ checkKey: true })
 })
 
 // App remounts (HMR) would otherwise stack PASSWORD_RECOVERY listeners.
@@ -426,7 +444,17 @@ function startLocalGame(mode?: 'official' | 'house' | 'casual') {
 // card or the game-over nudge — so adoption per surface is measurable. It is
 // NOT called `source`: GA4 reads a parameter of that name as a traffic source
 // and rewrites the session's attribution with it.
-function startDailyGame(entry_point: 'lobby' | 'game_over') {
+/**
+ * A reminder was tapped: open today's deal, unless the player is mid-game
+ * (never pull them out), signed out, or already played it today.
+ */
+function openFromReminder(variant: string | null) {
+  track('reminder_opened', { variant: variant?.slice(0, 32) ?? 'unknown' })
+  if (!authStore.isAuthenticated || inMpMatch.value || localGameStore.gameState !== 'LOBBY' || getDailyRecord()) return
+  startDailyGame('reminder')
+}
+
+function startDailyGame(entry_point: 'lobby' | 'game_over' | 'reminder') {
   if (localGameStore.resumeDaily()) return
   track('daily_started', { entry_point })
   localGameStore.initializeGame(['You', 'Terminator'], 'official', { dailySeed: localDateString() })

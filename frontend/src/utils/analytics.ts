@@ -28,7 +28,7 @@
  *   share              { method: whatsapp|x|image|native|clipboard,
  *                        content_type: sp_win|mp_win|daily }
  *   profile_shared     {}
- *   daily_started      { entry_point: lobby|game_over }
+ *   daily_started      { entry_point: lobby|game_over|reminder }
  *   daily_finished     { result: won|lost|eliminated, turns }
  *   bot_defeated       { bot_id, rung: 1..8 }
  *   play_clicked       { method: guest }
@@ -43,6 +43,17 @@
  *   leaderboard_filtered   { country: <ISO-3166 alpha-2>|global }
  *   avatar_saved       {}  - a claimed player saved a profile photo
  *   avatar_removed     {}  - and removed it
+ *
+ * Daily reminders (web push, game-server/src/push.ts). Shown over asked is the
+ * opt-in rate; opened per `variant` over push_sends.sent per variant is the
+ * click rate of each wording, and push_sends 'unsubscribed' is the turn-off
+ * count. `variant` must be a registered custom dimension to split by wording.
+ *   reminder_ask_shown { mode: sp|mp }  - the game-over card asked
+ *   reminder_on        {}               - subscribed (card or settings)
+ *   reminder_denied    {}               - the browser prompt was refused
+ *   reminder_skipped   {}               - "No thanks" on the card
+ *   reminder_off       {}               - switched off in settings
+ *   reminder_opened    { variant }      - a reminder was tapped
  *
  * What's New. The card trio is the whole evidence base for the loud-or-quiet
  * call that every release has to make (see "Shipping updates to players" in

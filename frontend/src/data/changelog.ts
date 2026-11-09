@@ -68,6 +68,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: '2026-11-09',
+        level: 'loud',
+        tag: 'NEW',
+        title: 'Shield your streak and get a daily reminder',
+        body: 'Miss a day and your free weekly shield keeps a streak of 2 or more days alive. On Android and computers you can also get one reminder a day, at the hour you usually play: tap the gear in any game to turn it on.',
+    },
+    {
         id: '2026-11-07',
         level: 'loud',
         tag: 'NEW',

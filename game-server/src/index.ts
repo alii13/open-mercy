@@ -17,10 +17,11 @@ import { houseClockFor, housePlanAtDeal, houseStep, leavesTable, newHouseSeat, t
 import { chatAllowed, loungeAllowed } from './chatLimit'
 import { cleanLoungeAct, LOUNGE_FACES, LOUNGE_TABLE, type LoungeAct } from '../../shared/lounge'
 import { sendRoomInvite } from './invites'
+import { deleteSubscription, pushConfigured, saveSubscription, sendNudges, type PushEnv } from './push'
 import { quickChatPhrase } from '../../shared/quickChat'
 import type { StackingMode } from '../../shared/engine'
 
-interface Env extends AuthEnv, VoiceEnv {
+interface Env extends AuthEnv, VoiceEnv, PushEnv {
     ROOM: DurableObjectNamespace
     /** Optional wrangler secret; enables server-side game_results persistence. */
     SUPABASE_SERVICE_KEY?: string
@@ -175,7 +176,24 @@ export default {
 
         if (url.pathname === '/health') {
             console.log('health check, secret bound:', !!env.SUPABASE_SERVICE_KEY)
-            return withCors(Response.json({ ok: true, resultsPersistence: !!env.SUPABASE_SERVICE_KEY, voice: voiceConfigured(env) }), req)
+            return withCors(Response.json({ ok: true, resultsPersistence: !!env.SUPABASE_SERVICE_KEY, voice: voiceConfigured(env), push: pushConfigured(env) }), req)
+        }
+
+        // Daily reminders. The public key is what a browser subscribes with;
+        // null tells the client reminders are off on this deploy.
+        if (url.pathname === '/push/key') {
+            return withCors(Response.json({ key: pushConfigured(env) ? env.VAPID_PUBLIC_KEY : null }), req)
+        }
+        if (req.method === 'POST' && (url.pathname === '/push/subscribe' || url.pathname === '/push/unsubscribe')) {
+            if (Number(req.headers.get('content-length') ?? 0) > 4096) return withCors(new Response('too large', { status: 413 }), req)
+            const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '')
+            const user = await verifySupabaseToken(token, env)
+            if (!user) return withCors(new Response('unauthorized', { status: 401 }), req)
+            const body = await req.json<Record<string, unknown>>().catch(() => null)
+            const status = url.pathname === '/push/subscribe'
+                ? await saveSubscription(env, user.userId, body)
+                : await deleteSubscription(env, user.userId, body?.endpoint)
+            return withCors(new Response(null, { status }), req)
         }
 
         // Open public rooms for quick match. Stays a bare array of codes:
@@ -215,6 +233,11 @@ export default {
         }
 
         return new Response('not found', { status: 404 })
+    },
+
+    // Hourly (wrangler.toml [triggers]): send the reminders that are due.
+    async scheduled(_ctrl: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+        ctx.waitUntil(sendNudges(env))
     },
 }
 

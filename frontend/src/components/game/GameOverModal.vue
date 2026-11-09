@@ -105,7 +105,7 @@
              player reads, so today's deal earns its comeback pitch here.
              The parent decides eligibility (solo game, deal not yet played,
              and never after the daily itself); this just renders. -->
-        <div v-if="daily && !claimSpotlight" class="daily-nudge">
+        <div v-if="daily && !claimSpotlight && !reminderAsk" class="daily-nudge">
           <div class="daily-nudge-text">
             <span class="daily-nudge-title">
               <Flame :size="14" :stroke-width="2" aria-hidden="true" />
@@ -115,6 +115,25 @@
             <span class="daily-nudge-sub">The same shuffle for the whole world. One scored attempt.</span>
           </div>
           <button class="daily-nudge-btn" type="button" @click="$emit('play-daily')">PLAY</button>
+        </div>
+
+        <!-- The daily reminder, asked on a game-over and never on a first
+             visit. Takes the daily strip's slot: one hazard-yellow ask at a time. -->
+        <div v-if="reminderAsk && !claimSpotlight" class="daily-nudge">
+          <div class="daily-nudge-text">
+            <span class="daily-nudge-title">
+              <Bell :size="14" :stroke-width="2" aria-hidden="true" />
+              DON'T BREAK THE STREAK
+            </span>
+            <span v-if="reminderAsk === 'on'" class="daily-nudge-sub">You're set. One reminder a day, only if you haven't played yet.</span>
+            <template v-else>
+              <span class="daily-nudge-sub">One ping a day when the new deal is ready, at the hour you usually play. Off anytime in settings.</span>
+              <button v-if="reminderAsk === 'ask'" class="link-btn reminder-skip" type="button" @click="skipReminder">No thanks</button>
+            </template>
+          </div>
+          <button v-if="reminderAsk !== 'on'" class="daily-nudge-btn" type="button" :disabled="reminderAsk === 'busy'" @click="remindMe">
+            {{ reminderAsk === 'busy' ? 'ONE MOMENT' : 'REMIND ME' }}
+          </button>
         </div>
 
         <!-- First win on this device: the claim pitch earns one prominent
@@ -146,13 +165,15 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import gsap from 'gsap'
-import { ArrowRight, Flame, ImageDown, UserPlus } from 'lucide-vue-next'
+import { ArrowRight, Bell, Flame, ImageDown, UserPlus } from 'lucide-vue-next'
 import { siX, siWhatsapp } from 'simple-icons'
 import { useSocialStore } from '../../stores/socialStore'
 import Avatar from '../Avatar.vue'
 import { generateShareImage, shareOrDownload } from '../../utils/shareImage'
 import { shouldSpotlightClaim, markClaimSpotlightShown } from '../../utils/claimSpotlight'
 import { track } from '../../utils/analytics'
+import { markReminderAnswered, markReminderAsked, shouldAskReminder } from '../../utils/reminderAsk'
+import { enableReminders, reminderKey, reminderPermission } from '../../composables/useReminders'
 
 interface Stats {
   cardsPlayed: number
@@ -211,6 +232,30 @@ onMounted(() => {
         track('claim_spotlight_shown', {})
     }
 })
+
+// The reminder ask waits behind the claim spotlight, and only shows on a
+// deploy whose game server has reminders on.
+// 'busy': subscribing can take several seconds on a slow link.
+const reminderAsk = ref<'ask' | 'busy' | 'on' | null>(null)
+onMounted(async () => {
+    if (claimSpotlight.value || !shouldAskReminder(reminderPermission.value)) return
+    if (!(await reminderKey())) return
+    reminderAsk.value = 'ask'
+    markReminderAsked()
+    track('reminder_ask_shown', { mode: props.mode })
+})
+
+async function remindMe() {
+    markReminderAnswered()
+    reminderAsk.value = 'busy'
+    reminderAsk.value = (await enableReminders()) === 'on' ? 'on' : null
+}
+
+function skipReminder() {
+    markReminderAnswered()
+    reminderAsk.value = null
+    track('reminder_skipped', {})
+}
 
 // Guests are included on purpose: an anonymous player has a durable profile
 // and can hold friends, and asking them to claim first is how a friends list
@@ -667,9 +712,19 @@ function confettiStyle(i: number) {
   transition: border-color 0.15s, color 0.15s;
   flex-shrink: 0;
 }
+.daily-nudge-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
 .daily-nudge-btn:hover {
   border-color: rgba(255, 204, 0, 0.8);
   color: #ffe066;
+}
+
+.link-btn.reminder-skip {
+  align-self: flex-start;
+  padding: 0.15rem 0 0;
+  font-size: 0.68rem;
 }
 
 .claim-nudge {

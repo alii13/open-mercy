@@ -12,7 +12,8 @@
       "@roomCode": ["../shared/roomCode.ts"],
       "@quickChat": ["../shared/quickChat.ts"],
       "@lounge": ["../shared/lounge.ts"],
-      "@handles": ["../shared/handles.ts"]
+      "@handles": ["../shared/handles.ts"],
+      "@streak": ["../shared/streak.ts"]
     },
 
     /* Linting */

@@ -15,6 +15,7 @@ export default defineConfig({
       '@quickChat': path.resolve(__dirname, '../shared/quickChat.ts'),
       '@lounge': path.resolve(__dirname, '../shared/lounge.ts'),
       '@handles': path.resolve(__dirname, '../shared/handles.ts'),
+      '@streak': path.resolve(__dirname, '../shared/streak.ts'),
     },
   },
   assetsInclude: ['**/*.png', '**/*.jpg', '**/*.jpeg'],

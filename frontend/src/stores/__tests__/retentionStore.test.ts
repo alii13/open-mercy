@@ -52,10 +52,33 @@ describe('day streak', () => {
     })
 
     it('is dead after two missed days', () => {
-        seed('2026-07-22', 3)
+        seed('2026-07-21', 3)
         setActivePinia(createPinia())
         const r = useRetentionStore()
         expect(r.effectiveStreak).toBe(0)
+    })
+
+    it('is held by the weekly shield over one missed day, and spends it on the next game', () => {
+        seed('2026-07-22', 3)
+        setActivePinia(createPinia())
+        const r = useRetentionStore()
+        expect(r.effectiveStreak).toBe(3)
+        expect(r.shieldHolding).toBe(true)
+        r.recordGameResult({ won: false, cardsPlayed: 10, biggestStackSurvived: 4, unoCalls: 1, peakHand: 9, mode: 'mp' })
+        expect(r.currentStreak).toBe(4)
+        expect(r.shieldReady).toBe(false)
+    })
+
+    it('remembers the hour the player usually plays', () => {
+        setActivePinia(createPinia())
+        const r = useRetentionStore()
+        expect(r.usualHour).toBeNull()
+        const game = { won: false, cardsPlayed: 10, biggestStackSurvived: 4, unoCalls: 1, peakHand: 9, mode: 'sp' as const }
+        for (const t of ['T20:10', 'T20:50', 'T09:00']) {
+            vi.setSystemTime(new Date(`2026-07-24${t}:00`))
+            r.recordGameResult(game)
+        }
+        expect(r.usualHour).toBe(20)
     })
 
     it('continues when a game is recorded the day after the last one', () => {

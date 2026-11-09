@@ -149,7 +149,15 @@
           >
             <Flame class="streak-flame" :stroke-width="2" aria-hidden="true" />
             <span class="streak-count">{{ retention.effectiveStreak }}-day streak</span>
-            <span v-if="!retention.playedToday" class="streak-state streak-state--warn">Play today to keep it</span>
+            <span v-if="retention.shieldHolding" class="streak-state streak-state--warn">
+              <Shield :size="14" :stroke-width="2" aria-hidden="true" />
+              Your shield is holding it. Play today
+            </span>
+            <span v-else-if="!retention.playedToday" class="streak-state streak-state--warn">Play today to keep it</span>
+            <span v-else-if="retention.shieldReady && retention.effectiveStreak >= 2" class="streak-state" title="Covers one missed day, once a week">
+              <Shield :size="14" :stroke-width="2" aria-hidden="true" />
+              Shield ready
+            </span>
           </div>
           <template v-if="!dailyRecord">
             <p class="daily-desc">The same shuffle for every player in the world. One scored attempt.</p>
@@ -636,7 +644,7 @@
 
 <script setup lang="ts">
 import { ref, computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, watch } from 'vue'
-import { ArrowRight, Bot, Check, ChevronDown, ChevronRight, Copy, Flame, Hash, HelpCircle, Menu as MenuIcon, Minus, Pencil, Share2, Skull, Users, Volume1, VolumeX, X } from 'lucide-vue-next'
+import { ArrowRight, Bot, Check, ChevronDown, ChevronRight, Copy, Flame, Hash, HelpCircle, Menu as MenuIcon, Minus, Pencil, Share2, Shield, Skull, Users, Volume1, VolumeX, X } from 'lucide-vue-next'
 import { useRetentionStore } from '../stores/retentionStore'
 import {
     getDailyRecord, fetchServerDailyRecord, dailyGridCells, buildDailyShareText, loadDailyProgress,
@@ -1804,6 +1812,9 @@ function copyLink() {
 .streak-state {
   font-size: 0.6rem;
   letter-spacing: 0.14em;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
 }
 
 .streak-chip.at-risk {
