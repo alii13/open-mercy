@@ -4,7 +4,7 @@ import { nextTick } from 'vue'
 
 const { rpc, channels, unsubscribe } = vi.hoisted(() => ({
     rpc: vi.fn(),
-    channels: [] as { name: string, filters: unknown[], fire: (i?: number) => void }[],
+    channels: [] as { name: string, filters: unknown[], fire: (i?: number) => void, status?: (s: string) => void }[],
     unsubscribe: vi.fn(),
 }))
 vi.mock('../../lib/supabase', () => ({
@@ -21,7 +21,9 @@ vi.mock('../../lib/supabase', () => ({
                 // One change matches one filter, so Realtime calls one handler.
                 fire: (i = 0) => handlers[i]?.(),
                 on: (_e: string, cfg: unknown, cb: () => void) => { ch.filters.push(cfg); handlers.push(cb); return ch },
-                subscribe: () => ch,
+                // Kept, so a test can report the join the way Realtime does.
+                status: undefined as ((s: string) => void) | undefined,
+                subscribe: (cb?: (s: string) => void) => { ch.status = cb; return ch },
                 unsubscribe,
             }
             channels.push(ch)
@@ -486,6 +488,31 @@ describe('social store', () => {
             listReturns([row({ user_id: 'asked-me', status: 'pending', incoming: true })])
             ch!.fire()
             await vi.waitFor(() => expect(social.incoming).toHaveLength(1))
+        })
+
+        it('leaves a screen opening to the channel, and catches up only after a few minutes', async () => {
+            listReturns([])
+            const social = useSocialStore()
+            useAuthStore().user = { id: 'me' } as never
+            await nextTick()
+            const reads = () => rpc.mock.calls.filter(([fn]) => fn === 'my_friends').length
+            const ch = channels.find(c => c.name === 'friendships:me')!
+
+            // Still joining: the join reads when it lands.
+            await social.catchUp()
+            expect(reads()).toBe(0)
+            ch.status!('SUBSCRIBED')
+            await vi.waitFor(() => expect(reads()).toBe(1))
+
+            // Live and just read: a return to the lobby asks for nothing.
+            await social.catchUp()
+            expect(reads()).toBe(1)
+
+            // Declines and unfriends stay quiet on the channel, so an old list is re-read.
+            const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 6 * 60_000)
+            await social.catchUp()
+            expect(reads()).toBe(2)
+            nowSpy.mockRestore()
         })
 
         it('closes the channel once the friends SQL turns out to be missing', async () => {

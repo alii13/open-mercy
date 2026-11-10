@@ -15,6 +15,8 @@
 import { ref } from 'vue'
 import { supabase } from '../lib/supabase'
 import { localDateString } from '../utils/seededRng'
+import { getDailyRecord } from '../utils/dailyChallenge'
+import { useAuthStore } from '../stores/authStore'
 
 export interface DailyRow {
     rank: number
@@ -232,4 +234,58 @@ export function useLeaderboard() {
         fetchAlltime,
         setCountry,
     }
+}
+
+/** "Today's top" draws five rows. */
+const LOBBY_ROWS = 5
+/** The lobby unmounts for every game and every page, and most players come
+ *  back to it a few minutes later. Their own place only moves when they play
+ *  the daily, which changes the key below and reads at once. */
+const LOBBY_FRESH_MS = 5 * 60_000
+
+const lobbyAvailable = ref(false)
+const lobbyDaily = ref<DailyRow[]>([])
+const lobbyContext = ref<BoardContext | null>(null)
+let lobbyKey = ''
+let lobbyReadAt = 0
+
+/**
+ * The lobby's board: today's top five and the viewer's place, nothing the
+ * lobby does not draw. Held at module level so a return to the lobby shows
+ * the same board without asking again.
+ */
+export function useLobbyBoard() {
+    const auth = useAuthStore()
+
+    async function fetchDaily() {
+        const date = localDateString()
+        // The viewer is in the key: my_rank and is_me belong to whoever is signed in.
+        const key = `${auth.user?.id ?? ''}:${date}:${getDailyRecord()?.result ?? ''}`
+        if (key === lobbyKey && Date.now() - lobbyReadAt < LOBBY_FRESH_MS) return
+        // Not the last player's rank on the next player's screen while this loads.
+        if (!lobbyKey.startsWith(`${auth.user?.id ?? ''}:`)) {
+            lobbyDaily.value = []
+            lobbyContext.value = null
+        }
+        try {
+            const [d, dc] = await Promise.all([
+                supabase.rpc('daily_leaderboard', { challenge_date: date, max_rows: LOBBY_ROWS }),
+                supabase.rpc('daily_my_rank', { challenge_date: date }),
+            ])
+            if (d.error) {
+                // Functions not installed yet: hide the board.
+                lobbyAvailable.value = false
+                return
+            }
+            lobbyAvailable.value = true
+            lobbyDaily.value = (d.data || []) as DailyRow[]
+            lobbyContext.value = dc.error ? null : ((dc.data as BoardContext[] | null)?.[0] ?? null)
+            lobbyKey = key
+            lobbyReadAt = Date.now()
+        } catch {
+            lobbyAvailable.value = false
+        }
+    }
+
+    return { available: lobbyAvailable, daily: lobbyDaily, dailyContext: lobbyContext, fetchDaily }
 }
