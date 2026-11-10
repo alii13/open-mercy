@@ -61,9 +61,10 @@ const inMatch = computed(() => {
 // The ten-minute window lives in my_invites and nowhere else. Re-reading on a
 // minute is what retires a toast on a tab left open all afternoon: the row
 // simply stops coming back. One clock, in the place that also matches the
-// room's GC window. With nothing on screen there is nothing to retire: a new
-// invite arrives through the store's row event and its wake-up read.
-usePoll(() => { if (invitesStore.invites.length) void invitesStore.refresh() }, 60_000)
+// room's GC window. With nothing on screen and the channel joined there is
+// nothing to do: a new invite arrives through its row event. A channel that
+// cannot join (WebSockets blocked) leaves this poll as the only way in.
+usePoll(() => { if (invitesStore.invites.length || !invitesStore.live) void invitesStore.refresh() }, 60_000)
 
 const inBotGame = computed(() => botGame.gameState !== 'LOBBY')
 const showing = computed(() => (inMatch.value || inBotGame.value ? null : invitesStore.current))

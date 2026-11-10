@@ -38,6 +38,9 @@ export interface RoomInvite {
 export const useInviteStore = defineStore('invites', () => {
     const invites = ref<RoomInvite[]>([])
     const unavailable = ref(false)
+    /** Joined and listening. Until then a new invite has no row event to
+     *  announce it, so the toast keeps polling. */
+    const live = ref(false)
     let channel: { unsubscribe: () => void } | null = null
 
     /** The one the toast shows: newest first, and only one at a time. */
@@ -102,6 +105,7 @@ export const useInviteStore = defineStore('invites', () => {
     function stop(): void {
         channel?.unsubscribe()
         channel = null
+        live.value = false
         invites.value = []
         if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisible)
     }
@@ -110,17 +114,23 @@ export const useInviteStore = defineStore('invites', () => {
         stop()
         if (unavailable.value) return
         void refresh()
-        channel = supabase
+        const ch = supabase
             .channel(`invites:${userId}`)
             .on(
                 'postgres_changes',
                 { event: 'INSERT', schema: 'public', table: 'room_invites', filter: `to_user=eq.${userId}` },
                 () => { void refresh({ force: true }) },
             )
-            // Read again on a successful join: a row inserted while the socket
-            // was down is never replayed, and a channel that fails to join at
-            // all would otherwise look exactly like a quiet one.
-            .subscribe((status: string) => { if (status === 'SUBSCRIBED') void refresh() })
+        channel = ch
+        // Read again on a successful join: a row inserted while the socket
+        // was down is never replayed, and a channel that fails to join at
+        // all would otherwise look exactly like a quiet one.
+        ch.subscribe((status: string) => {
+            // A torn-down channel still reports its close.
+            if (channel !== ch) return
+            live.value = status === 'SUBSCRIBED'
+            if (live.value) void refresh()
+        })
 
         // The same reason the heartbeat listens: a phone that slept through an
         // invite has ten minutes to notice it, and a reload should not be the
@@ -133,5 +143,5 @@ export const useInviteStore = defineStore('invites', () => {
         else stop()
     }, { immediate: true })
 
-    return { invites, current, unavailable, refresh, dismiss, start, stop }
+    return { invites, current, unavailable, live, refresh, dismiss, start, stop }
 })
