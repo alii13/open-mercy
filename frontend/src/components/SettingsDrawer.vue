@@ -171,7 +171,7 @@
 
 <script setup lang="ts">
 import { X } from 'lucide-vue-next'
-import { defineAsyncComponent, onMounted, ref } from 'vue'
+import { defineAsyncComponent, ref, watch } from 'vue'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useAuthStore } from '../stores/authStore'
 import { soundEffects } from '../composables/useSoundEffects'
@@ -186,7 +186,11 @@ const auth = useAuthStore()
 const showRules = ref(false)
 
 const reminderAvailable = ref(false)
-onMounted(async () => { reminderAvailable.value = !!(await reminderKey()) })
+// The drawer is always mounted and almost never opened, so the key is asked
+// for on the first open, not on every page load. reminderKey() remembers it.
+watch(() => settings.isOpen, async (open) => {
+  if (open && !reminderAvailable.value) reminderAvailable.value = !!(await reminderKey())
+})
 
 const reminderBusy = ref(false)
 const reminderFailed = ref(false)

@@ -100,15 +100,44 @@
 
 <script setup lang="ts">
 import { ChevronLeft } from 'lucide-vue-next'
-import { computed } from 'vue'
-import { BADGES, POINT_WEIGHTS } from '../utils/badges'
-import { usePlayerStats } from '../composables/usePlayerStats'
+import { computed, watch } from 'vue'
+import { BADGES, POINT_WEIGHTS, applyDecay, badgeFor, pointsFromRetention, progressToNext } from '../utils/badges'
+import { useBadges } from '../composables/useBadges'
+import { useAuthStore } from '../stores/authStore'
+import { useRetentionStore } from '../stores/retentionStore'
 import Badge from './Badge.vue'
 import SiteFooter from './SiteFooter.vue'
 
 defineEmits<{ (e: 'back'): void }>()
 
-const { badge, badgePoints, badgeProgress } = usePlayerStats()
+const auth = useAuthStore()
+const retention = useRetentionStore()
+// The same player_points read as every other badge in the app, rather than
+// the player's whole game history. Fresh, because the cache is per session and
+// this page is about the total after today's games.
+const { badges, fetchBadges } = useBadges()
+watch(() => auth.user?.id, (id) => { if (id) void fetchBadges([id], { fresh: true }) }, { immediate: true })
+
+function daysIdleFromDate(dateStr: string | null): number {
+  if (!dateStr) return 0
+  const then = Date.parse(`${dateStr}T00:00:00`)
+  if (Number.isNaN(then)) return 0
+  return Math.max(0, Math.floor((Date.now() - then) / 86_400_000))
+}
+
+// Signed out, the local estimate, so a visitor's badge still climbs.
+const badgePoints = computed(() => {
+  const id = auth.user?.id
+  if (id) return badges.value[id]?.points ?? 0
+  const earned = pointsFromRetention({
+    gamesPlayed: retention.gamesPlayed,
+    gamesWon: retention.gamesWon,
+    unoCalls: retention.totalUnos,
+  })
+  return applyDecay(earned, daysIdleFromDate(retention.lastPlayedDate))
+})
+const badge = computed(() => badgeFor(badgePoints.value))
+const badgeProgress = computed(() => progressToNext(badgePoints.value))
 const showOwn = computed(() => badgePoints.value > 0)
 
 const FEEL = [
