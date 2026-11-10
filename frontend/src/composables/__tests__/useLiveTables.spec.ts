@@ -84,6 +84,28 @@ describe('useLiveTables', () => {
         expect(lt.loaded.value).toBe(false)
     })
 
+    it('skips a hidden tab and reads again the moment it is back', async () => {
+        mockFetch([table()])
+        const doc = { visibilityState: 'visible', listeners: [] as (() => void)[] }
+        vi.stubGlobal('document', {
+            get visibilityState() { return doc.visibilityState },
+            addEventListener: (_e: string, cb: () => void) => { doc.listeners.push(cb) },
+            removeEventListener: () => { doc.listeners = [] },
+        })
+        const lt = useLiveTables()
+        lt.start()
+        const calls = () => (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.length
+        doc.visibilityState = 'hidden'
+        const hiddenAt = calls()
+        vi.advanceTimersByTime(60_000)
+        expect(calls()).toBe(hiddenAt)
+
+        doc.visibilityState = 'visible'
+        doc.listeners.forEach((cb) => cb())
+        expect(calls()).toBe(hiddenAt + 1)
+        lt.stop()
+    })
+
     it('stops polling when told to', async () => {
         mockFetch([table()])
         const lt = useLiveTables()

@@ -45,6 +45,11 @@ export const useAuthStore = defineStore('auth', () => {
             // IMPORTANT: Per Supabase docs, avoid await inside this callback!
             // Use setTimeout to defer Supabase calls to avoid deadlocks
             supabase.auth.onAuthStateChange((event, session) => {
+                // auth-js reports SIGNED_IN again every time the tab comes back
+                // into view, and TOKEN_REFRESHED about hourly. For the same
+                // player, still a guest or still claimed, the row is unchanged.
+                const samePlayer = !!session?.user && session.user.id === user.value?.id
+                    && session.user.is_anonymous === user.value?.is_anonymous
 
                 // Always sync user and token state immediately (non-async)
                 user.value = session?.user || null
@@ -64,8 +69,9 @@ export const useAuthStore = defineStore('auth', () => {
                 // updateUser calls (e.g. a guest claiming their account) —
                 // without it the profile would never refresh mid-session.
                 if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
-                    // Defer profile fetch to avoid blocking
-                    if (session?.user) {
+                    // Defer profile fetch to avoid blocking. A profile that never
+                    // loaded gets another go.
+                    if (session?.user && (event === 'USER_UPDATED' || !samePlayer || !profile.value)) {
                         setTimeout(async () => {
                             await fetchProfile()
                         }, 0)
