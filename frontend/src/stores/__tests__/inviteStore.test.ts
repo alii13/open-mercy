@@ -2,14 +2,14 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { nextTick } from 'vue'
 
-const { rpc, channelFor, unsubscribe, getSession } = vi.hoisted(() => {
+const { rpc, channelFor, unsubscribe, getSession, join } = vi.hoisted(() => {
     const unsubscribe = vi.fn()
     const channelFor = vi.fn()
     const getSession = vi.fn(async () => ({
         data: { session: { access_token: 't' } as { access_token: string } | null },
         error: null as { message: string } | null,
     }))
-    return { rpc: vi.fn(), channelFor, unsubscribe, getSession }
+    return { rpc: vi.fn(), channelFor, unsubscribe, getSession, join: { status: 'SUBSCRIBED' } }
 })
 
 // One fake channel per name, so a test can fire the row event the way
@@ -28,12 +28,22 @@ vi.mock('../../lib/supabase', () => ({
                 on: (_e: string, _cfg: unknown, cb: (p: unknown) => void) => { handlers.push(cb); return ch },
                 // Realtime reports the join through this callback; the store
                 // reads again on success.
-                subscribe: (cb?: (status: string) => void) => { cb?.('SUBSCRIBED'); return ch },
+                subscribe: (cb?: (status: string) => void) => { cb?.(join.status); return ch },
                 unsubscribe,
             }
             channelFor(ch)
             return ch
         },
+    },
+}))
+
+// The real guard reaches the client through import(). Two of those in flight
+// at once can resolve past the mock above and read a real, empty session,
+// which hides any same-tick race. Same rule, same session source.
+vi.mock('../../utils/liveSession', () => ({
+    hasLiveSession: async () => {
+        const { data, error } = await getSession()
+        return !error && !!data.session
     },
 }))
 
@@ -64,6 +74,7 @@ describe('invite store', () => {
         unsubscribe.mockReset()
         getSession.mockReset()
         getSession.mockResolvedValue({ data: { session: { access_token: 't' } }, error: null })
+        join.status = 'SUBSCRIBED'
     })
 
     it('opens a channel for the signed-in player and reads on start', async () => {
@@ -179,6 +190,29 @@ describe('invite store', () => {
         nowSpy.mockRestore()
         store.stop()
         vi.unstubAllGlobals()
+    })
+
+    it('sends one read when two wake-up listeners fire in the same tick', async () => {
+        // The store's listener and the toast's poll both run on visibilitychange,
+        // and the gap is stamped only after the session check.
+        rpcReturns([])
+        const store = useInviteStore()
+        await Promise.all([store.refresh(), store.refresh()])
+        expect(rpc.mock.calls.filter(([fn]) => fn === 'my_invites')).toHaveLength(1)
+    })
+
+    it('is live only once the channel has joined, so the toast keeps polling otherwise', async () => {
+        rpcReturns([])
+        const store = useInviteStore()
+        join.status = 'TIMED_OUT'
+        store.start('me')
+        expect(store.live).toBe(false)
+
+        join.status = 'SUBSCRIBED'
+        store.start('me')
+        expect(store.live).toBe(true)
+        store.stop()
+        expect(store.live).toBe(false)
     })
 
     it('a row event reads immediately even inside the gap', async () => {
