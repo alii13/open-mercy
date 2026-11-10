@@ -3,8 +3,9 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 type DbError = { message: string; code?: string }
 type Rows = { data: { id: string; avatar_version: number | null }[] | null; error: DbError | null }
 
-const { lookup, update, upload, remove, list } = vi.hoisted(() => ({
+const { lookup, rpc, update, upload, remove, list } = vi.hoisted(() => ({
     lookup: vi.fn<(ids: string[]) => Promise<Rows>>(),
+    rpc: vi.fn<(fn: string, args: { ids: string[] }) => Promise<Rows>>(),
     update: vi.fn<(patch: Record<string, unknown>, id: string) => Promise<{ error: null | DbError }>>(async () => ({ error: null })),
     upload: vi.fn<(path: string, blob: Blob, opts: Record<string, unknown>) => Promise<{ error: null | DbError }>>(async () => ({ error: null })),
     remove: vi.fn<(paths: string[]) => Promise<{ error: null }>>(async () => ({ error: null })),
@@ -13,6 +14,7 @@ const { lookup, update, upload, remove, list } = vi.hoisted(() => ({
 
 vi.mock('../../lib/supabase', () => ({
     supabase: {
+        rpc,
         from: () => ({
             select: () => ({ in: (_col: string, ids: string[]) => lookup(ids) }),
             update: (patch: Record<string, unknown>) => ({ eq: (_col: string, id: string) => update(patch, id) }),
@@ -42,6 +44,9 @@ async function fresh() {
 const tick = () => new Promise(r => setTimeout(r, 0))
 
 beforeEach(() => {
+    // Until avatar-versions.sql runs, the rest of these tests read the table.
+    rpc.mockReset()
+    rpc.mockResolvedValue({ data: null, error: { message: 'missing', code: 'PGRST202' } })
     lookup.mockReset()
     lookup.mockImplementation(async ids => ({
         data: ids.map(id => ({ id, avatar_version: id === PHOTO ? 42 : null })),
@@ -55,6 +60,26 @@ beforeEach(() => {
 })
 
 describe('photo lookup', () => {
+    it('reads at one fixed address once that exists, and from the table until then', async () => {
+        let { requestAvatars, avatarUrlFor } = await fresh()
+        requestAvatars([A])
+        await tick()
+        requestAvatars([B])
+        await tick()
+        // Missing function: tried once, then the table read for every batch.
+        expect(rpc).toHaveBeenCalledTimes(1)
+        expect(lookup).toHaveBeenCalledTimes(2)
+
+        rpc.mockImplementation(async (_fn, { ids }) => ({ data: ids.map(id => ({ id, avatar_version: 42 })), error: null }))
+        lookup.mockClear()
+        ;({ requestAvatars, avatarUrlFor } = await fresh())
+        requestAvatars([PHOTO])
+        await tick()
+        expect(rpc).toHaveBeenLastCalledWith('avatar_versions', { ids: [PHOTO] })
+        expect(lookup).not.toHaveBeenCalled()
+        expect(avatarUrlFor(PHOTO)).toContain('/42')
+    })
+
     it('asks once for every seat that renders together', async () => {
         const { requestAvatars } = await fresh()
         requestAvatars([A, PHOTO])
