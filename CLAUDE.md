@@ -4,6 +4,7 @@ Guidance for working in this repo. Hard-won - read before changing CSS, raising 
 
 ## UI conventions
 
+- **Read `docs/design-guidelines.md` before any visual change** (a new screen, overlay, component or restyle). It holds the hierarchy, token, dark-theme, touch and motion rules, the list of generated-looking patterns to avoid, and the pre-PR checklist. Screens built without it were rejected as vibecoded (2026-11-09 game-over boards, 2026-11-10 identity boards).
 - Icons come from `lucide-vue-next` (already a dependency) - never emoji glyphs in UI chrome. Country flag emoji on leaderboards/profiles are the one exception.
 - **Never hand-roll an icon as inline `<svg>`, and never stand one in as a text glyph or HTML entity** (`&rarr;`, `&times;`, `✕`, `✓`). Import the Lucide component. Hand-drawn duplicates of Lucide shapes and entity arrows were the whole of the 2026-08 icon cleanup.
 - **Icon scale is fixed: `:size="14"` inline-with-text, `16` buttons and chrome, `20` icon-only buttons and section headers, and `:stroke-width="2"` always.** Only large display/empty-state icons may sit outside it (currently two at 40). Deviating is what made the UI read as sloppy - there were six sizes and five stroke widths.
