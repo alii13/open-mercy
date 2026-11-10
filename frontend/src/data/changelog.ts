@@ -68,6 +68,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: '2026-11-10',
+        level: 'quiet',
+        tag: 'NEW',
+        title: "See each player's rank at the table",
+        body: 'Every seat now shows the rank word under the name, in that rank\'s colour, so you know who you are up against.',
+    },
+    {
         id: '2026-11-09',
         level: 'loud',
         tag: 'NEW',
