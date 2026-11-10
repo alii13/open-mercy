@@ -377,6 +377,7 @@ export const useSocialStore = defineStore('social', () => {
 
     function reset(): void {
         readSeq++
+        lastReadAt = 0
         rows.value = []
         recentRows.value = []
         pendingIds.value = new Set()

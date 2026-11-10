@@ -280,8 +280,12 @@ export function useLobbyBoard() {
             lobbyAvailable.value = true
             lobbyDaily.value = (d.data || []) as DailyRow[]
             lobbyContext.value = dc.error ? null : ((dc.data as BoardContext[] | null)?.[0] ?? null)
-            lobbyKey = key
-            lobbyReadAt = Date.now()
+            // Straight back from the daily, the result can still be on its way
+            // to the server: a board without the player's rank yet is not kept.
+            if (!getDailyRecord() || lobbyContext.value?.my_rank) {
+                lobbyKey = key
+                lobbyReadAt = Date.now()
+            }
         } catch {
             lobbyAvailable.value = false
         }
