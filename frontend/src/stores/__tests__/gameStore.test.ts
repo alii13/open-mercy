@@ -10,7 +10,7 @@ import { nextTick } from 'vue'
 
 vi.mock('../../lib/supabase', () => ({
     supabase: {
-        auth: { getUser: async () => ({ data: { user: null } }) },
+        auth: { getSession: async () => ({ data: { session: null } }) },
         from: () => {
             throw new Error('unexpected supabase call in single-player test')
         },

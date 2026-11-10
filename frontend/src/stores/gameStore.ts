@@ -828,7 +828,10 @@ export const useGameStore = defineStore('game', () => {
     })
 
     async function logGameResults() {
-        const { data: { user } } = await supabase.auth.getUser()
+        // getSession, not getUser: the id is already held locally, and getUser
+        // asks the auth server again before every result write.
+        const { data: { session } } = await supabase.auth.getSession()
+        const user = session?.user
         if (!user) return
 
         const humanPlayer = players.value.find(p => !p.isBot)
