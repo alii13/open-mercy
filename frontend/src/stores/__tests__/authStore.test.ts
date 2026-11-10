@@ -278,6 +278,28 @@ describe('claiming a guest account (in-place anonymous conversion)', () => {
         expect(auth.claimPending).toBe(true)
     })
 
+    it('leaves the profile alone when the same player comes back to the tab, unless the last read is old', async () => {
+        const auth = useAuthStore()
+        const user = { id: 'anon-1', is_anonymous: true }
+        h.state.getSession = async () => ({ data: { session: { user, access_token: 't' } } })
+        h.state.profileRow = { id: 'anon-1', username: 'RecklessShark28', created_at: '' }
+        await auth.initialize()
+        const fetchesBefore = h.state.profileFetches
+
+        // What auth-js sends on every hidden-to-visible switch, and hourly.
+        h.state.authCallback!('SIGNED_IN', { user: { ...user }, access_token: 't' })
+        h.state.authCallback!('TOKEN_REFRESHED', { user: { ...user }, access_token: 't2' })
+        await new Promise(r => setTimeout(r, 1))
+        expect(h.state.profileFetches).toBe(fetchesBefore)
+
+        // Another device may have changed the card back since: an old read is refreshed.
+        const later = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 16 * 60_000)
+        h.state.authCallback!('SIGNED_IN', { user: { ...user }, access_token: 't3' })
+        await new Promise(r => setTimeout(r, 1))
+        later.mockRestore()
+        expect(h.state.profileFetches).toBe(fetchesBefore + 1)
+    })
+
     it('tracks completion when the confirmed session lands', async () => {
         const auth = useAuthStore()
         await auth.initialize()

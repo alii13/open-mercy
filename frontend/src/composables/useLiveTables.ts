@@ -75,14 +75,22 @@ export function useLiveTables() {
         loaded.value && (joinable.value.length > 0 || inProgressCount.value > 0),
     )
 
+    // A lobby in a background tab shows its rooms to nobody. Coming back reads
+    // at once, since what is on screen is then at its most out of date.
+    const visible = () => typeof document === 'undefined' || document.visibilityState === 'visible'
+    const onVisibility = () => { if (visible()) void refresh() }
+
     function start() {
         void refresh()
-        timer ??= setInterval(refresh, POLL_MS)
+        if (timer) return
+        timer = setInterval(() => { if (visible()) void refresh() }, POLL_MS)
+        if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVisibility)
     }
 
     function stop() {
         if (timer) clearInterval(timer)
         timer = null
+        if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisibility)
     }
 
     onUnmounted(stop)
