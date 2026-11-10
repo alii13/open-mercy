@@ -47,7 +47,8 @@ export const useAuthStore = defineStore('auth', () => {
             supabase.auth.onAuthStateChange((event, session) => {
                 // auth-js reports SIGNED_IN again every time the tab comes back
                 // into view, and TOKEN_REFRESHED about hourly. For the same
-                // player, still a guest or still claimed, the row is unchanged.
+                // player, still a guest or still claimed, only another device
+                // can have changed the row, so a recent read is good enough.
                 const samePlayer = !!session?.user && session.user.id === user.value?.id
                     && session.user.is_anonymous === user.value?.is_anonymous
 
@@ -71,7 +72,8 @@ export const useAuthStore = defineStore('auth', () => {
                 if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
                     // Defer profile fetch to avoid blocking. A profile that never
                     // loaded gets another go.
-                    if (session?.user && (event === 'USER_UPDATED' || !samePlayer || !profile.value)) {
+                    const stale = Date.now() - profileReadAt > PROFILE_FRESH_MS
+                    if (session?.user && (event === 'USER_UPDATED' || !samePlayer || !profile.value || stale)) {
                         setTimeout(async () => {
                             await fetchProfile()
                         }, 0)
@@ -105,6 +107,7 @@ export const useAuthStore = defineStore('auth', () => {
             profile.value = data
             return
         }
+        profileReadAt = Date.now()
 
         // A guest (or confirmed account) with no row hit the username
         // collision before this fix - recreate the row instead of leaving
@@ -195,6 +198,10 @@ export const useAuthStore = defineStore('auth', () => {
     // One repair attempt per session: set by ensureProfile so a sign-in that
     // just ran it does not immediately re-run it from fetchProfile.
     let profileHealed = false
+    /** When profiles was last read, for the tab-return re-read below. */
+    let profileReadAt = 0
+    /** Another device can change the row (card back, name, country). */
+    const PROFILE_FRESH_MS = 15 * 60_000
 
     /**
      * Create the profile row, riding out username collisions. The handle
