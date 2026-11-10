@@ -453,6 +453,15 @@ body.fx-ko-desat .game-view {
   max-width: 130px;
 }
 
+.opponent-card .rank {
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  line-height: 1.2;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
 .opponent-card .card-count {
   font-family: var(--font-display);
   font-size: var(--text-sm);

@@ -28,6 +28,7 @@
       <span class="name">{{ name }}
         <span v-if="inVoice" class="voice-dot" :class="{ speaking: isSpeaking }" title="In voice"></span>
       </span>
+      <span v-if="badge" class="rank" :style="{ color: badge.color }">{{ badge.title }}</span>
       <span v-if="isDisconnected && !isEliminated" class="card-count dc-text">DISCONNECTED</span>
       <span v-else-if="isEliminated" class="card-count eliminated-text">{{ timedOut ? 'TIMED OUT' : 'OUT' }}</span>
       <span v-else class="card-count">{{ cardCount }} {{ displayLabel }}</span>
