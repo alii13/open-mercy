@@ -11,6 +11,7 @@
 import { ref } from 'vue'
 import { supabase } from '../lib/supabase'
 import { badgeFor, applyDecay, progressToNext, type Badge, type Progress } from '../utils/badges'
+import { isFatalSchemaError } from '../utils/supabaseErrors'
 
 export interface BadgeInfo {
     badge: Badge
@@ -29,14 +30,18 @@ function infoFor(earned: number, daysIdle: number): BadgeInfo {
 export function useBadges() {
     const badges = ref<Record<string, BadgeInfo>>({})
 
-    async function fetchBadges(userIds: string[]) {
+    /** `fresh` re-reads ids already cached: a page about the player's own
+     *  total must not show what it was before this session's games. */
+    async function fetchBadges(userIds: string[], opts: { fresh?: boolean } = {}) {
         if (broken) return
+        if (opts.fresh) for (const id of userIds) cache.delete(id)
         const missing = userIds.filter(id => id && !cache.has(id))
         if (missing.length) {
             const { data, error } = await supabase.rpc('player_points', { ids: missing })
             if (error) {
-                // Function not installed yet — stop asking this session.
-                broken = true
+                // Function not installed yet: stop asking this session. A
+                // dropped request is not that, and gets asked again.
+                if (isFatalSchemaError(error)) broken = true
                 return
             }
             const rows = (data ?? []) as { user_id: string; points: number; days_idle: number }[]

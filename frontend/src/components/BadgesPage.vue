@@ -112,10 +112,11 @@ defineEmits<{ (e: 'back'): void }>()
 
 const auth = useAuthStore()
 const retention = useRetentionStore()
-// The same player_points read as every other badge in the app, usually
-// already cached from the lobby, rather than the player's whole game history.
+// The same player_points read as every other badge in the app, rather than
+// the player's whole game history. Fresh, because the cache is per session and
+// this page is about the total after today's games.
 const { badges, fetchBadges } = useBadges()
-watch(() => auth.user?.id, (id) => { if (id) void fetchBadges([id]) }, { immediate: true })
+watch(() => auth.user?.id, (id) => { if (id) void fetchBadges([id], { fresh: true }) }, { immediate: true })
 
 function daysIdleFromDate(dateStr: string | null): number {
   if (!dateStr) return 0
