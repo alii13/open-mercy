@@ -28,7 +28,9 @@
       <span class="name">{{ name }}
         <span v-if="inVoice" class="voice-dot" :class="{ speaking: isSpeaking }" title="In voice"></span>
       </span>
-      <span v-if="badge" class="rank" :style="{ color: badge.color }">{{ badge.title }}</span>
+      <!-- 15% white keeps the darkest tiers (Merciless, Butcher, Doombringer)
+           above 4.5:1 as 10px text; the raw tier colours were picked for the shield art. -->
+      <span v-if="badge" class="rank" :style="{ color: `color-mix(in srgb, ${badge.color} 85%, white)` }">{{ badge.title }}</span>
       <span v-if="isDisconnected && !isEliminated" class="card-count dc-text">DISCONNECTED</span>
       <span v-else-if="isEliminated" class="card-count eliminated-text">{{ timedOut ? 'TIMED OUT' : 'OUT' }}</span>
       <span v-else class="card-count">{{ cardCount }} {{ displayLabel }}</span>
