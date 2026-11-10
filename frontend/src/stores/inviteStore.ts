@@ -49,10 +49,22 @@ export const useInviteStore = defineStore('invites', () => {
      *  own read through the row event. A read this recent is not repeated. */
     const REFRESH_GAP_MS = 20_000
     let lastReadAt = 0
+    /** The gap is stamped only once the session check passes, so a second
+     *  call in the same tick (two wake-up listeners) would pass it too. It
+     *  waits on this read instead of sending its own. */
+    let pending: Promise<void> | null = null
 
     async function refresh(opts: { force?: boolean } = {}): Promise<void> {
         if (unavailable.value) return
-        if (!opts.force && Date.now() - lastReadAt < REFRESH_GAP_MS) return
+        if (!opts.force) {
+            if (pending) return pending
+            if (Date.now() - lastReadAt < REFRESH_GAP_MS) return
+        }
+        const run = (pending = read())
+        try { await run } finally { if (pending === run) pending = null }
+    }
+
+    async function read(): Promise<void> {
         try {
             if (!(await hasLiveSession())) return
             // Stamped only now: the gap deduplicates reads, and an attempt the

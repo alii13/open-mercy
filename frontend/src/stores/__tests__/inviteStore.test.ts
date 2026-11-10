@@ -37,6 +37,16 @@ vi.mock('../../lib/supabase', () => ({
     },
 }))
 
+// The real guard reaches the client through import(). Two of those in flight
+// at once can resolve past the mock above and read a real, empty session,
+// which hides any same-tick race. Same rule, same session source.
+vi.mock('../../utils/liveSession', () => ({
+    hasLiveSession: async () => {
+        const { data, error } = await getSession()
+        return !error && !!data.session
+    },
+}))
+
 import { useInviteStore, type RoomInvite } from '../inviteStore'
 import { useAuthStore } from '../authStore'
 
@@ -179,6 +189,15 @@ describe('invite store', () => {
         nowSpy.mockRestore()
         store.stop()
         vi.unstubAllGlobals()
+    })
+
+    it('sends one read when two wake-up listeners fire in the same tick', async () => {
+        // The store's listener and the toast's poll both run on visibilitychange,
+        // and the gap is stamped only after the session check.
+        rpcReturns([])
+        const store = useInviteStore()
+        await Promise.all([store.refresh(), store.refresh()])
+        expect(rpc.mock.calls.filter(([fn]) => fn === 'my_invites')).toHaveLength(1)
     })
 
     it('a row event reads immediately even inside the gap', async () => {
