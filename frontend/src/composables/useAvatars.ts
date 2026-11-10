@@ -42,10 +42,27 @@ export function requestAvatars(ids: readonly (string | null | undefined)[]): voi
     if (idle && queued.size) queueMicrotask(flush)
 }
 
+let rpcMissing = false
+
+/** By POST at one fixed address, so the browser keeps its CORS preflight; a
+ *  GET that names the ids is a new address, and a new preflight, per batch.
+ *  The GET stays until supabase/avatar-versions.sql has been run. */
+async function lookup(ids: string[]): Promise<{
+    data: { id: string; avatar_version: number | null }[] | null
+    error: { code?: string } | null
+}> {
+    if (!rpcMissing) {
+        const res = await supabase.rpc('avatar_versions', { ids })
+        if (!isFatalSchemaError(res.error)) return res
+        rpcMissing = true
+    }
+    return supabase.from('profiles').select('id, avatar_version').in('id', ids)
+}
+
 async function flush() {
     const ids = [...queued]
     queued.clear()
-    const { data, error } = await supabase.from('profiles').select('id, avatar_version').in('id', ids)
+    const { data, error } = await lookup(ids)
     if (error) {
         if (isFatalSchemaError(error)) {
             broken = true
