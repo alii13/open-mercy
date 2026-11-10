@@ -85,6 +85,10 @@ export const useSocialStore = defineStore('social', () => {
     let announced = new Set<string>()
     const requestKey = (r: FriendRow) => `${r.user_id}:${r.created_at}`
     let channel: { unsubscribe: () => void } | null = null
+    /** Where the friendships channel stands. Joining means a read is coming
+     *  on SUBSCRIBED; live means every change it carries reads at once. */
+    let channelState: 'off' | 'joining' | 'live' = 'off'
+    let lastReadAt = 0
 
     const pings = ref<Ping[]>([])
     /** Friends you pinged inside the server's six-hour window. */
@@ -134,6 +138,7 @@ export const useSocialStore = defineStore('social', () => {
             const next = (data ?? []) as FriendRow[]
             raiseNotice(rows.value, next)
             rows.value = next
+            lastReadAt = Date.now()
             // A ping that arrived before the list did waits for it.
             raisePing()
         } catch {
@@ -141,6 +146,17 @@ export const useSocialStore = defineStore('social', () => {
         } finally {
             loading.value = false
         }
+    }
+
+    /** For a screen opening. A joining channel reads the moment it lands and a
+     *  live one reads on every change it carries, so the only thing left to
+     *  catch is what Realtime keeps quiet on purpose (a decline, an unfriend):
+     *  worth a read every few minutes, not on every return to the lobby. */
+    const CATCH_UP_MS = 5 * 60_000
+    function catchUp(): Promise<void> {
+        if (channelState === 'joining') return Promise.resolve()
+        if (channelState === 'live' && Date.now() - lastReadAt < CATCH_UP_MS) return Promise.resolve()
+        return refresh()
     }
 
     function raiseNotice(prev: FriendRow[], next: FriendRow[]): void {
@@ -324,6 +340,7 @@ export const useSocialStore = defineStore('social', () => {
     function stop(): void {
         channel?.unsubscribe()
         channel = null
+        channelState = 'off'
         stopPings()
     }
 
@@ -331,15 +348,22 @@ export const useSocialStore = defineStore('social', () => {
         stop()
         if (unavailable.value) return
         const nudge = () => { void refresh() }
-        channel = supabase
+        const ch = supabase
             .channel(`friendships:${userId}`)
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'friendships', filter: `addressee_id=eq.${userId}` }, nudge)
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'friendships', filter: `requester_id=eq.${userId}` }, nudge)
             // A request re-sent after a decline turns the existing row around
             // rather than inserting one.
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'friendships', filter: `addressee_id=eq.${userId}` }, nudge)
+        channel = ch
+        channelState = 'joining'
+        ch.subscribe((status: string) => {
+            // A torn-down channel still reports its close.
+            if (channel !== ch) return
+            channelState = status === 'SUBSCRIBED' ? 'live' : 'off'
             // A row written while the socket was down is never replayed.
-            .subscribe((status: string) => { if (status === 'SUBSCRIBED') nudge() })
+            if (status === 'SUBSCRIBED') nudge()
+        })
 
         // Its own channel: until friends-ping.sql runs the table does not
         // exist, and that must not take the friend requests down with it.
@@ -353,6 +377,7 @@ export const useSocialStore = defineStore('social', () => {
 
     function reset(): void {
         readSeq++
+        lastReadAt = 0
         rows.value = []
         recentRows.value = []
         pendingIds.value = new Set()
@@ -377,7 +402,7 @@ export const useSocialStore = defineStore('social', () => {
     return {
         rows, loading, unavailable, pendingIds, notice, recent, pinged, pingsUnavailable,
         friends, incoming, outgoing, blocked, knownIds,
-        refresh, fetchRecent, sendRequest, respond, remove, block, unblock, reset, dismissNotice,
+        refresh, catchUp, fetchRecent, sendRequest, respond, remove, block, unblock, reset, dismissNotice,
         fetchPings, sendPing, answerPing,
     }
 })

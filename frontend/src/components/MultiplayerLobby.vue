@@ -651,7 +651,7 @@ import {
 } from '../utils/dailyChallenge'
 import { localDateString } from '../utils/seededRng'
 import { generateDailyShareImage, shareOrDownload } from '../utils/shareImage'
-import { useLeaderboard } from '../composables/useLeaderboard'
+import { useLobbyBoard } from '../composables/useLeaderboard'
 import { flagEmoji } from '../utils/country'
 import { useLiveTables } from '../composables/useLiveTables'
 import { useOnlineCount } from '../composables/useOnlineCount'
@@ -783,7 +783,7 @@ const dailyDateLabel = new Date()
   .toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   .toUpperCase()
 
-const lb = useLeaderboard()
+const lb = useLobbyBoard()
 
 const dailyPlayerCount = computed(() => lb.dailyContext.value?.total_players ?? 0)
 
@@ -805,7 +805,7 @@ function openProfile(row: { share_code?: string | null }) {
 
 // Eager availability probe: until the SQL functions exist on the project the
 // rpc fails and the VIEW LEADERBOARD link never renders.
-onMounted(() => { void lb.fetchBoards() })
+onMounted(() => { void lb.fetchDaily() })
 
 // Badge chips for waiting-room seats. Being seen by badge is the point of
 // having one — feature-detects until supabase/badges.sql is installed.
@@ -816,6 +816,8 @@ watch(
   { immediate: true },
 )
 
+// The daily board on the lobby shows shields, so it shows presence too.
+const { presence, fetchPresence } = usePresence()
 // Badges for the "Today's top" daily board.
 const { badges: dailyBadges, fetchBadges: fetchDailyBadges } = useBadges()
 watch(
@@ -972,9 +974,7 @@ const online = useOnlineCount()
 // Read once on the lobby so a waiting friend request can announce itself
 // here, rather than only inside a screen nobody opens on purpose.
 const social = useSocialStore()
-// The daily board on the lobby shows shields, so it shows presence too.
-const { presence, fetchPresence } = usePresence()
-onMounted(() => { if (authStore.isAuthenticated) void social.refresh() })
+onMounted(() => { if (authStore.isAuthenticated) void social.catchUp() })
 
 function openFriends() {
     closeAccount()

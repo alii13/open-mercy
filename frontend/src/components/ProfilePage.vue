@@ -389,7 +389,7 @@ const presenceNow = useNow()
 // Friends. The list is read once so the button can say what it already is,
 // rather than offering ADD to someone you asked yesterday.
 const social = useSocialStore()
-onMounted(() => { if (authStore.isAuthenticated) void social.refresh() })
+onMounted(() => { if (authStore.isAuthenticated) void social.catchUp() })
 
 type FriendState = 'none' | 'friends' | 'asked' | 'asked-me' | 'blocked'
 const friendState = computed<FriendState>(() => {

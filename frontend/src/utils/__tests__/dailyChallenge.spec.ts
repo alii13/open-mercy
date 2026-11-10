@@ -4,15 +4,14 @@ import { describe, expect, it, vi } from 'vitest'
 // lib/supabase throws at import time when VITE_SUPABASE_* are unset — which is
 // the case in CI, where the workflow passes no env. Same mock gameStore.test.ts
 // uses, and for the same reason.
-vi.mock('../../lib/supabase', () => ({
-    supabase: {
-        from: () => {
-            throw new Error('unexpected supabase call in a pure daily test')
-        },
-    },
+const { from } = vi.hoisted(() => ({
+    from: vi.fn((): unknown => {
+        throw new Error('unexpected supabase call in a pure daily test')
+    }),
 }))
+vi.mock('../../lib/supabase', () => ({ supabase: { from } }))
 
-import { buildDailyShareText, dailyGridCells } from '../dailyChallenge'
+import { buildDailyShareText, dailyGridCells, fetchServerDailyRecord } from '../dailyChallenge'
 
 const base = { date: '2026-08-09', result: 'won' as const, turns: 23, log: '' }
 
@@ -68,5 +67,21 @@ describe('dailyGridCells', () => {
     it('returns an empty list for an empty log', () => {
         expect(dailyGridCells('')).toEqual([])
         expect(dailyGridCells(undefined)).toEqual([])
+    })
+})
+
+describe('fetchServerDailyRecord', () => {
+    it('asks once for a few minutes, a "not played yet" answer included', async () => {
+        // The lobby asks on every mount; most mounts follow a game minutes earlier.
+        const maybeSingle = vi.fn(async () => ({ data: null, error: null }))
+        const chain: Record<string, unknown> = { maybeSingle }
+        chain.select = () => chain
+        chain.eq = () => chain
+        from.mockImplementation(() => chain)
+
+        expect(await fetchServerDailyRecord('u1', '2026-11-10')).toBeNull()
+        expect(await fetchServerDailyRecord('u1', '2026-11-10')).toBeNull()
+        expect(maybeSingle).toHaveBeenCalledTimes(1)
+        from.mockReset()
     })
 })

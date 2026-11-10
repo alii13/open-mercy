@@ -228,7 +228,7 @@ defineEmits<{
 // mount so someone you are already connected to never shows an ADD chip.
 const social = useSocialStore()
 const addState = ref<Record<string, string>>({})
-onMounted(() => { if (props.mode === 'mp' && props.opponents?.length && !social.unavailable) void social.refresh() })
+onMounted(() => { if (props.mode === 'mp' && props.opponents?.length && !social.unavailable) void social.catchUp() })
 
 // First win on this device: one game-over where the claim CTA is loud.
 // Marked shown immediately - seen and ignored means quiet from then on.

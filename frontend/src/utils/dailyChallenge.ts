@@ -145,11 +145,21 @@ export function clearDailyProgress(): void {
  *
  * Returns null on any failure — a lookup that does not answer must not block
  * someone from playing.
+ *
+ * The lobby asks on every mount, so an answer is kept for a few minutes,
+ * "not played yet" included. A run finished on another device shows up on
+ * the first ask after that.
  */
+const REMOTE_FRESH_MS = 5 * 60_000
+const remoteAnswers = new Map<string, { at: number; record: DailyRecord | null }>()
+
 export async function fetchServerDailyRecord(
     userId: string,
     date: string,
 ): Promise<DailyRecord | null> {
+    const key = `${userId}:${date}`
+    const hit = remoteAnswers.get(key)
+    if (hit && Date.now() - hit.at < REMOTE_FRESH_MS) return hit.record
     try {
         const { data, error } = await supabase
             .from('game_results')
@@ -157,15 +167,18 @@ export async function fetchServerDailyRecord(
             .eq('game_id', `daily-${date}`)
             .eq('user_id', userId)
             .maybeSingle()
-        if (error || !data) return null
-        const result = data.result as DailyRecord['result']
+        if (error) return null
         // No log: the run itself only ever lived on the device that played it,
         // so the card shows the outcome without a grid.
-        return {
-            date,
-            result,
-            turns: Number(data.cards_played_total ?? 0) + Number(data.draws_taken ?? 0),
-        }
+        const record: DailyRecord | null = data
+            ? {
+                date,
+                result: data.result as DailyRecord['result'],
+                turns: Number(data.cards_played_total ?? 0) + Number(data.draws_taken ?? 0),
+            }
+            : null
+        remoteAnswers.set(key, { at: Date.now(), record })
+        return record
     } catch {
         return null
     }
