@@ -8,9 +8,15 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { nextTick } from 'vue'
 
+const { getSession, rpc } = vi.hoisted(() => ({
+    getSession: vi.fn(async (): Promise<{ data: { session: { user: { id: string } } | null } }> => ({ data: { session: null } })),
+    rpc: vi.fn(async () => ({ data: null, error: null })),
+}))
+
 vi.mock('../../lib/supabase', () => ({
     supabase: {
-        auth: { getSession: async () => ({ data: { session: null } }) },
+        auth: { getSession },
+        rpc,
         from: () => {
             throw new Error('unexpected supabase call in single-player test')
         },
@@ -36,6 +42,7 @@ const red5: Card = { id: 'c-red-5', color: 'red', type: 'number', value: 5 }
 beforeEach(() => {
     setActivePinia(createPinia())
     track.mockClear()
+    rpc.mockClear()
 })
 
 afterEach(() => {
@@ -692,5 +699,36 @@ describe('daily resume after a reload', () => {
         vi.setSystemTime(new Date('2026-08-11T12:00:00'))
 
         expect(reload().resumeDaily()).toBe(false)
+    })
+})
+
+describe('saving a finished bot game', () => {
+    it('saves the win even when the player leaves the victory screen before the session read returns', async () => {
+        let release!: () => void
+        getSession.mockImplementationOnce(() => new Promise(resolve => {
+            release = () => resolve({ data: { session: { user: { id: 'user-1' } } } })
+        }))
+        const store = useGameStore()
+        const red7: Card = { id: 'c-red-7', color: 'red', type: 'number', value: 7 }
+        const bot = makePlayer('p-1', 'Bot', [red5])
+        bot.isBot = true
+        store.players = [makePlayer('p-0', 'You', [red7]), bot]
+        store.playerStats = Object.fromEntries(['p-0', 'p-1'].map(id => [id, {
+            peakCards: 7, drawCardsPlayed: 0, wildCardsPlayed: 0, cardsPlayedTotal: 6, skipsDealt: 0,
+            swapsMade: 0, drawsTaken: 0, biggestStackSurvived: 0, unoCalls: 1, unoPenalties: 0,
+        }]))
+        store.gameState = 'PLAYING'
+        store.currentPlayerIndex = 0
+        store.discardPile = [red5]
+        store.currentColor = 'red'
+        store.turnState = 'WAITING_FOR_ACTION'
+
+        store.playCard('p-0', red7)
+        await nextTick()
+        store.returnToLobby()
+        release()
+        await vi.waitFor(() => expect(rpc).toHaveBeenCalled())
+
+        expect(rpc).toHaveBeenCalledWith('record_bot_result', expect.objectContaining({ p_result: 'won', p_cards_played_total: 7 }))
     })
 })
