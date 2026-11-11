@@ -43,16 +43,25 @@ function makeState(overrides: Partial<EngineState> = {}): EngineState {
 }
 
 describe('deck composition', () => {
-    it('generates the full 168-card No Mercy deck', () => {
+    // Mattel's box: 2 of each number 0-9 per color; Skip, Reverse, Draw 2 and
+    // Discard All 3 per color; Draw 4 and Skip Everyone 2 per color; 8 Wild
+    // Reverse Draw 4, 8 Wild Color Roulette, 4 Wild Draw 6, 4 Wild Draw 10.
+    // There is no plain Wild.
+    it('deals the official 168-card No Mercy deck', () => {
         const deck = generateFullDeck()
         expect(deck.length).toBe(168)
-        const breakdown = getDeckBreakdown(deck)
-        expect(breakdown['number-0']).toBe(4)
-        expect(breakdown['number-5']).toBe(8)
-        expect(breakdown['skipEveryone-red']).toBe(3)
-        expect(breakdown['discardAll-blue']).toBe(3)
-        expect(breakdown['wild-wild']).toBe(4)
-        expect(breakdown['wildColorRoulette-wild']).toBe(4)
+        const expected: Record<string, number> = {
+            'wildReverseDraw4-wild': 8,
+            'wildColorRoulette-wild': 8,
+            'draw6-wild': 4,
+            'draw10-wild': 4,
+        }
+        for (let n = 0; n <= 9; n++) expected[`number-${n}`] = 8
+        for (const color of ['red', 'blue', 'green', 'yellow']) {
+            for (const type of ['skip', 'reverse', 'draw2', 'discardAll']) expected[`${type}-${color}`] = 3
+            for (const type of ['draw4', 'skipEveryone']) expected[`${type}-${color}`] = 2
+        }
+        expect(getDeckBreakdown(deck)).toEqual(expected)
     })
 })
 

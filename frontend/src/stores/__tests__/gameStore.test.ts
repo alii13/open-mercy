@@ -647,6 +647,9 @@ describe('daily resume after a reload', () => {
         human.hand = [red7]
         store.discardPile = [red5]
         store.currentColor = 'red'
+        store.drawStack = 0
+        store.currentPlayerIndex = store.players.indexOf(human)
+        store.turnState = 'WAITING_FOR_ACTION'
         store.playCard(human.id, red7)
         await nextTick()
 
