@@ -19,6 +19,12 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
+      # Fails the PR when a dependency update starts touching the network, files,
+      # env or child processes it never had. Accept an expected change with
+      # `npx permlock accept <package> frontend` and commit frontend/permlock.json.
+      - uses: alii13/permlock@570a90e52ada9b6fb57a4560ce2e9638b30ad42b # v0.1.1
+        with:
+          working-directory: frontend
       - run: npm test
       # vue-tsc typecheck + production build (CF Pages only runs vite build,
       # so this is the only place type errors gate a merge).
