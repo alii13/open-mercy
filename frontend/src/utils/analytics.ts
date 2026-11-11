@@ -89,6 +89,10 @@
  *   guest_claim_google_started {}                  — handed off to Google
  *   guest_claim_google_taken   {}                  — that Google account is taken
  *   guest_claim_completed      { method: email|google }
+ *
+ * Moving an email account to a new address (settings drawer):
+ *   email_change_sent          {}                  — links mailed to the old and new address
+ *   email_change_completed     {}                  — the new address landed in this browser
  */
 
 /**
