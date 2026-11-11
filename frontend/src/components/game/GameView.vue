@@ -420,6 +420,7 @@ watch(() => store.gameState, (now, prev) => {
         drawCardsPlayed: s.drawCardsPlayed || 0,
         biggestStackSurvived: s.biggestStackSurvived || 0,
         unoCalls: s.unoCalls || 0,
+        isBotGame: true,
       })
       if (nb) fx.emit('badgeUp', { name: myPlayer.value?.name ?? 'You', tier: nb.tier, self: true })
     }

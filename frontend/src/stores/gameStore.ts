@@ -828,17 +828,14 @@ export const useGameStore = defineStore('game', () => {
     })
 
     async function logGameResults() {
-        // getSession, not getUser: the id is already held locally, and getUser
-        // asks the auth server again before every result write.
-        const { data: { session } } = await supabase.auth.getSession()
-        const user = session?.user
-        if (!user) return
-
+        // Read the finished game before any await: leaving the victory screen
+        // clears the players, and a save that reads them afterwards is lost.
         const humanPlayer = players.value.find(p => !p.isBot)
         if (!humanPlayer) return
 
-        const s = playerStats.value[humanPlayer.id]
-        if (!s) return
+        const stats = playerStats.value[humanPlayer.id]
+        if (!stats) return
+        const s = { ...stats }
 
         const duration = Math.round((Date.now() - gameStartTime.value) / 1000)
         let result: 'won' | 'lost' | 'eliminated' = 'lost'
@@ -846,14 +843,21 @@ export const useGameStore = defineStore('game', () => {
         else if (humanPlayer.isEliminated) result = 'eliminated'
 
         const gameId = dailyDate.value ? `daily-${dailyDate.value}` : `bot-${Date.now()}`
+        const opponentCount = players.value.length - 1
+        const cardsRemaining = humanPlayer.hand.length
+
+        // getSession, not getUser: the id is already held locally, and getUser
+        // asks the auth server again before every result write.
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session?.user) return
 
         // Through a definer function, not a table insert: it owns user_id,
         // played_at and is_bot_game and clamps the stats (supabase/results-hardening.sql).
         await supabase.rpc('record_bot_result', {
             p_game_id: gameId,
             p_result: result,
-            p_opponent_count: players.value.length - 1,
-            p_cards_remaining: humanPlayer.hand.length,
+            p_opponent_count: opponentCount,
+            p_cards_remaining: cardsRemaining,
             p_peak_cards: s.peakCards,
             p_draw_cards_played: s.drawCardsPlayed,
             p_wild_cards_played: s.wildCardsPlayed,

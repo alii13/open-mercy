@@ -92,7 +92,7 @@ describe('promotionHistory', () => {
         // cards_played_total below the MIN_PLAYS guard: no win points, so the
         // player never leaves Recruit however many walkovers they collect.
         const walkovers = Array.from({ length: 5 }, (_, i) =>
-            row({ result: 'won', cards_played_total: 1, played_at: `2026-06-0${i + 2}T12:00:00Z` }),
+            row({ result: 'won', cards_played_total: 1, is_bot_game: false, played_at: `2026-06-0${i + 2}T12:00:00Z` }),
         )
         const history = promotionHistory(walkovers)
         expect(history.map(p => p.badge.title)).toEqual(['Recruit'])

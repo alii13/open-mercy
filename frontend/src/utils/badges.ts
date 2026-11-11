@@ -99,6 +99,11 @@ export function earnedPoints(input: PointsInput): number {
  *  quitter from minting win or loss points. Mirrored in badges.sql. */
 export const MIN_PLAYS = 5
 
+/** A bot never walks out, so only a multiplayer game needs MIN_PLAYS to count. */
+export function isRealGame(r: Pick<ResultRow, 'is_bot_game' | 'cards_played_total'>): boolean {
+    return r.is_bot_game || r.cards_played_total >= MIN_PLAYS
+}
+
 export function aggregateRows(rows: ResultRow[]): PointsInput {
     const days = new Set<string>()
     let wins = 0
@@ -107,7 +112,7 @@ export function aggregateRows(rows: ResultRow[]): PointsInput {
     let stackSurvivedTotal = 0
     let unoCalls = 0
     for (const r of rows) {
-        const real = r.cards_played_total >= MIN_PLAYS
+        const real = isRealGame(r)
         if (r.result === 'won' && real) wins++
         else if ((r.result === 'lost' || r.result === 'eliminated') && real) completedLosses++
         drawCardsPlayed += r.draw_cards_played
@@ -180,10 +185,11 @@ export interface GameContribution {
     drawCardsPlayed: number
     biggestStackSurvived: number
     unoCalls: number
+    isBotGame: boolean
 }
 
 export function gameContribution(g: GameContribution): number {
-    const real = g.cardsPlayedTotal >= MIN_PLAYS
+    const real = isRealGame({ is_bot_game: g.isBotGame, cards_played_total: g.cardsPlayedTotal })
     let p = 0
     if (g.won && real) p += POINT_WEIGHTS.win
     else if (g.completedLoss && real) p += POINT_WEIGHTS.completedLoss

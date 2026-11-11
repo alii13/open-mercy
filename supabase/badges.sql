@@ -7,7 +7,7 @@
 -- Mirrors the weighted sum in frontend/src/utils/badges.ts (POINT_WEIGHTS +
 -- aggregateRows). The floored inactivity decay is applied client-side
 -- (applyDecay) from `days_idle`, so the tier table lives in one place (TS).
--- Keep the weights and the walkover guard (cards_played_total >= 5) in sync.
+-- Keep the weights and the walkover guard (is_bot_game or cards_played_total >= 5) in sync.
 -- The same arithmetic runs a third time in supabase/leaderboards-alltime.sql,
 -- which ranks the whole field instead of explicit ids. Change all three.
 
@@ -21,8 +21,8 @@ as $$
     select
         gr.user_id,
         (
-            count(*) filter (where gr.result = 'won' and gr.cards_played_total >= 5) * 100
-          + count(*) filter (where gr.result in ('lost', 'eliminated') and gr.cards_played_total >= 5) * 12
+            count(*) filter (where gr.result = 'won' and (gr.is_bot_game or gr.cards_played_total >= 5)) * 100
+          + count(*) filter (where gr.result in ('lost', 'eliminated') and (gr.is_bot_game or gr.cards_played_total >= 5)) * 12
           + coalesce(sum(gr.draw_cards_played), 0) * 2
           + coalesce(sum(gr.biggest_stack_survived), 0) * 3
           + coalesce(sum(gr.uno_calls), 0) * 4
