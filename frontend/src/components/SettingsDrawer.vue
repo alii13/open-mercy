@@ -18,37 +18,6 @@
           </header>
 
           <div class="settings-body">
-            <!-- Account: opened from the lobby's Change email only. -->
-            <section v-if="settings.showAccount && auth.user && !auth.isAnonymous" class="settings-section">
-              <h3 class="section-title">ACCOUNT</h3>
-              <p class="account-line">
-                {{ auth.canChangeEmail ? 'Signed in as' : 'Signed in with Google as' }}
-                <strong>{{ auth.user.email }}</strong>
-              </p>
-              <template v-if="auth.canChangeEmail">
-                <form v-if="emailFormOpen" class="email-form" @submit.prevent="submitEmail">
-                  <input
-                    v-model="newEmail"
-                    class="email-input"
-                    type="email"
-                    required
-                    autocomplete="email"
-                    placeholder="New email"
-                    aria-label="New email"
-                  />
-                  <button class="help-btn account-btn" type="submit" :disabled="emailBusy">
-                    {{ emailBusy ? 'SENDING…' : 'SEND LINKS' }}
-                  </button>
-                </form>
-                <button v-else class="help-btn account-btn" type="button" @click="openEmailForm">
-                  {{ auth.emailChangePending ? 'USE ANOTHER EMAIL' : 'CHANGE EMAIL' }}
-                </button>
-                <p v-if="emailNote" class="account-note" :class="{ 'account-note--error': emailNote.error }" role="status">
-                  {{ emailNote.text }}
-                </p>
-              </template>
-            </section>
-
             <!-- Audio -->
             <section class="settings-section">
               <h3 class="section-title">AUDIO</h3>
@@ -202,7 +171,7 @@
 
 <script setup lang="ts">
 import { X } from 'lucide-vue-next'
-import { computed, defineAsyncComponent, ref, watch } from 'vue'
+import { defineAsyncComponent, ref, watch } from 'vue'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useAuthStore } from '../stores/authStore'
 import { soundEffects } from '../composables/useSoundEffects'
@@ -234,42 +203,6 @@ async function toggleReminders() {
   else reminderFailed.value = (await enableReminders()) === 'failed'
   reminderBusy.value = false
 }
-// Account: Supabase mails both the old and the new address, and the change
-// lands once both links are clicked, so the pending line names both.
-const emailFormOpen = ref(false)
-const newEmail = ref('')
-const emailBusy = ref(false)
-const emailFailure = ref<string | null>(null)
-const EMAIL_ERRORS = {
-  same_email: 'That is already your email.',
-  email_exists: 'Another account already uses that email.',
-  rate_limited: 'Too many emails went out just now. Try again in an hour.',
-  failed: 'Could not send the links. Try again in a moment.',
-} as const
-const emailNote = computed(() => {
-  if (emailFailure.value) return { text: emailFailure.value, error: true }
-  if (auth.emailChangePending) {
-    return { text: `We sent a link to ${auth.user?.email} and to ${auth.user?.new_email}. Click both to finish. Not there? Check spam.`, error: false }
-  }
-  return null
-})
-function openEmailForm() {
-  emailFormOpen.value = true
-  emailFailure.value = null
-}
-async function submitEmail() {
-  emailBusy.value = true
-  emailFailure.value = null
-  const res = await auth.changeEmail(newEmail.value)
-  emailBusy.value = false
-  if (!res.success) {
-    emailFailure.value = EMAIL_ERRORS[res.error]
-    return
-  }
-  emailFormOpen.value = false
-  newEmail.value = ''
-}
-
 const sfx = soundEffects
 const music = musicComposable
 
@@ -444,50 +377,6 @@ input[type="range"]:disabled { opacity: 0.4; }
   color: #0a0a0b;
   background: #ffcc00;
   font-weight: 600;
-}
-
-.account-line {
-  margin: 0 0 var(--spacing-3);
-  font-size: var(--text-sm);
-  line-height: 1.5;
-  color: var(--text-secondary);
-  overflow-wrap: anywhere;
-}
-.account-line strong {
-  color: var(--text-primary);
-  font-weight: 600;
-}
-.email-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-2);
-}
-/* 16px text keeps iPhone Safari from zooming the page on focus. */
-.email-input {
-  min-height: 44px;
-  padding: 0 var(--spacing-3);
-  background: var(--surface-metal-dark);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font-size: var(--text-base);
-}
-.email-input:focus-visible {
-  outline: 2px solid var(--color-hazard);
-  outline-offset: 1px;
-}
-.account-btn {
-  min-height: 44px;
-}
-.account-note {
-  margin: var(--spacing-2) 0 0;
-  font-size: var(--text-xs);
-  line-height: 1.5;
-  color: var(--text-secondary);
-  overflow-wrap: anywhere;
-}
-.account-note--error {
-  color: var(--color-alert);
 }
 
 .hint {

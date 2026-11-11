@@ -677,6 +677,7 @@ import { track } from '../utils/analytics'
 import { normalizeRoomCode, roomCodeProblem } from '@roomCode'
 import { useBadges } from '../composables/useBadges'
 import { openPhotoSheet } from '../composables/usePhotoSheet'
+import { openEmailSheet } from '../composables/useEmailSheet'
 import { avatarsAvailable } from '../composables/useAvatars'
 import Avatar from './Avatar.vue'
 import AutoStartRing from './AutoStartRing.vue'
@@ -684,7 +685,6 @@ import QuickChat from './QuickChat.vue'
 import { vFocusRing } from '../directives/focusRing'
 import { preloadCardImages } from '../utils/preloadCardImages'
 import { useAuthStore } from '../stores/authStore'
-import { useSettingsStore } from '../stores/settingsStore'
 import { useMultiplayerStore } from '../stores/multiplayerStore'
 import { useVoiceStore } from '../stores/voiceStore'
 import { useGameStore } from '../stores/gameStore'
@@ -1160,11 +1160,9 @@ function photoFromMenu() {
     openPhotoSheet()
 }
 
-// The only way to the ACCOUNT section: the in-game gear leaves it out.
-const settings = useSettingsStore()
 function emailFromMenu() {
     closeAccount()
-    settings.openAccount()
+    openEmailSheet()
 }
 
 function signOutFromMenu() {
