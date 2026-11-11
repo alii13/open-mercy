@@ -34,11 +34,21 @@
           <span class="mercy-tick mercy-tick-warn"></span>
           <span class="mercy-tick mercy-tick-crit"></span>
         </div>
-        <div class="mercy-readout">
+        <button
+          type="button"
+          class="mercy-readout mercy-hint-trigger"
+          :aria-label="mercyAriaLabel"
+          @click="showMercyHint($event, 'right')"
+          @mouseenter="showMercyHint($event, 'right')"
+          @mouseleave="hideMercyHint"
+          @focus="showMercyHint($event, 'right')"
+          @blur="hideMercyHint"
+          @keydown.esc="hideMercyHint"
+        >
           <span class="mercy-num"><RollingNumber :value="myCardCount ?? 0" /></span>
           <span class="mercy-of">/25</span>
-          <span class="mercy-label-text">MERCY</span>
-        </div>
+          <span class="mercy-label-text">MERCY <Info :size="14" :stroke-width="2" class="mercy-hint-icon" aria-hidden="true" /></span>
+        </button>
       </div>
     </aside>
 
@@ -70,19 +80,38 @@
         <span class="color-dot" :class="`dot-${currentColor}`" aria-hidden="true"></span>
       </div>
       <div v-if="drawStack && drawStack > 0" class="hud-cell hud-stack-mobile" :class="{ critical: drawStack >= 12 }">+<RollingNumber :value="drawStack" /></div>
-      <div class="hud-cell hud-mercy-mobile" :class="mercyClass">
+      <button
+        type="button"
+        class="hud-cell hud-mercy-mobile mercy-hint-trigger"
+        :class="mercyClass"
+        :aria-label="mercyAriaLabel"
+        @click="showMercyHint($event, 'above')"
+        @mouseenter="showMercyHint($event, 'above')"
+        @mouseleave="hideMercyHint"
+        @focus="showMercyHint($event, 'above')"
+        @blur="hideMercyHint"
+        @keydown.esc="hideMercyHint"
+      >
         <span class="mobile-mercy-bar">
           <span class="mobile-mercy-fill" :style="{ width: mercyPct + '%' }"></span>
         </span>
         <span class="mobile-mercy-text"><RollingNumber :value="myCardCount ?? 0" />/25</span>
-      </div>
+        <Info :size="14" :stroke-width="2" class="mercy-hint-icon" aria-hidden="true" />
+      </button>
     </div>
+
+    <Teleport to="body">
+      <span v-if="mercyHint" role="tooltip" class="mercy-hint" :style="mercyHint">
+        <strong class="mercy-hint-title">Out at 25 cards</strong>
+        <span>{{ cardsToOut }} more {{ cardsToOut === 1 ? 'card' : 'cards' }} and you're out.</span>
+      </span>
+    </Teleport>
 
   </div>
 </template>
 
 <script setup lang="ts">
-import { RotateCw } from 'lucide-vue-next'
+import { Info, RotateCw } from 'lucide-vue-next'
 import { ref, computed, watch } from 'vue'
 import gsap from 'gsap'
 import { useScreenSize } from '../../composables/useScreenSize'
@@ -104,6 +133,30 @@ const drawHintText = computed(() => (isMobile.value ? 'TAP TO DRAW' : 'CLICK TO 
 const mercyPct = computed(() => {
   if (props.myCardCount === undefined) return 0
   return Math.min(100, (props.myCardCount / 25) * 100)
+})
+
+// "7/25" reads as room for 25 cards, but holding the 25th is what puts you
+// out. A tap, hover or focus on the meter says so. Teleported to body so the
+// pit's clipping cannot cut the bubble off.
+const MERCY_LIMIT = 25
+const mercyHint = ref<Record<string, string> | null>(null)
+const cardsToOut = computed(() => Math.max(1, MERCY_LIMIT - (props.myCardCount ?? 0)))
+const mercyAriaLabel = computed(() => `${props.myCardCount ?? 0} cards. You're out at ${MERCY_LIMIT}.`)
+
+function showMercyHint(e: Event, side: 'above' | 'right') {
+  const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+  mercyHint.value = side === 'right'
+    ? { left: `${Math.round(r.right + 12)}px`, top: `${Math.round(r.top + r.height / 2)}px`, transform: 'translateY(-50%)' }
+    : { left: `${Math.round(r.left + r.width / 2)}px`, top: `${Math.round(r.top - 8)}px`, transform: 'translate(-50%, -100%)' }
+}
+function hideMercyHint() { mercyHint.value = null }
+function closeMercyHintOutside(e: PointerEvent) {
+  if (!(e.target as Element | null)?.closest('.mercy-hint-trigger')) hideMercyHint()
+}
+watch(mercyHint, (open, _prev, onCleanup) => {
+  if (!open) return
+  document.addEventListener('pointerdown', closeMercyHintOutside, true)
+  onCleanup(() => document.removeEventListener('pointerdown', closeMercyHintOutside, true))
 })
 
 const mercyClass = computed(() => {

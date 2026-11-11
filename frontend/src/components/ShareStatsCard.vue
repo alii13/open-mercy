@@ -117,7 +117,7 @@ function render() {
         const wonW = (props.wins / props.games) * barW
         ctx.fillStyle = '#00ff66'
         ctx.fillRect(30, barY, wonW, 20)
-        const lostW = (props.losses / props.games) * barW
+        const lostW = ((props.losses + props.eliminated) / props.games) * barW
         ctx.fillStyle = '#ff2a2a'
         ctx.fillRect(30 + wonW, barY, lostW, 20)
     }
