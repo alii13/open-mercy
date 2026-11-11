@@ -406,10 +406,14 @@ export const useAuthStore = defineStore('auth', () => {
     function consumeOAuthError() {
         const found = readOAuthError(window.location.search, window.location.hash)
         if (!found) return
-        // An old or already-used email link comes back the same way. Unless a
-        // guest is waiting on a claim, the claim screen would only confuse.
-        if (found.code === 'otp_expired' && !claimPending.value) {
-            authNotice.value = 'That link has expired or was already used. You can send a new one from the gear, under Account.'
+        // Every old or already-used email link comes back as otp_expired: sign-up,
+        // password reset and email change alike. A signed-in account has no use
+        // for the auth screen, so it gets a notice; guests and signed-out
+        // visitors keep the screen, where they can sign in or ask again.
+        if (found.code === 'otp_expired' && user.value && !isAnonymous.value) {
+            authNotice.value = canChangeEmail.value
+                ? 'That link has expired or was already used. You can send a new one from the gear, under Account.'
+                : 'That link has expired or was already used.'
             void router.replace(urlWithoutOAuthError(window.location))
             return
         }

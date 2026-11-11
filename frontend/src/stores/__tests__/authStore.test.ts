@@ -765,4 +765,14 @@ describe('an expired email link', () => {
         expect(auth.authNotice).toMatch(/expired or was already used/)
         expect(h.state.replacedUrls).toEqual(['/'])
     })
+
+    it('still opens the auth screen for a signed-out visitor, whose old link may be a reset or sign-up link', async () => {
+        h.state.loc.hash = '#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired'
+        const auth = useAuthStore()
+
+        await auth.initialize()
+
+        expect(auth.oauthError?.code).toBe('otp_expired')
+        expect(auth.authNotice).toBeNull()
+    })
 })
