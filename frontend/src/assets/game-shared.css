@@ -704,6 +704,18 @@ body.fx-ko-desat .game-view {
   .rail-mercy.critical .mercy-fill { animation: none; }
 }
 
+/* The mercy readouts are buttons that explain the 25-card limit. Reset first:
+   .mercy-readout and .hud-cell below set the real look. */
+.mercy-hint-trigger {
+  position: relative;
+  padding: 0;
+  background: none;
+  border: 0;
+  font: inherit;
+  color: inherit;
+  cursor: help;
+}
+
 .mercy-readout {
   display: flex;
   flex-direction: column;
@@ -739,15 +751,6 @@ body.fx-ko-desat .game-view {
   margin-top: 2px;
 }
 
-/* The mercy readouts are buttons that explain the 25-card limit. */
-.mercy-hint-trigger {
-  position: relative;
-  background: none;
-  border: 0;
-  font: inherit;
-  color: inherit;
-  cursor: help;
-}
 .mercy-hint-trigger:focus-visible {
   outline: 2px solid var(--color-hazard);
   outline-offset: 2px;
