@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div class="game-over-overlay" :class="{ 'is-win': isWinner, 'is-loss': !isWinner }" @click.self="atTable ? $emit('rematch') : $emit('back-to-lobby')">
+    <div class="game-over-overlay" :class="{ 'is-win': isWinner, 'is-loss': !isWinner }" @click.capture="swallowEarlyTap" @click.self="atTable ? $emit('rematch') : $emit('back-to-lobby')">
       <!-- Confetti only on win, rendered as CSS particles -->
       <div v-if="isWinner" class="confetti-layer" aria-hidden="true">
         <span v-for="i in 30" :key="i" class="confetti-piece" :style="confettiStyle(i)"></span>
@@ -223,6 +223,17 @@ defineEmits<{
   (e: 'back-to-lobby'): void
   (e: 'upgrade-account'): void
 }>()
+
+// On a phone the last card sits where BACK TO MENU and the backdrop open, so a
+// double tap on it would leave the result screen before it is seen. Taps in
+// the first moment are swallowed here, not passed to the board beneath.
+const EARLY_TAP_MS = 600
+const shownAt = performance.now()
+function swallowEarlyTap(e: MouseEvent) {
+  if (performance.now() - shownAt >= EARLY_TAP_MS) return
+  e.stopImmediatePropagation()
+  e.preventDefault()
+}
 
 // Friend requests straight from the result screen. The store is read once on
 // mount so someone you are already connected to never shows an ADD chip.
