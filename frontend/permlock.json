@@ -1,0 +1,897 @@
+{
+  "schema": "permlock/v0",
+  "profile": "node",
+  "packages": {
+    "@cloudflare/realtimekit": {
+      "version": "2.0.0",
+      "observed": {
+        "env": [
+          {
+            "file": "dist/index.es.js",
+            "line": 5581,
+            "via": "process.env"
+          }
+        ],
+        "eval": [
+          {
+            "file": "dist/index.es.js",
+            "line": 3717,
+            "via": "Function"
+          }
+        ],
+        "net": [
+          {
+            "file": "dist/index.es.js",
+            "line": 890,
+            "via": "fetch"
+          },
+          {
+            "file": "dist/index.es.js",
+            "line": 26001,
+            "via": "WebSocket"
+          }
+        ]
+      },
+      "declared": null
+    },
+    "@cloudflare/realtimekit>@protobuf-ts/runtime": {
+      "version": "2.11.1",
+      "observed": {},
+      "declared": null
+    },
+    "@cloudflare/realtimekit>bowser": {
+      "version": "2.14.1",
+      "observed": {},
+      "declared": null
+    },
+    "@cloudflare/realtimekit>sdp-transform": {
+      "version": "2.15.0",
+      "observed": {},
+      "declared": null
+    },
+    "@cloudflare/realtimekit>uuid": {
+      "version": "8.3.2",
+      "observed": {},
+      "declared": null
+    },
+    "@cloudflare/realtimekit>worker-timers": {
+      "version": "7.0.60",
+      "observed": {},
+      "declared": null
+    },
+    "@cloudflare/realtimekit>worker-timers>@babel/runtime": {
+      "version": "7.29.7",
+      "observed": {},
+      "declared": null
+    },
+    "@cloudflare/realtimekit>worker-timers>tslib": {
+      "version": "2.8.1",
+      "observed": {},
+      "declared": null
+    },
+    "@cloudflare/realtimekit>worker-timers>worker-timers-broker": {
+      "version": "6.1.8",
+      "observed": {
+        "worker": [
+          {
+            "file": "build/es2019/module.js",
+            "line": 9,
+            "via": "Worker"
+          }
+        ]
+      },
+      "declared": null
+    },
+    "@cloudflare/realtimekit>worker-timers>worker-timers-broker>fast-unique-numbers": {
+      "version": "8.0.13",
+      "observed": {},
+      "declared": null
+    },
+    "@cloudflare/realtimekit>worker-timers>worker-timers-worker": {
+      "version": "7.0.71",
+      "observed": {},
+      "declared": null
+    },
+    "@mcp-b/transports": {
+      "version": "3.0.0",
+      "observed": {},
+      "declared": null
+    },
+    "@mcp-b/webmcp-ts-sdk": {
+      "version": "3.0.0",
+      "observed": {},
+      "declared": null
+    },
+    "@mcp-b/webmcp-ts-sdk>@mcp-b/webmcp-polyfill": {
+      "version": "3.0.0",
+      "observed": {},
+      "declared": null
+    },
+    "@mcp-b/webmcp-ts-sdk>@mcp-b/webmcp-polyfill>@cfworker/json-schema": {
+      "version": "4.1.1",
+      "observed": {},
+      "declared": null
+    },
+    "@mcp-b/webmcp-ts-sdk>@mcp-b/webmcp-polyfill>@standard-schema/spec": {
+      "version": "1.1.0",
+      "observed": {},
+      "declared": null
+    },
+    "@mcp-b/webmcp-ts-sdk>@mcp-b/webmcp-types": {
+      "version": "3.0.0",
+      "observed": {},
+      "declared": null
+    },
+    "@supabase/supabase-js": {
+      "version": "2.105.2",
+      "observed": {
+        "net": [
+          {
+            "file": "dist/index.mjs",
+            "line": 102,
+            "via": "fetch"
+          }
+        ]
+      },
+      "declared": null
+    },
+    "@supabase/supabase-js>@supabase/auth-js": {
+      "version": "2.105.2",
+      "observed": {
+        "net": [
+          {
+            "file": "dist/module/lib/helpers.js",
+            "line": 90,
+            "via": "fetch"
+          }
+        ]
+      },
+      "declared": null
+    },
+    "@supabase/supabase-js>@supabase/functions-js": {
+      "version": "2.105.2",
+      "observed": {
+        "net": [
+          {
+            "file": "dist/module/helper.js",
+            "line": 5,
+            "via": "fetch"
+          }
+        ]
+      },
+      "declared": null
+    },
+    "@supabase/supabase-js>@supabase/postgrest-js": {
+      "version": "2.105.2",
+      "observed": {
+        "net": [
+          {
+            "file": "dist/index.mjs",
+            "line": 140,
+            "via": "fetch"
+          }
+        ]
+      },
+      "declared": null
+    },
+    "@supabase/supabase-js>@supabase/realtime-js": {
+      "version": "2.105.2",
+      "observed": {
+        "net": [
+          {
+            "file": "dist/module/RealtimeClient.js",
+            "line": 140,
+            "via": "fetch"
+          },
+          {
+            "file": "dist/module/lib/websocket-factory.js",
+            "line": 11,
+            "via": "WebSocket"
+          }
+        ],
+        "worker": [
+          {
+            "file": "dist/module/RealtimeClient.js",
+            "line": 550,
+            "via": "Worker"
+          }
+        ]
+      },
+      "declared": null
+    },
+    "@supabase/supabase-js>@supabase/realtime-js>@supabase/phoenix": {
+      "version": "0.4.1",
+      "observed": {},
+      "declared": null
+    },
+    "@supabase/supabase-js>@supabase/realtime-js>@types/ws": {
+      "version": "8.18.1",
+      "observed": {},
+      "declared": null
+    },
+    "@supabase/supabase-js>@supabase/realtime-js>ws": {
+      "version": "8.22.0",
+      "observed": {},
+      "declared": null
+    },
+    "@supabase/supabase-js>@supabase/storage-js": {
+      "version": "2.105.2",
+      "observed": {
+        "net": [
+          {
+            "file": "dist/index.mjs",
+            "line": 225,
+            "via": "fetch"
+          }
+        ]
+      },
+      "declared": null
+    },
+    "@supabase/supabase-js>@supabase/storage-js>iceberg-js": {
+      "version": "0.8.1",
+      "observed": {
+        "net": [
+          {
+            "file": "dist/index.mjs",
+            "line": 62,
+            "via": "fetch"
+          }
+        ]
+      },
+      "declared": null
+    },
+    "@vueuse/core": {
+      "version": "14.3.0",
+      "observed": {},
+      "declared": null
+    },
+    "@vueuse/core>@types/web-bluetooth": {
+      "version": "0.0.21",
+      "observed": {},
+      "declared": null
+    },
+    "@vueuse/core>@vueuse/metadata": {
+      "version": "14.3.0",
+      "observed": {},
+      "declared": null
+    },
+    "@vueuse/core>@vueuse/shared": {
+      "version": "14.3.0",
+      "observed": {},
+      "declared": null
+    },
+    "gsap": {
+      "version": "3.15.0",
+      "observed": {},
+      "declared": null
+    },
+    "lucide-vue-next": {
+      "version": "1.0.0",
+      "observed": {},
+      "declared": null
+    },
+    "pinia": {
+      "version": "3.0.4",
+      "observed": {
+        "env": [
+          {
+            "file": "dist/pinia.mjs",
+            "line": 27,
+            "via": "process.env"
+          }
+        ],
+        "net": [
+          {
+            "file": "dist/pinia.mjs",
+            "line": 106,
+            "via": "XMLHttpRequest"
+          }
+        ]
+      },
+      "declared": null
+    },
+    "pinia>@vue/devtools-api": {
+      "version": "7.7.9",
+      "observed": {},
+      "declared": null
+    },
+    "pinia>@vue/devtools-api>@vue/devtools-kit": {
+      "version": "7.7.9",
+      "observed": {
+        "net": [
+          {
+            "file": "dist/index.js",
+            "line": 2728,
+            "via": "fetch"
+          }
+        ]
+      },
+      "declared": null
+    },
+    "pinia>@vue/devtools-api>@vue/devtools-kit>@vue/devtools-shared": {
+      "version": "7.7.9",
+      "observed": {},
+      "declared": null
+    },
+    "pinia>@vue/devtools-api>@vue/devtools-kit>@vue/devtools-shared>rfdc": {
+      "version": "1.4.1",
+      "observed": {},
+      "declared": null
+    },
+    "pinia>@vue/devtools-api>@vue/devtools-kit>birpc": {
+      "version": "2.9.0",
+      "observed": {},
+      "declared": null
+    },
+    "pinia>@vue/devtools-api>@vue/devtools-kit>hookable": {
+      "version": "5.5.3",
+      "observed": {},
+      "declared": null
+    },
+    "pinia>@vue/devtools-api>@vue/devtools-kit>mitt": {
+      "version": "3.0.1",
+      "observed": {},
+      "declared": null
+    },
+    "pinia>@vue/devtools-api>@vue/devtools-kit>perfect-debounce": {
+      "version": "1.0.0",
+      "observed": {},
+      "declared": null
+    },
+    "pinia>@vue/devtools-api>@vue/devtools-kit>speakingurl": {
+      "version": "14.0.1",
+      "observed": {},
+      "declared": null
+    },
+    "pinia>@vue/devtools-api>@vue/devtools-kit>superjson": {
+      "version": "2.2.6",
+      "observed": {},
+      "declared": null
+    },
+    "pinia>@vue/devtools-api>@vue/devtools-kit>superjson>copy-anything": {
+      "version": "4.0.5",
+      "observed": {},
+      "declared": null
+    },
+    "pinia>@vue/devtools-api>@vue/devtools-kit>superjson>copy-anything>is-what": {
+      "version": "5.5.0",
+      "observed": {},
+      "declared": null
+    },
+    "simple-icons": {
+      "version": "16.22.0",
+      "observed": {},
+      "declared": null
+    },
+    "three": {
+      "version": "0.185.1",
+      "observed": {
+        "net": [
+          {
+            "file": "build/three.core.js",
+            "line": 44628,
+            "via": "fetch"
+          }
+        ]
+      },
+      "declared": null
+    },
+    "uuid": {
+      "version": "13.0.2",
+      "observed": {},
+      "declared": null
+    },
+    "vue": {
+      "version": "3.5.44",
+      "observed": {
+        "env": [
+          {
+            "file": "index.js",
+            "line": 3,
+            "via": "process.env"
+          }
+        ],
+        "eval": [
+          {
+            "file": "dist/vue.cjs.js",
+            "line": 71,
+            "via": "Function"
+          }
+        ]
+      },
+      "declared": null
+    },
+    "vue-router": {
+      "version": "5.4.0",
+      "observed": {
+        "env": [
+          {
+            "file": "dist/devtools-CxgSYwGp.js",
+            "line": 127,
+            "via": "process.env"
+          }
+        ]
+      },
+      "declared": null
+    },
+    "vue-router>@vue-macros/common": {
+      "version": "3.1.4",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>@vue-macros/common>ast-kit": {
+      "version": "2.2.0",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>@vue-macros/common>magic-string-ast": {
+      "version": "1.0.3",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>@vue/devtools-api": {
+      "version": "8.2.1",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>@vue/devtools-api>@vue/devtools-kit": {
+      "version": "8.2.1",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>@vue/devtools-api>@vue/devtools-kit>@vue/devtools-shared": {
+      "version": "8.2.1",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>@vue/devtools-api>@vue/devtools-kit>perfect-debounce": {
+      "version": "2.1.0",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>ast-walker-scope": {
+      "version": "0.10.0",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>ast-walker-scope>@babel/parser": {
+      "version": "8.1.0",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>ast-walker-scope>@babel/types": {
+      "version": "8.1.0",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>ast-walker-scope>@babel/types>@babel/helper-string-parser": {
+      "version": "8.0.8",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>ast-walker-scope>@babel/types>@babel/helper-validator-identifier": {
+      "version": "8.0.6",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>ast-walker-scope>ast-kit": {
+      "version": "3.0.1",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>ast-walker-scope>ast-kit>estree-walker": {
+      "version": "3.0.3",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>chokidar": {
+      "version": "5.0.0",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>chokidar>readdirp": {
+      "version": "5.1.1",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>confbox": {
+      "version": "0.3.2",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>local-pkg": {
+      "version": "1.2.1",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>local-pkg>pkg-types": {
+      "version": "2.4.0",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>local-pkg>pkg-types>exsolve": {
+      "version": "1.2.0",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>local-pkg>quansync": {
+      "version": "0.2.11",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>magic-string": {
+      "version": "1.4.5",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>magic-string>@jridgewell/sourcemap-codec": {
+      "version": "1.6.0",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>mlly": {
+      "version": "1.8.2",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>mlly>acorn": {
+      "version": "8.19.0",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>mlly>pkg-types": {
+      "version": "1.3.1",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>mlly>pkg-types>confbox": {
+      "version": "0.1.8",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>mlly>ufo": {
+      "version": "1.6.4",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>muggle-string": {
+      "version": "0.4.1",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>nostics": {
+      "version": "1.3.0",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>pathe": {
+      "version": "2.0.3",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>picomatch": {
+      "version": "4.0.7",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>scule": {
+      "version": "1.3.0",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>tinyglobby": {
+      "version": "0.2.17",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>unplugin": {
+      "version": "3.7.0",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>unplugin-utils": {
+      "version": "0.3.2",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>unplugin>@jridgewell/remapping": {
+      "version": "2.3.5",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>unplugin>@jridgewell/remapping>@jridgewell/gen-mapping": {
+      "version": "0.3.13",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>unplugin>@jridgewell/remapping>@jridgewell/trace-mapping": {
+      "version": "0.3.31",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>unplugin>@jridgewell/remapping>@jridgewell/trace-mapping>@jridgewell/resolve-uri": {
+      "version": "3.1.2",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>unplugin>@rolldown/pluginutils": {
+      "version": "1.0.1",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>unplugin>webpack-virtual-modules": {
+      "version": "0.6.2",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>vite": {
+      "version": "7.3.7",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>vite>@types/node": {
+      "version": "24.12.2",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>vite>@types/node>undici-types": {
+      "version": "7.16.0",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>vite>esbuild": {
+      "version": "0.28.2",
+      "observed": {
+        "install": [
+          {
+            "file": "package.json",
+            "line": 0,
+            "via": "postinstall"
+          }
+        ]
+      },
+      "declared": null
+    },
+    "vue-router>vite>esbuild>@esbuild/darwin-arm64": {
+      "version": "0.28.2",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>vite>fdir": {
+      "version": "6.5.0",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>vite>fsevents": {
+      "version": "2.3.3",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>vite>jiti": {
+      "version": "2.7.0",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>vite>lightningcss": {
+      "version": "1.32.0",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>vite>lightningcss>detect-libc": {
+      "version": "2.1.2",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>vite>lightningcss>lightningcss-darwin-arm64": {
+      "version": "1.32.0",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>vite>postcss": {
+      "version": "8.5.31",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>vite>postcss>nanoid": {
+      "version": "3.3.20",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>vite>postcss>picocolors": {
+      "version": "1.1.1",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>vite>rollup": {
+      "version": "4.60.3",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>vite>rollup>@rollup/rollup-darwin-arm64": {
+      "version": "4.60.3",
+      "observed": {},
+      "declared": null
+    },
+    "vue-router>vite>rollup>@types/estree": {
+      "version": "1.0.8",
+      "observed": {},
+      "declared": null
+    },
+    "vue>@vue/compiler-dom": {
+      "version": "3.5.44",
+      "observed": {
+        "env": [
+          {
+            "file": "index.js",
+            "line": 3,
+            "via": "process.env"
+          }
+        ],
+        "eval": [
+          {
+            "file": "dist/compiler-dom.cjs.js",
+            "line": 673,
+            "via": "Function"
+          }
+        ]
+      },
+      "declared": null
+    },
+    "vue>@vue/compiler-dom>@vue/compiler-core": {
+      "version": "3.5.44",
+      "observed": {
+        "env": [
+          {
+            "file": "index.js",
+            "line": 3,
+            "via": "process.env"
+          }
+        ]
+      },
+      "declared": null
+    },
+    "vue>@vue/compiler-dom>@vue/compiler-core>entities": {
+      "version": "7.0.1",
+      "observed": {},
+      "declared": null
+    },
+    "vue>@vue/compiler-sfc": {
+      "version": "3.5.44",
+      "observed": {},
+      "declared": null
+    },
+    "vue>@vue/compiler-sfc>@babel/parser": {
+      "version": "7.29.9",
+      "observed": {},
+      "declared": null
+    },
+    "vue>@vue/compiler-sfc>@babel/parser>@babel/types": {
+      "version": "7.29.8",
+      "observed": {},
+      "declared": null
+    },
+    "vue>@vue/compiler-sfc>@babel/parser>@babel/types>@babel/helper-string-parser": {
+      "version": "7.29.7",
+      "observed": {},
+      "declared": null
+    },
+    "vue>@vue/compiler-sfc>@babel/parser>@babel/types>@babel/helper-validator-identifier": {
+      "version": "7.29.7",
+      "observed": {},
+      "declared": null
+    },
+    "vue>@vue/compiler-sfc>@vue/compiler-ssr": {
+      "version": "3.5.44",
+      "observed": {},
+      "declared": null
+    },
+    "vue>@vue/compiler-sfc>estree-walker": {
+      "version": "2.0.2",
+      "observed": {},
+      "declared": null
+    },
+    "vue>@vue/compiler-sfc>magic-string": {
+      "version": "0.30.21",
+      "observed": {},
+      "declared": null
+    },
+    "vue>@vue/compiler-sfc>source-map-js": {
+      "version": "1.2.2",
+      "observed": {
+        "eval": [
+          {
+            "file": "lib/quick-sort.js",
+            "line": 111,
+            "via": "Function"
+          }
+        ]
+      },
+      "declared": null
+    },
+    "vue>@vue/runtime-dom": {
+      "version": "3.5.44",
+      "observed": {
+        "env": [
+          {
+            "file": "index.js",
+            "line": 3,
+            "via": "process.env"
+          }
+        ]
+      },
+      "declared": null
+    },
+    "vue>@vue/runtime-dom>@vue/reactivity": {
+      "version": "3.5.44",
+      "observed": {
+        "env": [
+          {
+            "file": "index.js",
+            "line": 3,
+            "via": "process.env"
+          }
+        ]
+      },
+      "declared": null
+    },
+    "vue>@vue/runtime-dom>@vue/runtime-core": {
+      "version": "3.5.44",
+      "observed": {
+        "env": [
+          {
+            "file": "index.js",
+            "line": 3,
+            "via": "process.env"
+          }
+        ]
+      },
+      "declared": null
+    },
+    "vue>@vue/runtime-dom>csstype": {
+      "version": "3.2.3",
+      "observed": {},
+      "declared": null
+    },
+    "vue>@vue/server-renderer": {
+      "version": "3.5.44",
+      "observed": {},
+      "declared": null
+    },
+    "vue>@vue/shared": {
+      "version": "3.5.44",
+      "observed": {
+        "env": [
+          {
+            "file": "index.js",
+            "line": 3,
+            "via": "process.env"
+          }
+        ]
+      },
+      "declared": null
+    },
+    "vue>typescript": {
+      "version": "5.9.3",
+      "observed": {},
+      "declared": null
+    },
+    "zod": {
+      "version": "3.25.76",
+      "observed": {
+        "eval": [
+          {
+            "file": "v4/core/doc.js",
+            "line": 28,
+            "via": "Function"
+          }
+        ]
+      },
+      "declared": null
+    },
+    "zod-to-json-schema": {
+      "version": "3.25.2",
+      "observed": {},
+      "declared": null
+    }
+  }
+}
