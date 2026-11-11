@@ -136,6 +136,9 @@
     <!-- Profile photo: opened from the profile page and the account menu. -->
     <PhotoSheet v-if="authStore.isAuthenticated && photoSheetOpen" @claim="claimForPhoto" />
 
+    <!-- Change email: opened from the account menu, email accounts only. -->
+    <EmailSheet v-if="authStore.canChangeEmail && emailSheetOpen" />
+
     <!-- Guest sign-in failure toast. Top-center: the landing page owns the
          bottom edge with its sticky mobile CTA. -->
     <Transition name="signin-toast">
@@ -217,6 +220,7 @@ const BadgesPage = defineAsyncComponent(() => import('./components/BadgesPage.vu
 const ProfilePage = defineAsyncComponent(() => import('./components/ProfilePage.vue'))
 const ChangelogPage = defineAsyncComponent(() => import('./components/ChangelogPage.vue'))
 const PhotoSheet = defineAsyncComponent(() => import('./components/PhotoSheet.vue'))
+const EmailSheet = defineAsyncComponent(() => import('./components/EmailSheet.vue'))
 const GameView = defineAsyncComponent(() => import('./components/game/GameView.vue'))
 const MultiplayerGameView = defineAsyncComponent(() => import('./components/game/MultiplayerGameView.vue'))
 import { vFocusRing } from './directives/focusRing'
@@ -233,6 +237,7 @@ import {
   rememberPhotoAfterClaim,
   takePhotoAfterClaim,
 } from './composables/usePhotoSheet'
+import { emailSheetOpen } from './composables/useEmailSheet'
 
 const authStore = useAuthStore()
 const mpStore = useMultiplayerStore()
