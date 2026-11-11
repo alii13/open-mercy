@@ -41,6 +41,9 @@ function saveSettings(s: PersistedSettings): void {
 
 export const useSettingsStore = defineStore('settings', () => {
     const isOpen = ref(false)
+    // ACCOUNT shows only when the lobby's Change email opened the drawer: the
+    // in-game gear is for the game, and nobody moves their email mid-hand.
+    const showAccount = ref(false)
     const initial = loadSettings()
     const motionOverride = ref<'auto' | 'reduce'>(initial.motionOverride)
 
@@ -70,6 +73,12 @@ export const useSettingsStore = defineStore('settings', () => {
     })
 
     function open() {
+        showAccount.value = false
+        isOpen.value = true
+    }
+
+    function openAccount() {
+        showAccount.value = true
         isOpen.value = true
     }
 
@@ -94,10 +103,12 @@ export const useSettingsStore = defineStore('settings', () => {
 
     return {
         isOpen,
+        showAccount,
         motionOverride,
         reducedMotion,
         osPrefersReduced,
         open,
+        openAccount,
         close,
         toggle,
         setMotionOverride,

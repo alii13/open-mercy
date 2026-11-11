@@ -92,6 +92,7 @@
             </button>
             <button class="account-item" role="menuitem" @click="editNameFromMenu">Edit name</button>
             <button v-if="avatarsAvailable" class="account-item" role="menuitem" @click="photoFromMenu">Profile photo</button>
+            <button v-if="authStore.canChangeEmail" class="account-item" role="menuitem" @click="emailFromMenu">Change email</button>
             <button class="account-item account-item--out" role="menuitem" @click="signOutFromMenu">Sign out</button>
           </div>
         </div>
@@ -683,6 +684,7 @@ import QuickChat from './QuickChat.vue'
 import { vFocusRing } from '../directives/focusRing'
 import { preloadCardImages } from '../utils/preloadCardImages'
 import { useAuthStore } from '../stores/authStore'
+import { useSettingsStore } from '../stores/settingsStore'
 import { useMultiplayerStore } from '../stores/multiplayerStore'
 import { useVoiceStore } from '../stores/voiceStore'
 import { useGameStore } from '../stores/gameStore'
@@ -1156,6 +1158,13 @@ function editNameFromMenu() {
 function photoFromMenu() {
     closeAccount()
     openPhotoSheet()
+}
+
+// The only way to the ACCOUNT section: the in-game gear leaves it out.
+const settings = useSettingsStore()
+function emailFromMenu() {
+    closeAccount()
+    settings.openAccount()
 }
 
 function signOutFromMenu() {
