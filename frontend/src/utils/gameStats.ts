@@ -27,6 +27,8 @@ export interface ResultRow {
 export interface ProfileAggregates {
     games: number
     wins: number
+    /** Missing until supabase/profile-pages.sql is re-run. */
+    eliminations?: number
     best_win_streak: number
     max_stack_survived: number
     max_peak_cards: number
