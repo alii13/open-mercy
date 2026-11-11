@@ -225,8 +225,8 @@ defineEmits<{
 }>()
 
 // On a phone the last card sits where BACK TO MENU and the backdrop open, so a
-// double tap on it used to leave the result screen before it was seen. Taps
-// in the first moment are swallowed here, not passed to the board beneath.
+// double tap on it would leave the result screen before it is seen. Taps in
+// the first moment are swallowed here, not passed to the board beneath.
 const EARLY_TAP_MS = 600
 const shownAt = performance.now()
 function swallowEarlyTap(e: MouseEvent) {
