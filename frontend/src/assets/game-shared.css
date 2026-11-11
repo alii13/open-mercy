@@ -739,6 +739,58 @@ body.fx-ko-desat .game-view {
   margin-top: 2px;
 }
 
+/* The mercy readouts are buttons that explain the 25-card limit. */
+.mercy-hint-trigger {
+  position: relative;
+  background: none;
+  border: 0;
+  font: inherit;
+  color: inherit;
+  cursor: help;
+}
+.mercy-hint-trigger:focus-visible {
+  outline: 2px solid var(--color-hazard);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+.mercy-label-text .mercy-hint-icon {
+  vertical-align: -2px;
+}
+.mercy-hint-icon {
+  flex: none;
+  color: var(--text-muted);
+}
+/* The mobile pill is shorter than a thumb; the hit area still reaches 44px. */
+.hud-mercy-mobile.mercy-hint-trigger::after {
+  content: '';
+  position: absolute;
+  inset: calc(-1 * var(--spacing-2)) 0;
+}
+
+/* Same layer as the badge tooltip: above the game view. */
+.mercy-hint {
+  position: fixed;
+  z-index: 3200;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-1);
+  padding: var(--spacing-2) var(--spacing-3);
+  background: var(--surface-metal-dark);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-primary);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.mercy-hint-title {
+  font-size: var(--text-sm);
+  color: var(--color-alert);
+  letter-spacing: 0.04em;
+}
+
 .pit-table {
   display: flex;
   align-items: center;
