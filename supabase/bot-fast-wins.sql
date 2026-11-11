@@ -1,6 +1,7 @@
 -- Every bot win scores, however few cards it took. Run once in the Supabase
--- SQL Editor; it only replaces function bodies (same signatures, grants kept),
--- so it is safe to run again.
+-- SQL Editor (done 2026-11-11). It only replaces function bodies (same
+-- signatures, grants kept). Do not run it again after any of the source files
+-- named below change: it would put these older bodies back.
 --
 -- The walkover guard (cards_played_total >= 5) stops a multiplayer game that
 -- every opponent left from minting win points. A bot never leaves, so the

@@ -96,4 +96,4 @@ Guidance for working in this repo. Hard-won - read before changing CSS, raising 
 
 ## Data quality
 
-- Multiplayer walkover wins (every opponent left) record near-zero cards played and seconds-long durations. Speed/efficiency records and achievements gate on `cards_played_total >= 5` - keep that filter consistent between SQL (`public_profile`, `weekly_spotlights`) and `frontend/src/utils/achievements.ts`, which has an agreement test suite for exactly this.
+- Multiplayer walkover wins (every opponent left) record near-zero cards played and seconds-long durations. Points, speed/efficiency records and achievements gate on `(is_bot_game or cards_played_total >= 5)`: a bot never leaves, so only multiplayer needs 5 cards. Keep that guard identical in every SQL definer function (`player_points`, the all-time boards, `public_profile`, `weekly_spotlights`, the profile dossier) and in `isRealGame` (`frontend/src/utils/badges.ts`). `walkoverGuardSql.spec.ts` fails on a SQL copy that drops `is_bot_game`.
