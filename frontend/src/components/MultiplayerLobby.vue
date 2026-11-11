@@ -1160,12 +1160,11 @@ function photoFromMenu() {
     openPhotoSheet()
 }
 
-// The settings drawer's gear only shows during a game, so the lobby menu is
-// the way in from here. The drawer opens with ACCOUNT first.
+// The only way to the ACCOUNT section: the in-game gear leaves it out.
 const settings = useSettingsStore()
 function emailFromMenu() {
     closeAccount()
-    settings.open()
+    settings.openAccount()
 }
 
 function signOutFromMenu() {

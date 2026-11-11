@@ -18,8 +18,8 @@
           </header>
 
           <div class="settings-body">
-            <!-- Account: signed-in players. Email accounts can move to another address. -->
-            <section v-if="auth.user && !auth.isAnonymous" class="settings-section">
+            <!-- Account: opened from the lobby's Change email only. -->
+            <section v-if="settings.showAccount && auth.user && !auth.isAnonymous" class="settings-section">
               <h3 class="section-title">ACCOUNT</h3>
               <p class="account-line">
                 {{ auth.canChangeEmail ? 'Signed in as' : 'Signed in with Google as' }}
