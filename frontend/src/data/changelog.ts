@@ -74,7 +74,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         level: 'loud',
         tag: 'NEW',
         title: 'Change the email on your account',
-        body: "Signed up with email? Open the gear and look under Account: we send a link to your old and new address, and once you click both, you're moved.",
+        body: "Signed up with email? Open the menu at the top right and tap Change email. We send a link to your old and new address; click both and you're moved.",
     },
     {
         id: '2026-11-11',
