@@ -751,3 +751,18 @@ describe('changing the email on an account', () => {
         expect(local.has('om_email_change_to')).toBe(false)
     })
 })
+
+describe('an expired email link', () => {
+    it('reads as an expired link for a signed-in player, not as a failed guest claim', async () => {
+        const user = { id: 'reg-1', is_anonymous: false, email: 'old@b.com', app_metadata: { providers: ['email'] } }
+        h.state.getSession = async () => ({ data: { session: { user, access_token: 't' } } })
+        h.state.loc.hash = '#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired'
+        const auth = useAuthStore()
+
+        await auth.initialize()
+
+        expect(auth.oauthError).toBeNull()
+        expect(auth.authNotice).toMatch(/expired or was already used/)
+        expect(h.state.replacedUrls).toEqual(['/'])
+    })
+})

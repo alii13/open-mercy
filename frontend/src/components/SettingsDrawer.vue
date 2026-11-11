@@ -249,7 +249,7 @@ const EMAIL_ERRORS = {
 const emailNote = computed(() => {
   if (emailFailure.value) return { text: emailFailure.value, error: true }
   if (auth.emailChangePending) {
-    return { text: `We sent a link to ${auth.user?.email} and to ${auth.user?.new_email}. Click both to finish.`, error: false }
+    return { text: `We sent a link to ${auth.user?.email} and to ${auth.user?.new_email}. Click both to finish. Not there? Check spam.`, error: false }
   }
   return null
 })

@@ -406,6 +406,13 @@ export const useAuthStore = defineStore('auth', () => {
     function consumeOAuthError() {
         const found = readOAuthError(window.location.search, window.location.hash)
         if (!found) return
+        // An old or already-used email link comes back the same way. Unless a
+        // guest is waiting on a claim, the claim screen would only confuse.
+        if (found.code === 'otp_expired' && !claimPending.value) {
+            authNotice.value = 'That link has expired or was already used. You can send a new one from the gear, under Account.'
+            void router.replace(urlWithoutOAuthError(window.location))
+            return
+        }
         oauthError.value = found
         if (found.code === 'identity_already_exists') track('guest_claim_google_taken', {})
         // The claim died here. Leaving the marker set would attribute the next

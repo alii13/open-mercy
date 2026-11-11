@@ -68,6 +68,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        // A second entry on the same day: a full timestamp still parses as a
+        // date and sorts after the plain 2026-11-11 above it.
+        id: '2026-11-11T12:00Z',
+        level: 'loud',
+        tag: 'NEW',
+        title: 'Change the email on your account',
+        body: "Signed up with email? Open the gear and look under Account: we send a link to your old and new address, and once you click both, you're moved.",
+    },
+    {
         id: '2026-11-11',
         level: 'loud',
         tag: 'FIXED',
