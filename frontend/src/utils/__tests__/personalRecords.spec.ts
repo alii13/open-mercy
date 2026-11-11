@@ -53,7 +53,7 @@ describe('personalRecords', () => {
         // Every opponent quit: seconds long, almost no cards played. The same
         // cards_played_total >= 5 guard the points formula and the SQL use.
         const records = personalRecords([
-            row({ game_duration_secs: 3, cards_played_total: 1 }),
+            row({ game_duration_secs: 3, cards_played_total: 1, is_bot_game: false }),
             row({ game_duration_secs: 240, cards_played_total: 18 }),
         ])
         expect(records.fastestWinSecs).toBe(240)
@@ -61,7 +61,7 @@ describe('personalRecords', () => {
     })
 
     it('returns null when every win is a walkover', () => {
-        expect(personalRecords([row({ cards_played_total: 2 })])).toEqual({
+        expect(personalRecords([row({ cards_played_total: 2, is_bot_game: false })])).toEqual({
             fastestWinSecs: null,
             leanestWinCards: null,
         })

@@ -19,8 +19,8 @@ as $$
             gr.user_id,
             count(*) as games,
             (
-                count(*) filter (where gr.result = 'won' and gr.cards_played_total >= 5) * 100
-              + count(*) filter (where gr.result in ('lost', 'eliminated') and gr.cards_played_total >= 5) * 12
+                count(*) filter (where gr.result = 'won' and (gr.is_bot_game or gr.cards_played_total >= 5)) * 100
+              + count(*) filter (where gr.result in ('lost', 'eliminated') and (gr.is_bot_game or gr.cards_played_total >= 5)) * 12
               + coalesce(sum(gr.draw_cards_played), 0) * 2
               + coalesce(sum(gr.biggest_stack_survived), 0) * 3
               + coalesce(sum(gr.uno_calls), 0) * 4

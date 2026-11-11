@@ -21,6 +21,7 @@ as $$
         select
             gr.played_at,
             gr.result,
+            gr.is_bot_game,
             gr.cards_played_total,
             gr.draw_cards_played,
             gr.biggest_stack_survived,
@@ -38,8 +39,8 @@ as $$
         select
             played_at,
             (
-                sum(case when result = 'won' and cards_played_total >= 5 then 1 else 0 end) over w * 100
-              + sum(case when result in ('lost', 'eliminated') and cards_played_total >= 5 then 1 else 0 end) over w * 12
+                sum(case when result = 'won' and (is_bot_game or cards_played_total >= 5) then 1 else 0 end) over w * 100
+              + sum(case when result in ('lost', 'eliminated') and (is_bot_game or cards_played_total >= 5) then 1 else 0 end) over w * 12
               + sum(draw_cards_played) over w * 2
               + sum(biggest_stack_survived) over w * 3
               + sum(uno_calls) over w * 4

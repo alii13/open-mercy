@@ -68,6 +68,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: '2026-11-11',
+        level: 'loud',
+        tag: 'FIXED',
+        title: 'Every bot win now gives you points',
+        body: "Some wins against bots gave 0 points by mistake. It's fixed, and your old wins were added back too.",
+        cta: { label: 'SEE YOUR RANK', route: { name: 'leaderboard', tab: 'alltime' } },
+        stat: 'alltime_rank',
+    },
+    {
         id: '2026-11-09',
         level: 'loud',
         tag: 'NEW',

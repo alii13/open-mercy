@@ -11,7 +11,7 @@
  * is stable: a badge that appears here can never disappear from it later.
  */
 
-import { BADGES, MIN_PLAYS, earnedPoints, type Badge } from './badges'
+import { BADGES, earnedPoints, isRealGame, type Badge } from './badges'
 import type { ResultRow } from './gameStats'
 
 export interface Promotion {
@@ -49,7 +49,7 @@ export function promotionHistory(rows: ResultRow[]): Promotion[] {
     for (const r of ordered) {
         // Same walkover guard as aggregateRows — a quitter's opponent must not
         // mint win points here either.
-        const real = r.cards_played_total >= MIN_PLAYS
+        const real = isRealGame(r)
         if (r.result === 'won' && real) wins++
         else if ((r.result === 'lost' || r.result === 'eliminated') && real) completedLosses++
         drawCardsPlayed += r.draw_cards_played

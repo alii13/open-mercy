@@ -95,12 +95,12 @@ describe('earnedPoints', () => {
 })
 
 describe('aggregateRows (mirrors badges.sql)', () => {
-    it('gates win and loss points on cards_played_total >= 5 (walkover guard)', () => {
+    it('gates multiplayer win and loss points on cards_played_total >= 5 (walkover guard)', () => {
         const rows = [
             row({ result: 'won', cards_played_total: 20 }),   // real win
-            row({ result: 'won', cards_played_total: 2 }),    // walkover, ignored
+            row({ result: 'won', cards_played_total: 2, is_bot_game: false }),    // walkover, ignored
             row({ result: 'lost', cards_played_total: 12 }),  // completed loss
-            row({ result: 'eliminated', cards_played_total: 3 }), // walkover loss, ignored
+            row({ result: 'eliminated', cards_played_total: 3, is_bot_game: false }), // walkover loss, ignored
             row({ result: 'abandoned', cards_played_total: 30 }), // rage-quit, never counts
         ]
         const agg = aggregateRows(rows)
@@ -161,16 +161,20 @@ describe('pointsFromRetention (guest estimate)', () => {
 describe('gameContribution (signed-in live badge-up)', () => {
     it('adds a win, draw cards, stack, and mercy for a real game', () => {
         // win(100) + 3 draw(6) + 8 stack(24) + 2 mercy(8) = 138
-        expect(gameContribution({ won: true, completedLoss: false, cardsPlayedTotal: 20, drawCardsPlayed: 3, biggestStackSurvived: 8, unoCalls: 2 })).toBe(138)
+        expect(gameContribution({ won: true, completedLoss: false, cardsPlayedTotal: 20, drawCardsPlayed: 3, biggestStackSurvived: 8, unoCalls: 2, isBotGame: false })).toBe(138)
     })
 
     it('does not mint win/loss points for a walkover (< 5 cards)', () => {
-        expect(gameContribution({ won: true, completedLoss: false, cardsPlayedTotal: 2, drawCardsPlayed: 0, biggestStackSurvived: 0, unoCalls: 0 })).toBe(0)
+        expect(gameContribution({ won: true, completedLoss: false, cardsPlayedTotal: 2, drawCardsPlayed: 0, biggestStackSurvived: 0, unoCalls: 0, isBotGame: false })).toBe(0)
+    })
+
+    it('counts a short win against a bot, which can never walk out', () => {
+        expect(gameContribution({ won: true, completedLoss: false, cardsPlayedTotal: 2, drawCardsPlayed: 0, biggestStackSurvived: 0, unoCalls: 0, isBotGame: true })).toBe(100)
     })
 
     it('a baseline + contribution can cross a tier', () => {
         const before = 590 // Scrapper, just under Enforcer (600)
-        const after = before + gameContribution({ won: true, completedLoss: false, cardsPlayedTotal: 20, drawCardsPlayed: 0, biggestStackSurvived: 0, unoCalls: 0 })
+        const after = before + gameContribution({ won: true, completedLoss: false, cardsPlayedTotal: 20, drawCardsPlayed: 0, biggestStackSurvived: 0, unoCalls: 0, isBotGame: false })
         expect(badgeFor(before).title).toBe('Scrapper')
         expect(badgeFor(after).title).toBe('Enforcer')
     })

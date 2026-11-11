@@ -83,11 +83,12 @@ as $$
         coalesce(max(r.biggest_stack_survived), 0) as max_stack_survived,
         coalesce(max(r.peak_cards), 0) as max_peak_cards,
         coalesce(max(r.peak_cards) filter (where r.result = 'won'), 0) as max_peak_cards_won,
-        -- Speed/efficiency records require >= 5 cards actually played:
-        -- walkover wins (every opponent left) record near-zero plays and
-        -- seconds-long durations that aren't real records.
-        min(r.cards_played_total) filter (where r.result = 'won' and r.cards_played_total >= 5) as min_cards_won,
-        min(r.game_duration_secs) filter (where r.result = 'won' and r.game_duration_secs > 0 and r.cards_played_total >= 5) as min_duration_won,
+        -- Speed/efficiency records require >= 5 cards actually played in
+        -- multiplayer: walkover wins (every opponent left) record near-zero
+        -- plays and seconds-long durations that aren't real records. A bot
+        -- never leaves, so every bot win counts.
+        min(r.cards_played_total) filter (where r.result = 'won' and (r.is_bot_game or r.cards_played_total >= 5)) as min_cards_won,
+        min(r.game_duration_secs) filter (where r.result = 'won' and r.game_duration_secs > 0 and (r.is_bot_game or r.cards_played_total >= 5)) as min_duration_won,
         coalesce(max(r.game_duration_secs), 0) as max_duration,
         coalesce(sum(r.skips_dealt), 0) as sum_skips,
         coalesce(sum(r.draw_cards_played), 0) as sum_draw_cards,
@@ -128,7 +129,7 @@ as $$
         where gr.played_at > now() - interval '7 days'
           and gr.result = 'won' and gr.game_duration_secs > 0
           -- exclude walkover wins (opponents left, near-zero cards played)
-          and gr.cards_played_total >= 5
+          and (gr.is_bot_game or gr.cards_played_total >= 5)
         order by gr.game_duration_secs asc
         limit 1
     )

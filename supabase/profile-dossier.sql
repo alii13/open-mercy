@@ -16,7 +16,7 @@
 --   supabase/profile-dossier.sql       (this file)
 -- No test can catch a drift between them: the SQL needs a database. Grep for
 -- POINT_WEIGHTS before touching any weight, and keep the walkover guard
--- (cards_played_total >= 5) identical everywhere.
+-- (is_bot_game or cards_played_total >= 5) identical everywhere.
 --
 -- profile_promotions ALSO duplicates the tier thresholds from badges.ts BADGES.
 -- That is the only copy of the ladder outside TypeScript. Change both together.
@@ -74,8 +74,8 @@ as $$
             p.country,
             count(*) as games,
             (
-                count(*) filter (where gr.result = 'won' and gr.cards_played_total >= 5) * 100
-              + count(*) filter (where gr.result in ('lost', 'eliminated') and gr.cards_played_total >= 5) * 12
+                count(*) filter (where gr.result = 'won' and (gr.is_bot_game or gr.cards_played_total >= 5)) * 100
+              + count(*) filter (where gr.result in ('lost', 'eliminated') and (gr.is_bot_game or gr.cards_played_total >= 5)) * 12
               + coalesce(sum(gr.draw_cards_played), 0) * 2
               + coalesce(sum(gr.biggest_stack_survived), 0) * 3
               + coalesce(sum(gr.uno_calls), 0) * 4
@@ -137,6 +137,7 @@ as $$
         select
             gr.played_at,
             gr.result,
+            gr.is_bot_game,
             gr.cards_played_total,
             gr.draw_cards_played,
             gr.biggest_stack_survived,
@@ -154,8 +155,8 @@ as $$
         select
             played_at,
             (
-                sum(case when result = 'won' and cards_played_total >= 5 then 1 else 0 end) over w * 100
-              + sum(case when result in ('lost', 'eliminated') and cards_played_total >= 5 then 1 else 0 end) over w * 12
+                sum(case when result = 'won' and (is_bot_game or cards_played_total >= 5) then 1 else 0 end) over w * 100
+              + sum(case when result in ('lost', 'eliminated') and (is_bot_game or cards_played_total >= 5) then 1 else 0 end) over w * 12
               + sum(draw_cards_played) over w * 2
               + sum(biggest_stack_survived) over w * 3
               + sum(uno_calls) over w * 4
@@ -225,8 +226,8 @@ as $$
         gr.biggest_stack_survived,
         (
             case
-                when gr.cards_played_total >= 5 and gr.result = 'won' then 100
-                when gr.cards_played_total >= 5 and gr.result in ('lost', 'eliminated') then 12
+                when (gr.is_bot_game or gr.cards_played_total >= 5) and gr.result = 'won' then 100
+                when (gr.is_bot_game or gr.cards_played_total >= 5) and gr.result in ('lost', 'eliminated') then 12
                 else 0
             end
           + greatest(coalesce(gr.draw_cards_played, 0), 0) * 2
