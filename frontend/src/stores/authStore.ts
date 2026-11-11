@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { supabase, type UserProfile } from '../lib/supabase'
 import { track, setAnalyticsUser } from '../utils/analytics'
-import { readOAuthError, rememberReturnPath, takeReturnPath, urlWithoutOAuthError, type OAuthRedirectError } from '../utils/oauthRedirect'
+import { isFirstEmailChangeLink, readOAuthError, rememberReturnPath, takeReturnPath, urlWithoutOAuthError, type OAuthRedirectError } from '../utils/oauthRedirect'
 import { router } from '../utils/routes'
 import { randomHandle } from '@handles'
 import type { OAuthResponse, User } from '@supabase/supabase-js'
@@ -35,11 +35,13 @@ export const useAuthStore = defineStore('auth', () => {
                 // Resume a claim that was pending before a refresh, so its
                 // completion still gets counted when the confirmation lands.
                 if (session.user.is_anonymous && session.user.new_email) markClaimPending('email')
+                noticeEmailChangeLanded(session.user)
                 await fetchProfile()
             }
 
             // After getSession, so the SDK has already had its look at the URL.
             consumeOAuthError()
+            consumeEmailChangeLink()
 
             // Listen for auth changes
             // IMPORTANT: Per Supabase docs, avoid await inside this callback!
@@ -54,6 +56,7 @@ export const useAuthStore = defineStore('auth', () => {
 
                 // Always sync user and token state immediately (non-async)
                 user.value = session?.user || null
+                if (session?.user) noticeEmailChangeLanded(session.user)
                 accessToken.value = session?.access_token || null
                 setAnalyticsUser(session?.user?.id ?? null)
 
@@ -276,6 +279,57 @@ export const useAuthStore = defineStore('auth', () => {
     // A claim is pending while the guest's confirmation email is unclicked.
     // Derived from the user object (survives refreshes), never latched.
     const claimPending = computed(() => isAnonymous.value && !!user.value?.new_email)
+    /** Email + password accounts can move to another address; Google ones use Google's. */
+    const canChangeEmail = computed(() => !isAnonymous.value && (user.value?.app_metadata?.providers ?? []).includes('email'))
+    const emailChangePending = computed(() => !isAnonymous.value && !!user.value?.new_email)
+
+    /** One line for the player about their account, shown as a toast. */
+    const authNotice = ref<string | null>(null)
+    function clearAuthNotice() { authNotice.value = null }
+
+    // The last confirmation link usually opens a new tab, which never saw the
+    // old address. The requested one rides localStorage so whichever tab sees
+    // it land can say so.
+    const EMAIL_CHANGE_KEY = 'om_email_change_to'
+
+    /** Move an email account to a new address. Supabase mails a link to both
+     *  the old and the new address; the change lands when both are clicked. */
+    async function changeEmail(email: string):
+        Promise<{ success: true } | { success: false; error: 'same_email' | 'email_exists' | 'rate_limited' | 'failed' }> {
+        const clean = email.trim().toLowerCase()
+        if (!canChangeEmail.value) return { success: false, error: 'failed' }
+        if (clean === user.value?.email?.toLowerCase()) return { success: false, error: 'same_email' }
+        try {
+            const { data, error: updateError } = await supabase.auth.updateUser(
+                { email: clean },
+                { emailRedirectTo: window.location.origin },
+            )
+            if (updateError) throw updateError
+            if (data.user) user.value = data.user // carries new_email -> emailChangePending
+            try { localStorage.setItem(EMAIL_CHANGE_KEY, clean) } catch { /* private mode */ }
+            track('email_change_sent', {})
+            return { success: true }
+        } catch (err: any) {
+            if (err?.code === 'email_exists' || /already.*registered/i.test(err?.message ?? '')) return { success: false, error: 'email_exists' }
+            if (err?.code === 'over_email_send_rate_limit' || err?.status === 429) return { success: false, error: 'rate_limited' }
+            return { success: false, error: 'failed' }
+        }
+    }
+
+    function noticeEmailChangeLanded(u: User) {
+        let wanted: string | null = null
+        try { wanted = localStorage.getItem(EMAIL_CHANGE_KEY) } catch { return }
+        if (!wanted || u.is_anonymous || u.email?.toLowerCase() !== wanted) return
+        try { localStorage.removeItem(EMAIL_CHANGE_KEY) } catch { /* private mode */ }
+        authNotice.value = `Your email is now ${u.email}.`
+        track('email_change_completed', {})
+    }
+
+    function consumeEmailChangeLink() {
+        if (!isFirstEmailChangeLink(window.location.hash)) return
+        authNotice.value = 'Link accepted. Now click the link we sent to your other address.'
+        void router.replace(urlWithoutOAuthError(window.location))
+    }
 
     /**
      * Which claim is in flight, so the completion event can say how it happened.
@@ -524,6 +578,11 @@ export const useAuthStore = defineStore('auth', () => {
         isAuthenticated,
         isAnonymous,
         claimPending,
+        canChangeEmail,
+        emailChangePending,
+        authNotice,
+        clearAuthNotice,
+        changeEmail,
         username,
         oauthError,
         initialize,

@@ -127,6 +127,13 @@ vi.stubGlobal('sessionStorage', {
     removeItem: (k: string) => { session.delete(k) },
 })
 
+const local = new Map<string, string>()
+vi.stubGlobal('localStorage', {
+    getItem: (k: string) => local.get(k) ?? null,
+    setItem: (k: string, v: string) => { local.set(k, v) },
+    removeItem: (k: string) => { local.delete(k) },
+})
+
 import { useAuthStore } from '../authStore'
 import { takeReturnPath } from '../../utils/oauthRedirect'
 
@@ -134,6 +141,7 @@ beforeEach(() => {
     setActivePinia(createPinia())
     h.state.reset()
     session.clear()
+    local.clear()
     track.mockClear()
 })
 
@@ -667,5 +675,79 @@ describe('username collision resilience', () => {
             const auth = useAuthStore()
             expect(await auth.suggestUsernames('Rahul')).toEqual([])
         })
+    })
+})
+
+describe('changing the email on an account', () => {
+    const emailUser = { id: 'reg-1', is_anonymous: false, email: 'old@b.com', app_metadata: { providers: ['email'] } }
+
+    it('sends the confirmation links for an email account and shows the change as pending', async () => {
+        const auth = useAuthStore()
+        auth.user = { ...emailUser } as unknown as User
+        h.state.updateUserResult = { data: { user: { ...emailUser, new_email: 'new@b.com' } }, error: null }
+
+        const res = await auth.changeEmail('  New@B.com ')
+
+        expect(res).toEqual({ success: true })
+        expect(h.state.updateUserCalls[0]!.attrs).toEqual({ email: 'new@b.com' })
+        expect(h.state.updateUserCalls[0]!.opts).toMatchObject({ emailRedirectTo: 'https://uno-no-mercy.com' })
+        expect(auth.emailChangePending).toBe(true)
+        expect(auth.claimPending).toBe(false)
+        expect(track).toHaveBeenCalledWith('email_change_sent', expect.anything())
+    })
+
+    it('refuses a Google account and the current address without calling the API', async () => {
+        const auth = useAuthStore()
+        auth.user = { ...emailUser, email: 'g@gmail.com', app_metadata: { providers: ['google'] } } as unknown as User
+        expect(auth.canChangeEmail).toBe(false)
+        expect((await auth.changeEmail('new@b.com')).success).toBe(false)
+
+        auth.user = { ...emailUser } as unknown as User
+        expect(auth.canChangeEmail).toBe(true)
+        expect(await auth.changeEmail('OLD@b.com')).toEqual({ success: false, error: 'same_email' })
+        expect(h.state.updateUserCalls).toHaveLength(0)
+    })
+
+    it('tells a taken address apart from the email send limit', async () => {
+        const auth = useAuthStore()
+        auth.user = { ...emailUser } as unknown as User
+
+        h.state.updateUserResult = { data: { user: null }, error: { message: 'A user with this email address has already been registered', code: 'email_exists' } }
+        expect(await auth.changeEmail('taken@b.com')).toEqual({ success: false, error: 'email_exists' })
+
+        h.state.updateUserResult = { data: { user: null }, error: { message: 'email rate limit exceeded', code: 'over_email_send_rate_limit', status: 429 } }
+        expect(await auth.changeEmail('new@b.com')).toEqual({ success: false, error: 'rate_limited' })
+    })
+
+    it('turns the first of the two confirmation links into a notice and clears it from the URL', async () => {
+        h.state.loc.hash = '#message=Confirmation+link+accepted.+Please+proceed+to+confirm+link+sent+to+the+other+email'
+        const auth = useAuthStore()
+
+        await auth.initialize()
+
+        expect(auth.authNotice).toMatch(/other address/)
+        expect(h.state.replacedUrls).toEqual(['/'])
+    })
+
+    it('says so when the change lands, in the tab that asked or a new one', async () => {
+        const auth = useAuthStore()
+        h.state.getSession = async () => ({ data: { session: { user: { ...emailUser }, access_token: 't' } } })
+        await auth.initialize()
+        h.state.updateUserResult = { data: { user: { ...emailUser, new_email: 'new@b.com' } }, error: null }
+        await auth.changeEmail('new@b.com')
+        expect(auth.authNotice).toBeNull()
+
+        h.state.authCallback!('USER_UPDATED', { user: { ...emailUser, email: 'new@b.com' }, access_token: 't2' })
+        expect(auth.authNotice).toBe('Your email is now new@b.com.')
+        expect(auth.emailChangePending).toBe(false)
+
+        // The last link usually opens a new tab, which only ever sees the new address.
+        setActivePinia(createPinia())
+        local.set('om_email_change_to', 'newer@b.com')
+        h.state.getSession = async () => ({ data: { session: { user: { ...emailUser, email: 'newer@b.com' }, access_token: 't3' } } })
+        const fresh = useAuthStore()
+        await fresh.initialize()
+        expect(fresh.authNotice).toBe('Your email is now newer@b.com.')
+        expect(local.has('om_email_change_to')).toBe(false)
     })
 })

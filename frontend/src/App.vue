@@ -151,6 +151,18 @@
       </div>
     </Transition>
 
+    <!-- Account notices, such as an email change landing. Same spot as the
+         sign-in toast; it only ever shows to a signed-in player. -->
+    <Transition name="signin-toast">
+      <div v-if="authStore.authNotice && !guestError" class="signin-toast signin-toast--info" role="status">
+        <div class="signin-toast__text">
+          <span class="signin-toast__title">ACCOUNT</span>
+          <span class="signin-toast__sub">{{ authStore.authNotice }}</span>
+        </div>
+        <button class="signin-toast__dismiss" aria-label="Dismiss" @click="authStore.clearAuthNotice()"><X :size="16" :stroke-width="2" aria-hidden="true" /></button>
+      </div>
+    </Transition>
+
     <!-- A player on the home screen holds no game socket, so an invite
          arrives over Realtime and lands here, above every screen. -->
     <InviteToast v-if="authStore.isAuthenticated" />
@@ -478,6 +490,33 @@ function startDailyGame(entry_point: 'lobby' | 'game_over' | 'reminder') {
   .app-container {
     -webkit-overflow-scrolling: touch;
   }
+}
+
+/* Account notices reuse the toast's place and shape in neutral colours, with
+   the sentence in sentence case so an email address reads as typed. */
+.signin-toast.signin-toast--info {
+  align-items: flex-start;
+  background: var(--surface-metal-dark);
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow: var(--shadow-md);
+}
+.signin-toast--info .signin-toast__title {
+  color: var(--text-primary);
+}
+/* Only a dismiss button here, so it stays beside the text on narrow screens
+   instead of wrapping under it like RETRY does. */
+.signin-toast.signin-toast--info {
+  flex-wrap: nowrap;
+}
+.signin-toast--info .signin-toast__text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.signin-toast--info .signin-toast__sub {
+  font-size: var(--text-sm);
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-secondary);
 }
 
 /* Guest sign-in failure toast — mirrors the in-game eliminated banner,

@@ -32,6 +32,17 @@ export function readOAuthError(search: string, hash: string): OAuthRedirectError
 const ERROR_PARAMS = ['error', 'error_code', 'error_description']
 
 /**
+ * True when GoTrue sent back the first of the two email-change confirmations.
+ * With secure email change on, the first link clicked returns with only a
+ * `message` in the fragment. The text itself is never shown: anyone can put
+ * words in a link, so the app answers with its own copy.
+ */
+export function isFirstEmailChangeLink(hash: string): boolean {
+    const message = new URLSearchParams(hash.replace(/^#/, '')).get('message') ?? ''
+    return /confirm link sent to the other email/i.test(message)
+}
+
+/**
  * The same URL with only the OAuth error params removed.
  *
  * Deliberately surgical rather than resetting to `/`: the path and the rest of
