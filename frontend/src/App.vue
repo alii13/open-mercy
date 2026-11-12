@@ -231,8 +231,10 @@ function gameScreen(loader: AsyncComponentLoader, failEvent: string) {
     loadingComponent: GameLoadState,
     errorComponent: GameLoadState,
     timeout: 15000,
-    onError: (_err, retry, fail, attempts) => {
-      if (attempts <= 3) { setTimeout(retry, attempts * 1000); return }
+    onError: (err, retry, fail, attempts) => {
+      // Vite never requests a stylesheet a second time, so a retry after one
+      // failed would draw the game unstyled: that case goes straight to Reload.
+      if (attempts <= 3 && !err.message.includes('preload CSS')) { setTimeout(retry, attempts * 1000); return }
       track(failEvent)
       fail()
     },
