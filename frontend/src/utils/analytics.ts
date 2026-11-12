@@ -13,6 +13,9 @@
  *                            mp_join_failed so that metric means "a join the
  *                            player asked for did not work".
  *   mp_game_started    { players, rules, rematch }
+ *   mp_game_load_failed {}  — the game screen still failed to load after 3
+ *                            retries, so the player got the Reload screen
+ *                            (sp_game_load_failed: the same for a bot game)
  *   mp_game_finished   { players, result: won|lost, duration_seconds, rules }
  *   mp_room_left       { phase: lobby|playing|finished, seconds_in_room }
  *   mp_lobby_rescue_taken { players }  — a solo waiter moved to a room that
