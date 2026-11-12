@@ -189,7 +189,7 @@
 
 <script setup lang="ts">
 import { X } from 'lucide-vue-next'
-import { ref, computed, watch, onMounted, onUnmounted, defineAsyncComponent } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, defineAsyncComponent, type AsyncComponentLoader } from 'vue'
 import { track, trackScreen } from './utils/analytics'
 import { syncReminders } from './composables/useReminders'
 import { localDateString } from './utils/seededRng'
@@ -205,6 +205,7 @@ import { syncCountryToProfile } from './utils/country'
 import LandingPage from './components/LandingPage.vue'
 import SettingsDrawer from './components/SettingsDrawer.vue'
 import Button from './components/ui/Button.vue'
+import GameLoadState from './components/game/GameLoadState.vue'
 // The gameplay surfaces are code-split: a first-time visitor who only sees the
 // landing page shouldn't download the whole game engine + dashboard. They load
 // on demand when the view is first shown.
@@ -221,8 +222,24 @@ const ProfilePage = defineAsyncComponent(() => import('./components/ProfilePage.
 const ChangelogPage = defineAsyncComponent(() => import('./components/ChangelogPage.vue'))
 const PhotoSheet = defineAsyncComponent(() => import('./components/PhotoSheet.vue'))
 const EmailSheet = defineAsyncComponent(() => import('./components/EmailSheet.vue'))
-const GameView = defineAsyncComponent(() => import('./components/game/GameView.vue'))
-const MultiplayerGameView = defineAsyncComponent(() => import('./components/game/MultiplayerGameView.vue'))
+// A game screen that fails to download must never leave a blank page: in a
+// multiplayer room the turns keep running and time the player out. The
+// fallback screen is bundled here, since a lazy one would fail the same way.
+function gameScreen(loader: AsyncComponentLoader, failEvent: string) {
+  return defineAsyncComponent({
+    loader,
+    loadingComponent: GameLoadState,
+    errorComponent: GameLoadState,
+    timeout: 15000,
+    onError: (_err, retry, fail, attempts) => {
+      if (attempts <= 3) { setTimeout(retry, attempts * 1000); return }
+      track(failEvent)
+      fail()
+    },
+  })
+}
+const GameView = gameScreen(() => import('./components/game/GameView.vue'), 'sp_game_load_failed')
+const MultiplayerGameView = gameScreen(() => import('./components/game/MultiplayerGameView.vue'), 'mp_game_load_failed')
 import { vFocusRing } from './directives/focusRing'
 import { useAuthStore } from './stores/authStore'
 import { supabase } from './lib/supabase'
