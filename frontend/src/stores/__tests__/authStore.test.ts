@@ -27,6 +27,7 @@ const h = vi.hoisted(() => {
         updateUserCalls: [] as { attrs: unknown; opts: unknown }[],
         updateUserResult: { data: { user: null }, error: null } as unknown,
         resendCalls: [] as unknown[],
+        refreshSessionCalls: 0,
         authCallback: null as ((event: string, session: unknown) => void) | null,
         linkIdentityCalls: [] as unknown[],
         oauthCalls: [] as unknown[],
@@ -54,6 +55,7 @@ const h = vi.hoisted(() => {
             state.updateUserCalls = []
             state.updateUserResult = { data: { user: null }, error: null }
             state.resendCalls = []
+            state.refreshSessionCalls = 0
             state.authCallback = null
             state.linkIdentityCalls = []
             state.oauthCalls = []
@@ -90,6 +92,7 @@ vi.mock('../../lib/supabase', () => ({
                 return h.state.updateUserResult
             },
             resend: async (opts: unknown) => { h.state.resendCalls.push(opts); return { error: null } },
+            refreshSession: async () => { h.state.refreshSessionCalls++; return { data: {}, error: null } },
             linkIdentity: async (creds: unknown) => { h.state.linkIdentityCalls.push(creds); return h.state.oauthResult },
             signInWithOAuth: async (creds: unknown) => { h.state.oauthCalls.push(creds); return h.state.oauthResult },
             signOut: async (opts?: { scope?: string }) => { h.state.steps.push(`signOut:${opts?.scope ?? 'global'}`); return { error: null } },
@@ -310,6 +313,22 @@ describe('claiming a guest account (in-place anonymous conversion)', () => {
 
         expect(h.state.profileFetches).toBe(fetchesBefore + 1)
         expect(auth.claimPending).toBe(true)
+    })
+
+    it('refreshes the token when a guest with an email claim pending comes back to the page', async () => {
+        // The confirmation link opens in another browser (Safari, from the apps),
+        // so only a fresh token tells this page the claim landed.
+        const auth = useAuthStore()
+        await auth.initialize()
+
+        // What auth-js sends on every hidden-to-visible switch.
+        h.state.authCallback!('SIGNED_IN', {
+            user: { id: 'anon-1', is_anonymous: true, new_email: 'a@b.com' },
+            access_token: 't',
+        })
+        await new Promise(r => setTimeout(r, 1))
+
+        expect(h.state.refreshSessionCalls).toBe(1)
     })
 
     it('leaves the profile alone when the same player comes back to the tab, unless the last read is old', async () => {

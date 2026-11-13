@@ -72,6 +72,14 @@ export const useAuthStore = defineStore('auth', () => {
                     track('guest_claim_completed', { method: claimMethod })
                 }
 
+                // The claim's confirmation link opens in another browser (Safari,
+                // from the apps), so this page learns the claim landed only from
+                // a fresh token, up to an hour away. auth-js sends SIGNED_IN each
+                // time the page comes back into view, which is when players look.
+                if (event === 'SIGNED_IN' && session?.user?.is_anonymous && session.user.new_email) {
+                    setTimeout(() => { void supabase.auth.refreshSession() }, 0)
+                }
+
                 // Handle specific events. USER_UPDATED fires on in-place
                 // updateUser calls (e.g. a guest claiming their account) —
                 // without it the profile would never refresh mid-session.

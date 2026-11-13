@@ -102,7 +102,8 @@
  */
 
 import { Capacitor, registerPlugin } from '@capacitor/core'
-import type { FirebaseAnalyticsPlugin } from '@capacitor-firebase/analytics'
+import type { ConsentStatus, ConsentType, FirebaseAnalyticsPlugin } from '@capacitor-firebase/analytics'
+import { detectedCountry } from './country'
 
 /**
  * GA4 reads these parameter names as attribution, whatever event carries them,
@@ -123,9 +124,27 @@ type Params = Record<string, string | number | boolean | undefined>
  */
 const firebase = Capacitor.isNativePlatform() ? registerPlugin<FirebaseAnalyticsPlugin>('FirebaseAnalytics') : null
 
-function definedOnly(params?: Params): Record<string, string | number | boolean> {
-    const out: Record<string, string | number | boolean> = {}
-    for (const [k, v] of Object.entries(params ?? {})) if (v !== undefined) out[k] = v
+/*
+ * The website keeps analytics cookieless in the EEA, UK and Switzerland (the
+ * Consent Mode default in index.html, same list) and asks nobody. The apps
+ * start with analytics storage denied (Info.plist, AndroidManifest.xml) and
+ * grant it only once the player's country is known to be outside them.
+ */
+const CONSENT_REGIONS = new Set(['AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE', 'IS', 'LI', 'NO', 'GB', 'CH'])
+if (firebase) {
+    void detectedCountry()
+        .then(country => {
+            if (!country || CONSENT_REGIONS.has(country)) return
+            return firebase.setConsent({ type: 'ANALYTICS_STORAGE' as ConsentType, status: 'GRANTED' as ConsentStatus })
+        })
+        .catch(() => { /* analytics never breaks the game */ })
+}
+
+// Booleans become "true"/"false", as gtag sends them: Firebase on Android takes
+// no booleans, and on iOS they would arrive as 1/0.
+function definedOnly(params?: Params): Record<string, string | number> {
+    const out: Record<string, string | number> = {}
+    for (const [k, v] of Object.entries(params ?? {})) if (v !== undefined) out[k] = typeof v === 'boolean' ? String(v) : v
     return out
 }
 

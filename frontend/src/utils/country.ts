@@ -24,6 +24,21 @@ export function usableCountry(raw: string | null | undefined): string | null {
     return up
 }
 
+let detected: Promise<string | null> | null = null
+
+/** The CDN-detected country, fetched once per session; null when unknown. */
+export function detectedCountry(): Promise<string | null> {
+    detected ??= fetch(`${siteOrigin()}/api/geo`)
+        .then(async res => {
+            // A misrouted function serves the SPA shell with a 200 — only JSON counts.
+            if (!res.ok || !res.headers.get('content-type')?.includes('json')) return null
+            const body = await res.json() as { country?: string | null }
+            return usableCountry(body.country)
+        })
+        .catch(() => null)
+    return detected
+}
+
 let attempted = false
 
 /** Mirror the CDN-detected country onto the profile — once per session,
@@ -33,11 +48,7 @@ export async function syncCountryToProfile(current: string | null | undefined): 
     if (attempted) return
     attempted = true
     try {
-        const res = await fetch(`${siteOrigin()}/api/geo`)
-        // A misrouted function serves the SPA shell with a 200 — only JSON counts.
-        if (!res.ok || !res.headers.get('content-type')?.includes('json')) return
-        const body = await res.json() as { country?: string | null }
-        const country = usableCountry(body.country)
+        const country = await detectedCountry()
         if (!country || country === current) return
         const { supabase } = await import('../lib/supabase')
         const { data: { session } } = await supabase.auth.getSession()
