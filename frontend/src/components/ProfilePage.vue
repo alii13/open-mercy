@@ -312,6 +312,7 @@ import Avatar from './Avatar.vue'
 import { openPhotoSheet } from '../composables/usePhotoSheet'
 import { avatarsAvailable } from '../composables/useAvatars'
 import ShareStatsCard from './ShareStatsCard.vue'
+import { siteOrigin } from '../utils/siteOrigin'
 
 const props = defineProps<{ code: string }>()
 defineEmits<{ (e: 'back'): void }>()
@@ -319,7 +320,7 @@ defineEmits<{ (e: 'back'): void }>()
 const pp = useProfile()
 const dossier = useProfileDossier()
 const showShareCard = ref(false)
-const shareUrl = computed(() => `${window.location.origin}/p/${props.code}`)
+const shareUrl = computed(() => `${siteOrigin()}/p/${props.code}`)
 const authStore = useAuthStore()
 const motion = useMotion()
 const contentEl = ref<HTMLElement | null>(null)
@@ -491,7 +492,7 @@ async function onShare() {
         wins: p.value.wins,
         max_stack_survived: p.value.max_stack_survived,
         isOwn: isOwn.value,
-        url: `${window.location.origin}/p/${props.code}`,
+        url: `${siteOrigin()}/p/${props.code}`,
     })
     track('profile_shared', { method: outcome, own: isOwn.value })
     if (outcome === 'copied') {

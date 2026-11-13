@@ -704,6 +704,7 @@ import ConfirmDialog from './ConfirmDialog.vue'
 import Button from './ui/Button.vue'
 import VoiceMicCluster from './game/VoiceMicCluster.vue'
 import type { StackingMode } from '../utils/gameRules'
+import { siteOrigin } from '../utils/siteOrigin'
 
 const emit = defineEmits<{
   (e: 'playLocal', mode: StackingMode): void
@@ -1292,7 +1293,7 @@ async function shareInvite() {
 }
 
 function inviteUrl() {
-  return new URL(routePath({ name: 'room', code: mpStore.roomCode }), window.location.origin).toString()
+  return new URL(routePath({ name: 'room', code: mpStore.roomCode }), siteOrigin()).toString()
 }
 
 // Copy the full invite link (not just the code) — tapping it opens the join

@@ -7,6 +7,8 @@ import { router } from '../utils/routes'
 import { randomHandle } from '@handles'
 import { deleteAvatarFolder } from '../composables/useAvatars'
 import type { OAuthResponse, User } from '@supabase/supabase-js'
+import { siteOrigin } from '../utils/siteOrigin'
+import { canSignInWithApple, isNativeApp, nativeIdToken, revokeAppleSignIn, SignInCancelled, type NativeProvider } from '../utils/nativeSignIn'
 
 export const useAuthStore = defineStore('auth', () => {
     const user = ref<User | null>(null)
@@ -68,6 +70,14 @@ export const useAuthStore = defineStore('auth', () => {
                 if (claimMethod && session?.user && session.user.is_anonymous === false) {
                     clearPendingClaim()
                     track('guest_claim_completed', { method: claimMethod })
+                }
+
+                // The claim's confirmation link opens in another browser (Safari,
+                // from the apps), so this page learns the claim landed only from
+                // a fresh token, up to an hour away. auth-js sends SIGNED_IN each
+                // time the page comes back into view, which is when players look.
+                if (event === 'SIGNED_IN' && session?.user?.is_anonymous && session.user.new_email) {
+                    setTimeout(() => { void supabase.auth.refreshSession() }, 0)
                 }
 
                 // Handle specific events. USER_UPDATED fires on in-place
@@ -303,7 +313,7 @@ export const useAuthStore = defineStore('auth', () => {
         try {
             const { data, error: updateError } = await supabase.auth.updateUser(
                 { email: clean },
-                { emailRedirectTo: window.location.origin },
+                { emailRedirectTo: siteOrigin() },
             )
             if (updateError) throw updateError
             if (data.user) user.value = data.user // carries new_email -> emailChangePending
@@ -345,7 +355,7 @@ export const useAuthStore = defineStore('auth', () => {
      * Email keeps working off user.new_email, which survives the confirmation
      * link being opened in a different tab or browser altogether.
      */
-    type ClaimMethod = 'email' | 'google'
+    type ClaimMethod = 'email' | 'google' | 'apple'
     const CLAIM_METHOD_KEY = 'om_claim_method'
     let pendingClaim: ClaimMethod | null = null
 
@@ -380,7 +390,7 @@ export const useAuthStore = defineStore('auth', () => {
         try {
             const { data, error: updateError } = await supabase.auth.updateUser(
                 { email, password },
-                { emailRedirectTo: window.location.origin },
+                { emailRedirectTo: siteOrigin() },
             )
             if (updateError) throw updateError
             if (data.user) user.value = data.user // carries new_email → claimPending
@@ -468,6 +478,7 @@ export const useAuthStore = defineStore('auth', () => {
             return { success: false, error: 'Not a guest session' }
         }
         track('guest_claim_google_started', {})
+        if (isNativeApp) return linkNativeIdentity('google')
         markClaimPending('google')
         return startGoogleRedirect(() => supabase.auth.linkIdentity({
             provider: 'google',
@@ -483,10 +494,73 @@ export const useAuthStore = defineStore('auth', () => {
      * redirects through instead of following them (supabase-proxy/src/index.ts).
      */
     async function signInWithGoogle() {
+        if (isNativeApp) return signInWithNative('google')
         return startGoogleRedirect(() => supabase.auth.signInWithOAuth({
             provider: 'google',
             options: { redirectTo: window.location.origin },
         }))
+    }
+
+    /** Sign in with Apple. iOS app only (nativeSignIn.canSignInWithApple). */
+    async function signInWithApple() {
+        return signInWithNative('apple')
+    }
+
+    /** A guest keeps their account with Apple. iOS app only, like signInWithApple. */
+    async function linkAppleIdentity() {
+        if (!user.value || !isAnonymous.value) {
+            return { success: false, error: 'Not a guest session' }
+        }
+        return linkNativeIdentity('apple')
+    }
+
+    type ProviderResult = { success: boolean; error?: string; cancelled?: boolean }
+
+    function providerFailure(err: unknown): ProviderResult {
+        if (err instanceof SignInCancelled) return { success: false, cancelled: true }
+        // identity_already_exists: this Google or Apple sign-in is another
+        // player's. email_exists: the email it shares is another player's.
+        const e = err as { code?: string; message?: string }
+        const taken = e?.code === 'identity_already_exists' || e?.code === 'email_exists'
+        return { success: false, error: taken ? e.code : (e?.message ?? 'failed') }
+    }
+
+    /**
+     * The apps' sign-in: the system Google or Apple sheet returns an ID token,
+     * and Supabase starts the session from it. Nothing navigates, so success
+     * and failure both come back to the caller.
+     */
+    async function signInWithNative(provider: NativeProvider): Promise<ProviderResult> {
+        try {
+            const { token, nonce } = await nativeIdToken(provider)
+            const { error: signInError } = await supabase.auth.signInWithIdToken({ provider, token, nonce })
+            if (signInError) throw signInError
+            return { success: true }
+        } catch (err) {
+            return providerFailure(err)
+        }
+    }
+
+    /**
+     * The apps' guest claim: the same in-place conversion as the web's
+     * linkIdentity redirect, from an ID token instead. The user id stays, so
+     * the profile, share code and game_results stay attached.
+     */
+    async function linkNativeIdentity(provider: NativeProvider): Promise<ProviderResult> {
+        markClaimPending(provider)
+        try {
+            const { token, nonce } = await nativeIdToken(provider)
+            const { data, error: linkError } = await supabase.auth.linkIdentity({ provider, token, nonce })
+            if (linkError) throw linkError
+            if (data.user) user.value = data.user
+            return { success: true }
+        } catch (err) {
+            clearPendingClaim()
+            const result = providerFailure(err)
+            const taken = result.error === 'identity_already_exists' || result.error === 'email_exists'
+            if (taken && provider === 'google') track('guest_claim_google_taken', {})
+            return result
+        }
     }
 
     /** Re-send the claim confirmation to the pending address. */
@@ -550,7 +624,7 @@ export const useAuthStore = defineStore('auth', () => {
     async function sendPasswordReset(email: string) {
         try {
             const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-                redirectTo: window.location.origin,
+                redirectTo: siteOrigin(),
             })
             if (resetError) throw resetError
             return { success: true }
@@ -590,11 +664,19 @@ export const useAuthStore = defineStore('auth', () => {
         try {
             const probe = await supabase.rpc('delete_my_account', { dry_run: true })
             if (probe.error) throw probe.error
+            // Apple requires its tokens revoked with the account. Only the iOS
+            // app has Apple sign-in, and the revoke needs the live session.
+            if (canSignInWithApple && user.value?.identities?.some(i => i.provider === 'apple')) {
+                const { data: { session } } = await supabase.auth.getSession()
+                await revokeAppleSignIn(session?.access_token ?? '')
+            }
             const photoError = await deleteAvatarFolder(id)
             if (photoError) throw new Error(photoError)
             const { error: deleteError } = await supabase.rpc('delete_my_account')
             if (deleteError) throw deleteError
         } catch (err) {
+            // Closing the Apple sheet is a change of mind, not an error.
+            if (err instanceof SignInCancelled) return { success: false }
             console.error('deleteAccount error:', err)
             authNotice.value = "We couldn't delete your account. Try again in a minute."
             return { success: false }
@@ -634,6 +716,8 @@ export const useAuthStore = defineStore('auth', () => {
         deleteAccount,
         linkGoogleIdentity,
         signInWithGoogle,
+        signInWithApple,
+        linkAppleIdentity,
         clearOAuthError,
         resendClaimEmail,
         updateUsername,

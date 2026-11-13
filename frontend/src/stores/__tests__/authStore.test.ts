@@ -27,6 +27,7 @@ const h = vi.hoisted(() => {
         updateUserCalls: [] as { attrs: unknown; opts: unknown }[],
         updateUserResult: { data: { user: null }, error: null } as unknown,
         resendCalls: [] as unknown[],
+        refreshSessionCalls: 0,
         authCallback: null as ((event: string, session: unknown) => void) | null,
         linkIdentityCalls: [] as unknown[],
         oauthCalls: [] as unknown[],
@@ -36,6 +37,7 @@ const h = vi.hoisted(() => {
         } as unknown,
         navigations: [] as string[],
         replacedUrls: [] as string[],
+        native: false,
         // Ordered record of the storage, rpc and sign-out calls account deletion makes.
         steps: [] as string[],
         rpcResults: {} as Record<string, { data: unknown; error: unknown }>,
@@ -53,6 +55,7 @@ const h = vi.hoisted(() => {
             state.updateUserCalls = []
             state.updateUserResult = { data: { user: null }, error: null }
             state.resendCalls = []
+            state.refreshSessionCalls = 0
             state.authCallback = null
             state.linkIdentityCalls = []
             state.oauthCalls = []
@@ -62,6 +65,7 @@ const h = vi.hoisted(() => {
             }
             state.navigations = []
             state.replacedUrls = []
+            state.native = false
             state.steps = []
             state.rpcResults = {}
             state.avatarFiles = []
@@ -88,6 +92,7 @@ vi.mock('../../lib/supabase', () => ({
                 return h.state.updateUserResult
             },
             resend: async (opts: unknown) => { h.state.resendCalls.push(opts); return { error: null } },
+            refreshSession: async () => { h.state.refreshSessionCalls++; return { data: {}, error: null } },
             linkIdentity: async (creds: unknown) => { h.state.linkIdentityCalls.push(creds); return h.state.oauthResult },
             signInWithOAuth: async (creds: unknown) => { h.state.oauthCalls.push(creds); return h.state.oauthResult },
             signOut: async (opts?: { scope?: string }) => { h.state.steps.push(`signOut:${opts?.scope ?? 'global'}`); return { error: null } },
@@ -115,6 +120,15 @@ vi.mock('../../lib/supabase', () => ({
             return b
         },
     },
+}))
+
+// The iOS and Android apps sign in through the system sheet, which returns an ID token.
+vi.mock('../../utils/nativeSignIn', () => ({
+    get isNativeApp() { return h.state.native },
+    get canSignInWithApple() { return h.state.native },
+    revokeAppleSignIn: async (token: string) => { h.state.steps.push(`apple-revoke:${token}`) },
+    nativeIdToken: async (provider: string) => ({ token: `id-token-${provider}`, nonce: 'raw-nonce' }),
+    SignInCancelled: class extends Error {},
 }))
 
 const { track, setAnalyticsUser } = vi.hoisted(() => ({ track: vi.fn(), setAnalyticsUser: vi.fn() }))
@@ -299,6 +313,22 @@ describe('claiming a guest account (in-place anonymous conversion)', () => {
 
         expect(h.state.profileFetches).toBe(fetchesBefore + 1)
         expect(auth.claimPending).toBe(true)
+    })
+
+    it('refreshes the token when a guest with an email claim pending comes back to the page', async () => {
+        // The confirmation link opens in another browser (Safari, from the apps),
+        // so only a fresh token tells this page the claim landed.
+        const auth = useAuthStore()
+        await auth.initialize()
+
+        // What auth-js sends on every hidden-to-visible switch.
+        h.state.authCallback!('SIGNED_IN', {
+            user: { id: 'anon-1', is_anonymous: true, new_email: 'a@b.com' },
+            access_token: 't',
+        })
+        await new Promise(r => setTimeout(r, 1))
+
+        expect(h.state.refreshSessionCalls).toBe(1)
     })
 
     it('leaves the profile alone when the same player comes back to the tab, unless the last read is old', async () => {
@@ -792,6 +822,23 @@ describe('an expired email link', () => {
     })
 })
 
+describe('claiming a guest account with Google in the app', () => {
+    // signInWithIdToken would mint a second user and strand the guest's stats,
+    // so the app has to link the token to the account the guest already has.
+    it('links the ID token to the same account instead of starting a new one', async () => {
+        h.state.native = true
+        h.state.getSession = async () => ({ data: { session: { user: { id: 'anon-1', is_anonymous: true }, access_token: 't' } } })
+        const auth = useAuthStore()
+        await auth.initialize()
+
+        const result = await auth.linkGoogleIdentity()
+
+        expect(result.success).toBe(true)
+        expect(h.state.linkIdentityCalls).toEqual([{ provider: 'google', token: 'id-token-google', nonce: 'raw-nonce' }])
+        expect(h.state.navigations).toEqual([])
+    })
+})
+
 describe('deleting an account', () => {
     async function signedIn() {
         h.state.getSession = async () => ({ data: { session: { user: { id: 'u-1' }, access_token: 't' } } })
@@ -833,5 +880,20 @@ describe('deleting an account', () => {
         expect(result.success).toBe(false)
         expect(h.state.steps).toEqual(['rpc:delete_my_account:{"dry_run":true}'])
         expect(auth.user?.id).toBe('u-1')
+    })
+
+    // Apple requires its tokens revoked with the account, and the revoke needs
+    // the session that deleting ends, so it has to come before anything else goes.
+    it('in the iPhone app, revokes Sign in with Apple before deleting anything', async () => {
+        h.state.native = true
+        h.state.getSession = async () => ({ data: { session: { user: { id: 'u-1', identities: [{ provider: 'apple' }] }, access_token: 't' } } })
+        const auth = useAuthStore()
+        await auth.initialize()
+        h.state.steps = []
+
+        const result = await auth.deleteAccount()
+
+        expect(result.success).toBe(true)
+        expect(h.state.steps.slice(0, 3)).toEqual(['rpc:delete_my_account:{"dry_run":true}', 'apple-revoke:t', 'list:avatars/u-1'])
     })
 })

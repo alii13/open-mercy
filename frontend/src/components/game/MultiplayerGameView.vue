@@ -26,6 +26,8 @@
         :can-voice-mute="canVoiceMute(opp.user_id)"
         :voice-muted="voiceStore.localMutedUserIds.has(opp.user_id)"
         :voice-mute-title="voiceMuteTitle(opp.user_id)"
+        reportable
+        @click="reportTarget = { id: opp.user_id, name: opp.name }"
         @voice-mute="handleVoiceMute(opp.user_id)"
         @kick="requestKick(opp.user_id, opp.name)"
       />
@@ -266,6 +268,8 @@
       @confirm="confirmKick"
       @cancel="kickTarget = null"
     />
+
+    <ReportPlayerDialog :target="reportTarget" :room-code="mpStore.roomCode" @close="reportTarget = null" />
   </div>
 </template>
 
@@ -297,6 +301,7 @@ import StatusPanel from './StatusPanel.vue'
 import PlayerConsoleBar from './PlayerConsoleBar.vue'
 import GameOverModal from './GameOverModal.vue'
 import ConfirmDialog from '../ConfirmDialog.vue'
+import ReportPlayerDialog from './ReportPlayerDialog.vue'
 import FxLayer from './FxLayer.vue'
 import StackCam from './StackCam.vue'
 import BadgeUpBanner from './BadgeUpBanner.vue'
@@ -1033,6 +1038,9 @@ function isDisconnected(userId: string) {
 }
 
 const kickTarget = ref<{ id: string; name: string } | null>(null)
+// Tapping a seat reports that player: App Review requires a way to report
+// strangers in an app with voice chat (supabase/player-reports.sql).
+const reportTarget = ref<{ id: string; name: string } | null>(null)
 
 function requestKick(userId: string, name: string) {
   kickTarget.value = { id: userId, name }

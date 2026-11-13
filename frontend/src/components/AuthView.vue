@@ -54,7 +54,7 @@
           </p>
 
           <div class="google-block">
-            <button type="button" class="google-btn" :disabled="loading" @click="handleGoogle">
+            <button type="button" class="google-btn" :disabled="pendingProvider === 'google'" @click="handleProvider('google')">
               <span class="google-mark" aria-hidden="true">
                 <svg viewBox="0 0 48 48" width="18" height="18">
                   <path fill="#4285F4" d="M45.12 24.5c0-1.56-.14-3.06-.4-4.5H24v8.51h11.84c-.51 2.75-2.06 5.08-4.39 6.64v5.52h7.11c4.16-3.83 6.56-9.47 6.56-16.17z" />
@@ -63,7 +63,11 @@
                   <path fill="#EA4335" d="M24 10.75c3.23 0 6.13 1.11 8.41 3.29l6.31-6.31C34.91 4.18 29.93 2 24 2 15.4 2 7.96 6.93 4.34 14.12l7.35 5.7c1.73-5.2 6.58-9.07 12.31-9.07z" />
                 </svg>
               </span>
-              <span class="google-label">{{ loading ? 'OPENING GOOGLE…' : 'CLAIM WITH GOOGLE' }}</span>
+              <span class="google-label">{{ pendingProvider === 'google' ? 'OPENING GOOGLE…' : 'CLAIM WITH GOOGLE' }}</span>
+            </button>
+            <button v-if="canSignInWithApple" type="button" class="apple-btn" :disabled="pendingProvider === 'apple'" @click="handleProvider('apple')">
+              <svg class="apple-mark" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path :d="siApple.path" /></svg>
+              <span>{{ pendingProvider === 'apple' ? 'OPENING APPLE…' : 'CLAIM WITH APPLE' }}</span>
             </button>
             <p class="google-note">One tap. No confirmation email.</p>
           </div>
@@ -169,7 +173,7 @@
       <form v-else-if="mode !== 'claim'" class="auth-form" @submit.prevent="handleSubmit">
         <!-- Also on sign-in, not just sign-up: someone who created their account
              with Google has no password to type. -->
-        <button type="button" class="google-btn" :disabled="loading" @click="handleGoogle">
+        <button type="button" class="google-btn" :disabled="pendingProvider === 'google'" @click="handleProvider('google')">
           <span class="google-mark" aria-hidden="true">
             <svg viewBox="0 0 48 48" width="18" height="18">
               <path fill="#4285F4" d="M45.12 24.5c0-1.56-.14-3.06-.4-4.5H24v8.51h11.84c-.51 2.75-2.06 5.08-4.39 6.64v5.52h7.11c4.16-3.83 6.56-9.47 6.56-16.17z" />
@@ -178,7 +182,11 @@
               <path fill="#EA4335" d="M24 10.75c3.23 0 6.13 1.11 8.41 3.29l6.31-6.31C34.91 4.18 29.93 2 24 2 15.4 2 7.96 6.93 4.34 14.12l7.35 5.7c1.73-5.2 6.58-9.07 12.31-9.07z" />
             </svg>
           </span>
-          <span class="google-label">{{ loading ? 'OPENING GOOGLE…' : 'CONTINUE WITH GOOGLE' }}</span>
+          <span class="google-label">{{ pendingProvider === 'google' ? 'OPENING GOOGLE…' : 'CONTINUE WITH GOOGLE' }}</span>
+        </button>
+        <button v-if="canSignInWithApple" type="button" class="apple-btn" :disabled="pendingProvider === 'apple'" @click="handleProvider('apple')">
+          <svg class="apple-mark" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path :d="siApple.path" /></svg>
+          <span>{{ pendingProvider === 'apple' ? 'OPENING APPLE…' : 'CONTINUE WITH APPLE' }}</span>
         </button>
 
         <div class="or-rule"><span>OR USE AN EMAIL</span></div>
@@ -266,7 +274,9 @@
 <script setup lang="ts">
 import { ArrowRight, ChevronLeft } from 'lucide-vue-next'
 import { ref, onMounted } from 'vue'
+import { siApple } from 'simple-icons'
 import { useAuthStore } from '../stores/authStore'
+import { canSignInWithApple, isNativeApp, type NativeProvider } from '../utils/nativeSignIn'
 import { vFocusRing } from '../directives/focusRing'
 import Button from './ui/Button.vue'
 
@@ -289,6 +299,8 @@ const error = ref('')
 const successMsg = ref('')
 const emailTaken = ref(false)
 const googleTaken = ref(false)
+// Which sign-in sheet is open, so only the button that was tapped shows it.
+const pendingProvider = ref<NativeProvider | null>(null)
 const editingClaimEmail = ref(false)
 
 onMounted(() => {
@@ -318,32 +330,55 @@ function setMode(next: 'login' | 'signup' | 'forgot' | 'claim') {
   googleTaken.value = false
 }
 
-// Success never returns here — the browser is already on its way to Google.
-async function handleGoogle() {
-  loading.value = true
+// On the web success never returns here: the browser is already on its way to
+// Google. In the apps the system sheet answers in place, so success does.
+async function handleProvider(provider: NativeProvider) {
+  // One sign-in at a time: a Google or Apple flow must not start while an
+  // email request is in flight, and the other way round (see the handlers below).
+  if (loading.value || pendingProvider.value) return
+  pendingProvider.value = provider
   error.value = ''
   googleTaken.value = false
 
   try {
-    const result = mode.value === 'claim'
-      ? await authStore.linkGoogleIdentity()
-      : await authStore.signInWithGoogle()
-    if (!result.success) fail(result.error)
+    const claiming = mode.value === 'claim'
+    const result = provider === 'apple'
+      ? await (claiming ? authStore.linkAppleIdentity() : authStore.signInWithApple())
+      : await (claiming ? authStore.linkGoogleIdentity() : authStore.signInWithGoogle())
+    if (result.success) {
+      if (!isNativeApp) return
+      pendingProvider.value = null
+      // A claim swaps this view to ACCOUNT CLAIMED by itself; a plain sign-in
+      // closes it, as an email sign-in does.
+      if (!claiming) emit('back')
+    } else if ('cancelled' in result && result.cancelled) {
+      pendingProvider.value = null
+    } else if (result.error === 'identity_already_exists' || result.error === 'email_exists') {
+      const account = provider === 'apple' ? 'Apple ID' : 'Google account'
+      googleTaken.value = true
+      error.value = result.error === 'email_exists'
+        ? `The email on that ${account} already has an Open Mercy account. Sign in with it instead.`
+        : `That ${account} already belongs to another player.`
+      pendingProvider.value = null
+    } else {
+      fail(provider, result.error)
+    }
   } catch (err: any) {
-    fail(err?.message)
+    fail(provider, err?.message)
   }
 }
 
 // GoTrue's own wording ("Manual linking is disabled") describes our
 // configuration, not anything the player can act on. Keep it in the console and
 // point them at the path that still works.
-function fail(reason?: string) {
-  console.error('Google sign-in failed:', reason)
-  error.value = 'Google sign-in is unavailable right now. Use an email instead.'
-  loading.value = false
+function fail(provider: NativeProvider, reason?: string) {
+  console.error(`${provider} sign-in failed:`, reason)
+  error.value = `${provider === 'apple' ? 'Apple' : 'Google'} sign-in is unavailable right now. Use an email instead.`
+  pendingProvider.value = null
 }
 
 async function handleClaim() {
+  if (pendingProvider.value) return
   loading.value = true
   error.value = ''
   emailTaken.value = false
@@ -366,6 +401,7 @@ async function handleClaim() {
 }
 
 async function handleResend() {
+  if (pendingProvider.value) return
   loading.value = true
   error.value = ''
   successMsg.value = ''
@@ -386,6 +422,7 @@ function switchToLoginFromCollision() {
 }
 
 async function handleSubmit() {
+  if (pendingProvider.value) return
   loading.value = true
   error.value = ''
 
@@ -423,6 +460,7 @@ async function handleSubmit() {
 }
 
 async function handleForgotPassword() {
+  if (pendingProvider.value) return
   loading.value = true
   error.value = ''
   successMsg.value = ''
@@ -732,6 +770,38 @@ async function handleForgotPassword() {
 .google-btn:disabled {
   opacity: 0.55;
   cursor: default;
+}
+
+/* Apple's outlined style: white on the dark card, so it sits under Google's
+   white button without competing with it. */
+.apple-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-3);
+  width: 100%;
+  min-height: 48px;
+  margin-top: var(--spacing-2);
+  padding: var(--spacing-3) var(--spacing-4);
+  background: #000;
+  border: 1px solid #fff;
+  border-radius: var(--radius-sm);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+}
+
+.apple-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.apple-mark {
+  flex-shrink: 0;
+  fill: currentColor;
 }
 
 /* The mark keeps its size when a long label wraps. */
