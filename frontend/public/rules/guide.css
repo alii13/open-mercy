@@ -277,9 +277,7 @@ section p a:hover,
   display: flex;
   flex-direction: column;
   gap: 4rem;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 6rem 1.5rem 2rem;
+  padding: 6rem 2rem 2rem;
 }
 .sf-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 4rem; }
 .site-footer .sf-community { display: flex; flex-direction: column; gap: 1rem; margin: 0; }
@@ -358,7 +356,7 @@ section p a:hover,
   .sf-top { flex-direction: column; gap: 3rem; }
 }
 @media (max-width: 640px) {
-  .sf-inner { gap: 3rem; padding-top: 4rem; }
+  .sf-inner { gap: 3rem; padding: 4rem 1.5rem 2rem; }
   .site-footer .sf-title { font-size: 2rem; }
   .site-footer .sf-lead { font-size: 1rem; }
   /* Discord takes the row; Telegram and Instagram share the one below it. */

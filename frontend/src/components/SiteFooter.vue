@@ -102,9 +102,7 @@ onMounted(() => { void privacySettingsAvailable().then(v => { privacySettings.va
   display: flex;
   flex-direction: column;
   gap: var(--spacing-16);
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: var(--spacing-24) var(--spacing-6) var(--spacing-8);
+  padding: var(--spacing-24) var(--spacing-8) var(--spacing-8);
 }
 
 .sf-top {
@@ -268,7 +266,7 @@ onMounted(() => { void privacySettingsAvailable().then(v => { privacySettings.va
 @media (max-width: 640px) {
   .sf-inner {
     gap: var(--spacing-12);
-    padding-top: var(--spacing-16);
+    padding: var(--spacing-16) var(--spacing-6) var(--spacing-8);
   }
 
   .sf-title { font-size: var(--text-3xl); }
