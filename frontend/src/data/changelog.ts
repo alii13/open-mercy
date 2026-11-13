@@ -69,6 +69,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: '2026-11-14T12:00Z',
+        level: 'quiet',
+        tag: 'NEW',
+        title: 'Report or block a player at the table',
+        body: "Tap a player's seat in a multiplayer game to report them. They are muted for you at once, and you can block them too.",
+    },
+    {
         id: '2026-11-14',
         level: 'quiet',
         tag: 'NEW',
