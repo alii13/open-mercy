@@ -16,9 +16,9 @@ describe('static page footer', () => {
         for (const [path, html] of pages) expect(footerOf(html), path).toBe(first)
     })
 
-    it('opens Discord, Telegram and Instagram in a new tab', () => {
+    it('opens every social link in a new tab', () => {
         const footer = footerOf(pages[0]?.[1] ?? '') ?? ''
-        for (const url of ['https://discord.gg/4hwKGhJak9', 'https://t.me/openmercy', 'https://www.instagram.com/openmercyy']) {
+        for (const url of ['https://discord.gg/4hwKGhJak9', 'https://t.me/openmercy', 'https://www.instagram.com/openmercyy', 'https://github.com/alii13/open-mercy']) {
             expect(footer).toContain(`href="${url}" target="_blank" rel="noopener noreferrer"`)
         }
     })
