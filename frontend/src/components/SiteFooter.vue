@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { siDiscord, siGithub, siInstagram, siTelegram } from 'simple-icons'
 import { openPrivacySettings, privacySettingsAvailable } from '../utils/consent'
 
 const privacySettings = ref(false)
@@ -7,128 +8,134 @@ onMounted(() => { void privacySettingsAvailable().then(v => { privacySettings.va
 </script>
 
 <template>
+  <!-- The static pages under public/ carry this footer as plain HTML, styled
+       in public/rules/guide.css. A change here goes there too. -->
   <footer class="site-footer">
-    <span class="footer-text">Built by</span>
-    <a href="https://github.com/alii13" target="_blank" rel="noopener noreferrer" class="footer-link">
-      <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.4 3-.405 1.02.005 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
-      alii13
-    </a>
-    <span class="footer-sep">·</span>
-    <!-- Sitewide crawlable link into the rules guide. It was reachable only
-         from the settings drawer, which left a 1,800-word page effectively
-         orphaned for search. -->
-    <a href="/how-to-play/" class="footer-link">How to play</a>
-    <span class="footer-sep">·</span>
-    <a href="/rules/" class="footer-link">Rules guide</a>
-    <span class="footer-sep">·</span>
-    <a href="/faq/" class="footer-link">FAQ</a>
-    <span class="footer-sep">·</span>
-    <a href="/about/" class="footer-link">About</a>
-    <span class="footer-sep">·</span>
-    <a href="/contact/" class="footer-link">Contact</a>
-    <span class="footer-sep">·</span>
-    <a href="https://t.me/openmercy" target="_blank" rel="noopener noreferrer" class="footer-link">
-      <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14" aria-hidden="true"><path d="M21.7 2.3a1 1 0 0 0-1.05-.23L2.6 9.1a1 1 0 0 0 .06 1.9l4.9 1.63 1.9 5.9a1 1 0 0 0 1.7.4l2.7-2.9 4.4 3.3a1 1 0 0 0 1.57-.6l3-15.2a1 1 0 0 0-.13-.73ZM9.9 14.2l-.9 3.1-1.2-3.7 8.9-6.3Z"/></svg>
-      Telegram
-    </a>
-    <span class="footer-sep">·</span>
-    <a href="/privacy/" class="footer-link">Privacy</a>
-    <span class="footer-sep">·</span>
-    <a href="/terms/" class="footer-link">Terms</a>
-    <span class="footer-sep">·</span>
-    <template v-if="privacySettings">
-      <button type="button" class="footer-link footer-button" @click="openPrivacySettings()">Privacy settings</button>
-      <span class="footer-sep">·</span>
-    </template>
-    <span class="footer-attribution">
-      Music: <a href="https://incompetech.com/" target="_blank" rel="noopener noreferrer" class="footer-attribution-link">Kevin MacLeod</a>
-      (<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer" class="footer-attribution-link">CC BY 4.0</a>)
-      ·
-      SFX: <a href="https://kenney.nl/assets/casino-audio" target="_blank" rel="noopener noreferrer" class="footer-attribution-link">Kenney</a>
-      (CC0)
-    </span>
+    <nav class="sf-links" aria-label="Site">
+      <!-- Crawlable links into the guides: the rules guide was once reachable
+           only from the settings drawer, which left it orphaned for search. -->
+      <a href="/how-to-play/" class="sf-link">How to play</a>
+      <a href="/rules/" class="sf-link">Rules guide</a>
+      <a href="/about/" class="sf-link">About</a>
+      <a href="/contact/" class="sf-link">Contact</a>
+      <a href="/privacy/" class="sf-link">Privacy</a>
+      <a href="/terms/" class="sf-link">Terms</a>
+      <button v-if="privacySettings" type="button" class="sf-link sf-button" @click="openPrivacySettings()">Privacy settings</button>
+    </nav>
+
+    <span class="sf-divider" aria-hidden="true"></span>
+
+    <div class="sf-socials">
+      <a href="https://discord.gg/4hwKGhJak9" target="_blank" rel="noopener noreferrer" class="sf-social sf-discord" aria-label="Open Mercy on Discord">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path :d="siDiscord.path" /></svg>
+      </a>
+      <a href="https://t.me/openmercy" target="_blank" rel="noopener noreferrer" class="sf-social sf-telegram" aria-label="Open Mercy on Telegram">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path :d="siTelegram.path" /></svg>
+      </a>
+      <a href="https://www.instagram.com/openmercyy" target="_blank" rel="noopener noreferrer" class="sf-social sf-instagram" aria-label="Open Mercy on Instagram">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+          <defs>
+            <linearGradient id="sf-instagram" x1="0" y1="1" x2="1" y2="0">
+              <stop offset="0" stop-color="#feda75" />
+              <stop offset="0.35" stop-color="#fa7e1e" />
+              <stop offset="0.6" stop-color="#d62976" />
+              <stop offset="0.85" stop-color="#962fbf" />
+              <stop offset="1" stop-color="#4f5bd5" />
+            </linearGradient>
+          </defs>
+          <path :d="siInstagram.path" /></svg>
+      </a>
+      <a href="https://github.com/alii13/open-mercy" target="_blank" rel="noopener noreferrer" class="sf-social sf-github" aria-label="Open Mercy's code on GitHub">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path :d="siGithub.path" /></svg>
+      </a>
+    </div>
   </footer>
 </template>
 
 <style scoped>
 .site-footer {
-  background: rgba(0, 0, 0, 0.7);
-  border-top: 1px solid #2a2a2a;
-  padding: 0.75rem 1rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  letter-spacing: 1px;
   position: relative;
   z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  column-gap: var(--spacing-6);
+  row-gap: var(--spacing-2);
+  /* No vertical padding: each link is already a 44px tap target, so the
+     footer is one 44px row. */
+  padding: 0 var(--spacing-6);
+  background: var(--bg-concrete);
+  border-top: 1px solid var(--bg-concrete-light);
+  font-family: var(--font-body);
 }
 
-.footer-text {
-  line-height: 1;
+.sf-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  column-gap: var(--spacing-6);
 }
 
-.footer-link {
+.sf-link {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  color: var(--text-primary);
+  gap: var(--spacing-2);
+  min-height: 44px;
+  font-size: var(--text-sm);
+  font-weight: 500;
   text-decoration: none;
-  font-weight: bold;
-  transition: color 0.2s;
+  color: var(--text-secondary);
+  transition: color var(--duration-snap) var(--ease-snap);
 }
 
-.footer-button {
+
+.sf-button {
+  padding: 0;
   background: none;
   border: 0;
-  padding: 0;
-  font: inherit;
-  font-weight: bold;
-  letter-spacing: inherit;
+  font-family: inherit;
   cursor: pointer;
 }
 
-.footer-link:hover {
-  color: var(--color-hazard);
+.sf-socials {
+  display: flex;
+  align-items: center;
 }
 
-.footer-sep {
-  color: #2a2a2a;
-  margin: 0 0.25rem;
+.sf-social {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-pill);
+  color: var(--text-secondary);
+  transition: color var(--duration-snap) var(--ease-snap);
 }
 
-.footer-attribution {
-  font-size: 0.68rem;
-  color: var(--text-muted);
-  letter-spacing: 0.5px;
+/* Grey like the links until hovered, then the network's own colour. */
+.sf-social svg { fill: currentColor; }
+
+/* Splits the page links from the social icons while they share one row. */
+.sf-divider {
+  width: 1px;
+  height: var(--spacing-6);
+  background: color-mix(in srgb, var(--text-muted) 45%, transparent);
 }
 
-.footer-attribution-link {
-  color: var(--text-muted);
-  text-decoration: none;
-  border-bottom: 1px dotted rgba(255, 255, 255, 0.15);
+/* Mouse only: on a phone a tapped link keeps its hover colour after the tap. */
+@media (hover: hover) {
+  .sf-link:hover { color: var(--text-primary); }
+  .sf-discord:hover { color: #5865f2; }
+  .sf-telegram:hover { color: #26a5e4; }
+  .sf-instagram:hover path { fill: url(#sf-instagram); }
+  .sf-github:hover { color: var(--text-primary); }
 }
 
-.footer-attribution-link:hover {
-  color: var(--text-primary);
-  border-bottom-color: var(--text-primary);
-}
-
-@media (max-width: 640px) {
-  .site-footer {
-    flex-wrap: wrap;
-    row-gap: 0.4rem;
-  }
-  .footer-attribution {
-    flex-basis: 100%;
-    text-align: center;
-    margin-top: 0;
-  }
-  .footer-sep {
-    display: none;
-  }
+/* Once the icons wrap below the links there is nothing beside them to split. */
+@media (max-width: 960px) {
+  .sf-divider { display: none; }
 }
 </style>

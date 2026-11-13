@@ -264,20 +264,61 @@ section p a:hover,
 .final-cta h2 { border: none; padding: 0; margin-bottom: 0.75rem; }
 .final-cta p { margin-bottom: 1.5rem; }
 
-/* Footer */
-footer {
-  background: rgba(0,0,0,0.7);
-  border-top: 1px solid var(--border);
-  padding: 1rem 1.5rem;
-  text-align: center;
-  font-family: var(--mono-font);
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  line-height: 2;
+/* Footer — the same footer as the app's SiteFooter.vue; keep the two in step. */
+.site-footer {
   margin-top: 3rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  column-gap: 1.5rem;
+  row-gap: 0.5rem;
+  padding: 0 1.5rem;
+  background: var(--bg);
+  border-top: 1px solid var(--surface);
+  font-family: var(--body-font);
+  line-height: 1.5;
 }
-footer a { color: var(--text); font-weight: bold; text-decoration: none; }
-footer a:hover { color: var(--yellow); }
+.sf-links { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; column-gap: 1.5rem; }
+.sf-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+  color: var(--text-dim);
+  transition: color 180ms cubic-bezier(0.33, 1, 0.68, 1);
+}
+.sf-link[hidden] { display: none; }
+.sf-socials { display: flex; align-items: center; }
+.sf-social {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 9999px;
+  color: var(--text-dim);
+  transition: color 180ms cubic-bezier(0.33, 1, 0.68, 1);
+}
+/* Grey like the links until hovered, then the network's own colour. */
+.sf-social svg { fill: currentColor; }
+/* Splits the page links from the social icons while they share one row. */
+.sf-divider { width: 1px; height: 1.5rem; background: rgba(128, 128, 137, 0.45); }
+/* Mouse only: on a phone a tapped link keeps its hover colour after the tap. */
+@media (hover: hover) {
+  .sf-link:hover { color: var(--text); }
+  .sf-discord:hover { color: #5865f2; }
+  .sf-telegram:hover { color: #26a5e4; }
+  .sf-instagram:hover path { fill: url(#sf-instagram); }
+  .sf-github:hover { color: var(--text); }
+}
+/* Once the icons wrap below the links there is nothing beside them to split. */
+@media (max-width: 960px) {
+  .sf-divider { display: none; }
+}
 
 @media (max-width: 600px) {
   h1 { font-size: 2rem; }
