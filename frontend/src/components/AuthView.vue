@@ -333,6 +333,9 @@ function setMode(next: 'login' | 'signup' | 'forgot' | 'claim') {
 // On the web success never returns here: the browser is already on its way to
 // Google. In the apps the system sheet answers in place, so success does.
 async function handleProvider(provider: NativeProvider) {
+  // One sign-in at a time: a Google or Apple flow must not start while an
+  // email request is in flight, and the other way round (see the handlers below).
+  if (loading.value || pendingProvider.value) return
   pendingProvider.value = provider
   error.value = ''
   googleTaken.value = false
@@ -375,6 +378,7 @@ function fail(provider: NativeProvider, reason?: string) {
 }
 
 async function handleClaim() {
+  if (pendingProvider.value) return
   loading.value = true
   error.value = ''
   emailTaken.value = false
@@ -397,6 +401,7 @@ async function handleClaim() {
 }
 
 async function handleResend() {
+  if (pendingProvider.value) return
   loading.value = true
   error.value = ''
   successMsg.value = ''
@@ -417,6 +422,7 @@ function switchToLoginFromCollision() {
 }
 
 async function handleSubmit() {
+  if (pendingProvider.value) return
   loading.value = true
   error.value = ''
 
@@ -454,6 +460,7 @@ async function handleSubmit() {
 }
 
 async function handleForgotPassword() {
+  if (pendingProvider.value) return
   loading.value = true
   error.value = ''
   successMsg.value = ''

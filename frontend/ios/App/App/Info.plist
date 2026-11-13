@@ -35,6 +35,10 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Open Mercy uses the camera when you take a new profile photo.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Open Mercy uses the microphone for voice chat with the players at your table.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

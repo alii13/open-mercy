@@ -33,7 +33,9 @@ function initialize(): Promise<void> {
             iOSServerClientId: GOOGLE_WEB_CLIENT_ID,
             mode: 'online',
         },
-        apple: { clientId: 'com.openmercy.app' },
+        // iOS only. On Android an Apple block without a redirectUrl makes the
+        // plugin reject before it sets up Google.
+        ...(canSignInWithApple && { apple: { clientId: 'com.openmercy.app' } }),
     }).catch((err: unknown) => {
         initialized = null
         throw err
@@ -60,7 +62,9 @@ export async function nativeIdToken(provider: NativeProvider): Promise<{ token: 
             ? await SocialLogin.login({ provider: 'apple', options: { scopes: ['email', 'name'], nonce: hashed } })
             : await SocialLogin.login({ provider: 'google', options: { nonce: hashed } })
     } catch (err) {
-        if (/cancel/i.test(String((err as { message?: string })?.message ?? err))) throw new SignInCancelled()
+        // Apple's cancel (error 1001) never says "cancel"; the plugin's code does.
+        const e = err as { code?: string; message?: string }
+        if (e?.code === 'USER_CANCELLED' || /cancel/i.test(String(e?.message ?? err))) throw new SignInCancelled()
         throw err
     }
     const token = 'idToken' in response.result ? response.result.idToken : null
