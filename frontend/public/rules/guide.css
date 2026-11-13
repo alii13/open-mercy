@@ -291,7 +291,6 @@ section p a:hover,
   color: var(--text-dim);
   transition: color 180ms cubic-bezier(0.33, 1, 0.68, 1);
 }
-.sf-link[hidden] { display: none; }
 .sf-socials { display: flex; align-items: center; }
 .sf-social {
   display: inline-flex;

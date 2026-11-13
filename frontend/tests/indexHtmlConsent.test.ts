@@ -52,14 +52,17 @@ describe('index.html consent and analytics loading', () => {
     beforeEach(() => vi.useFakeTimers())
     afterEach(() => vi.useRealTimers())
 
-    it("requests the consent message once the app's code has run, async, after the denied Consent Mode defaults", () => {
+    // There is no consent message: without one, the EEA, UK and Switzerland
+    // stay on the denied defaults, so they must be queued before gtag.js.
+    it('queues the denied Consent Mode defaults before gtag.js and never requests a consent message', () => {
         const page = openPage('open-mercy.com')
-        expect(page.loads(CONSENT)).toHaveLength(0)
         page.ready()
-        const consent = page.loads(CONSENT)
-        expect(consent).toHaveLength(1)
-        expect(consent[0].async).toBe(true)
-        const defaults = consent[0].queuedBefore.find((c) => c[0] === 'consent' && c[1] === 'default')
+        page.interact('pointerdown')
+        expect(page.loads(CONSENT)).toHaveLength(0)
+        const gtag = page.loads(GTAG)
+        expect(gtag).toHaveLength(1)
+        expect(gtag[0].async).toBe(true)
+        const defaults = gtag[0].queuedBefore.find((c) => c[0] === 'consent' && c[1] === 'default')
         expect(defaults?.[2]).toMatchObject({
             ad_storage: 'denied',
             ad_user_data: 'denied',
@@ -68,11 +71,6 @@ describe('index.html consent and analytics loading', () => {
             wait_for_update: 500,
         })
         expect((defaults?.[2] as { region: string[] }).region).toEqual(expect.arrayContaining(['DE', 'FR', 'GB', 'CH', 'NO']))
-        expect(page.loads(GTAG)).toHaveLength(0)
-    })
-
-    it('keeps the googlefcPresent marker', () => {
-        expect(openPage('open-mercy.com').win.frames.googlefcPresent).toBeDefined()
     })
 
     it('loads gtag.js once on the first interaction, never again after more interactions or the fallback', () => {
@@ -84,7 +82,6 @@ describe('index.html consent and analytics loading', () => {
         page.interact('pointerdown')
         vi.advanceTimersByTime(20_000)
         expect(page.loads(GTAG)).toHaveLength(1)
-        expect(page.loads(CONSENT)).toHaveLength(1)
     })
 
     it('loads gtag.js after 15 s when the visitor never interacts', () => {
@@ -107,14 +104,13 @@ describe('index.html consent and analytics loading', () => {
     })
 
     it.each(['localhost', '127.0.0.1', 'fix-consent-load-on-arrival.uno-no-mercy.pages.dev', '4f2a9c1e.uno-no-mercy.pages.dev'])(
-        'keeps analytics off on %s while the consent message still loads',
+        'keeps analytics off on %s',
         (host) => {
             const page = openPage(host)
             page.ready()
             ENGAGE.forEach(page.interact)
             vi.advanceTimersByTime(20_000)
             expect(page.loads(GTAG)).toHaveLength(0)
-            expect(page.loads(CONSENT)).toHaveLength(1)
             expect(page.calls().some((c: unknown[]) => c[0] === 'config' || c[0] === 'event')).toBe(false)
             expect(page.win.gtag_report_conversion('/play')).toBe(false)
             expect(page.win.location).toBe('/play')
