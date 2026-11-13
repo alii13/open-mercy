@@ -96,6 +96,8 @@ function corsOrigin(req: Request): string | null {
     if (origin === 'https://open-mercy.com' || origin === 'https://www.open-mercy.com') return origin
     if (origin === 'https://uno-no-mercy.pages.dev') return origin
     if (/^http:\/\/localhost(:\d+)?$/.test(origin)) return origin
+    // The iOS and Android apps: Capacitor serves the bundled web build from these.
+    if (origin === 'capacitor://localhost' || origin === 'https://localhost') return origin
     if (/^https:\/\/[a-z0-9-]+\.uno-no-mercy\.pages\.dev$/.test(origin)) return origin
     return null
 }

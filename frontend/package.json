@@ -11,6 +11,10 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@capacitor/android": "8.6.0",
+    "@capacitor/core": "8.6.0",
+    "@capacitor/ios": "8.6.0",
+    "@capgo/capacitor-social-login": "8.7.7",
     "@cloudflare/realtimekit": "2.0.0",
     "@mcp-b/transports": "^3.0.0",
     "@mcp-b/webmcp-ts-sdk": "^3.0.0",
@@ -28,6 +32,7 @@
     "zod-to-json-schema": "^3.25.2"
   },
   "devDependencies": {
+    "@capacitor/cli": "8.6.0",
     "@tailwindcss/vite": "^4.3.0",
     "@types/node": "^24.10.1",
     "@types/three": "0.185.0",

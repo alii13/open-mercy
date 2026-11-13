@@ -5,6 +5,8 @@
  * handling, country-level only.
  */
 
+import { siteOrigin } from './siteOrigin'
+
 /** ISO-3166 alpha-2 → flag emoji via regional indicators; '' when unknown. */
 export function flagEmoji(iso: string | null | undefined): string {
     if (!iso || !/^[A-Za-z]{2}$/.test(iso)) return ''
@@ -31,7 +33,7 @@ export async function syncCountryToProfile(current: string | null | undefined): 
     if (attempted) return
     attempted = true
     try {
-        const res = await fetch('/api/geo')
+        const res = await fetch(`${siteOrigin()}/api/geo`)
         // A misrouted function serves the SPA shell with a 200 — only JSON counts.
         if (!res.ok || !res.headers.get('content-type')?.includes('json')) return
         const body = await res.json() as { country?: string | null }

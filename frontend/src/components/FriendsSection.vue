@@ -180,6 +180,7 @@ import Avatar from './Avatar.vue'
 import Button from './ui/Button.vue'
 import FriendMore from './FriendMore.vue'
 import { navigate } from '../utils/routes'
+import { siteOrigin } from '../utils/siteOrigin'
 
 const social = useSocialStore()
 const emit = defineEmits<{ (e: 'opened-room'): void }>()
@@ -263,7 +264,7 @@ function headToHead(o: RecentOpponent): string {
 const authStore = useAuthStore()
 const myLink = computed(() => {
   const code = authStore.profile?.share_code
-  return code ? `${window.location.origin}/p/${code}` : ''
+  return code ? `${siteOrigin()}/p/${code}` : ''
 })
 const myLinkLabel = computed(() => myLink.value.replace(/^https?:\/\//, ''))
 const whatsappHref = computed(() =>

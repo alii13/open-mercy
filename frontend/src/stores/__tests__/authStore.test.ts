@@ -36,6 +36,7 @@ const h = vi.hoisted(() => {
         } as unknown,
         navigations: [] as string[],
         replacedUrls: [] as string[],
+        native: false,
         loc: { origin: 'https://uno-no-mercy.com', pathname: '/', search: '', hash: '' },
         reset() {
             state.getSession = async () => ({ data: { session: null } })
@@ -58,6 +59,7 @@ const h = vi.hoisted(() => {
             }
             state.navigations = []
             state.replacedUrls = []
+            state.native = false
             state.loc.pathname = '/'
             state.loc.search = ''
             state.loc.hash = ''
@@ -100,6 +102,13 @@ vi.mock('../../lib/supabase', () => ({
             return b
         },
     },
+}))
+
+// The iOS and Android apps sign in through the system sheet, which returns an ID token.
+vi.mock('../../utils/nativeSignIn', () => ({
+    get isNativeApp() { return h.state.native },
+    nativeIdToken: async (provider: string) => ({ token: `id-token-${provider}`, nonce: 'raw-nonce' }),
+    SignInCancelled: class extends Error {},
 }))
 
 const { track, setAnalyticsUser } = vi.hoisted(() => ({ track: vi.fn(), setAnalyticsUser: vi.fn() }))
@@ -774,5 +783,22 @@ describe('an expired email link', () => {
 
         expect(auth.oauthError?.code).toBe('otp_expired')
         expect(auth.authNotice).toBeNull()
+    })
+})
+
+describe('claiming a guest account with Google in the app', () => {
+    // signInWithIdToken would mint a second user and strand the guest's stats,
+    // so the app has to link the token to the account the guest already has.
+    it('links the ID token to the same account instead of starting a new one', async () => {
+        h.state.native = true
+        h.state.getSession = async () => ({ data: { session: { user: { id: 'anon-1', is_anonymous: true }, access_token: 't' } } })
+        const auth = useAuthStore()
+        await auth.initialize()
+
+        const result = await auth.linkGoogleIdentity()
+
+        expect(result.success).toBe(true)
+        expect(h.state.linkIdentityCalls).toEqual([{ provider: 'google', token: 'id-token-google', nonce: 'raw-nonce' }])
+        expect(h.state.navigations).toEqual([])
     })
 })
