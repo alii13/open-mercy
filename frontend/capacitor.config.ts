@@ -19,6 +19,22 @@ const config: CapacitorConfig = {
       },
     },
   },
+  experimental: {
+    ios: {
+      spm: {
+        // Firebase Analytics without the advertising identifier: no IDFA is
+        // read, so the app needs no App Tracking Transparency prompt.
+        swiftToolsVersion: '6.1',
+        packageTraits: {
+          '@capacitor-firebase/analytics': ['AnalyticsWithoutAdIdSupport'],
+        },
+        // Avoids a SwiftPM package identity collision (capacitor-firebase#959).
+        packageOptions: {
+          '@capacitor-firebase/analytics': { symlink: true },
+        },
+      },
+    },
+  },
 };
 
 export default config;

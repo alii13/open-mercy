@@ -101,6 +101,9 @@
  *   account_deleted            {}                  — sent after the server delete succeeds
  */
 
+import { Capacitor, registerPlugin } from '@capacitor/core'
+import type { FirebaseAnalyticsPlugin } from '@capacitor-firebase/analytics'
+
 /**
  * GA4 reads these parameter names as attribution, whatever event carries them,
  * and rewrites the session's traffic source with the value. `daily_started`
@@ -111,7 +114,26 @@
  */
 type Params = Record<string, string | number | boolean | undefined>
 
+/*
+ * The iOS and Android apps send through Firebase Analytics, which reports into
+ * the same GA4 property with the app's platform: gtag sends nothing from the
+ * iOS app's capacitor:// page. The plugin is registered here by name rather
+ * than imported, because its own entry bundles a web build that needs the
+ * Firebase web SDK, which the site does not use.
+ */
+const firebase = Capacitor.isNativePlatform() ? registerPlugin<FirebaseAnalyticsPlugin>('FirebaseAnalytics') : null
+
+function definedOnly(params?: Params): Record<string, string | number | boolean> {
+    const out: Record<string, string | number | boolean> = {}
+    for (const [k, v] of Object.entries(params ?? {})) if (v !== undefined) out[k] = v
+    return out
+}
+
 export function track(event: string, params?: Params): void {
+    if (firebase) {
+        void firebase.logEvent({ name: event, params: definedOnly(params) }).catch(() => { /* analytics never breaks the game */ })
+        return
+    }
     if (typeof window === 'undefined') return
     const g = (window as unknown as { gtag?: (...args: unknown[]) => void }).gtag
     if (typeof g !== 'function') return
@@ -132,6 +154,10 @@ export function track(event: string, params?: Params): void {
  * Pass null on sign-out, or GA keeps stitching the next player to the last one.
  */
 export function setAnalyticsUser(userId: string | null): void {
+    if (firebase) {
+        void firebase.setUserId({ userId }).catch(() => { /* analytics never breaks the game */ })
+        return
+    }
     if (typeof window === 'undefined') return
     const g = (window as unknown as { gtag?: (...args: unknown[]) => void }).gtag
     if (typeof g !== 'function') return
@@ -142,5 +168,10 @@ export function setAnalyticsUser(userId: string | null): void {
 
 /** Virtual page view for a screen change (this SPA has no router). */
 export function trackScreen(screen: string): void {
+    // Apps report screens as screen_view, the GA4 app event, not page_view.
+    if (firebase) {
+        void firebase.setCurrentScreen({ screenName: screen }).catch(() => { /* analytics never breaks the game */ })
+        return
+    }
     track('page_view', { page_title: screen, page_path: `/${screen}` })
 }
