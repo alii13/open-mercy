@@ -91,10 +91,19 @@ export function avatarUrlFor(id: string | null | undefined): string | null {
 
 /** Deletes every object in the player's folder except `keep`. Listing rather
  *  than trusting this tab's cache catches photos saved from another device. */
-async function clearFolder(userId: string, keep: string | null) {
-    const { data } = await supabase.storage.from('avatars').list(userId)
+async function clearFolder(userId: string, keep: string | null): Promise<string | null> {
+    const { data, error } = await supabase.storage.from('avatars').list(userId)
+    if (error) return error.message
     const stale = (data ?? []).map(f => `${userId}/${f.name}`).filter(p => p !== keep)
-    if (stale.length) await supabase.storage.from('avatars').remove(stale)
+    if (!stale.length) return null
+    const removed = await supabase.storage.from('avatars').remove(stale)
+    return removed.error?.message ?? null
+}
+
+/** Deletes every photo the player has saved, before their account goes:
+ *  Storage only lets the owner delete. */
+export function deleteAvatarFolder(userId: string): Promise<string | null> {
+    return clearFolder(userId, null)
 }
 
 export async function uploadAvatar(userId: string, photo: Blob): Promise<{ error: string | null }> {

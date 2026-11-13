@@ -37,6 +37,10 @@ const h = vi.hoisted(() => {
         navigations: [] as string[],
         replacedUrls: [] as string[],
         native: false,
+        // Ordered record of the storage, rpc and sign-out calls account deletion makes.
+        steps: [] as string[],
+        rpcResults: {} as Record<string, { data: unknown; error: unknown }>,
+        avatarFiles: [] as { name: string }[],
         loc: { origin: 'https://uno-no-mercy.com', pathname: '/', search: '', hash: '' },
         reset() {
             state.getSession = async () => ({ data: { session: null } })
@@ -60,6 +64,9 @@ const h = vi.hoisted(() => {
             state.navigations = []
             state.replacedUrls = []
             state.native = false
+            state.steps = []
+            state.rpcResults = {}
+            state.avatarFiles = []
             state.loc.pathname = '/'
             state.loc.search = ''
             state.loc.hash = ''
@@ -85,10 +92,18 @@ vi.mock('../../lib/supabase', () => ({
             resend: async (opts: unknown) => { h.state.resendCalls.push(opts); return { error: null } },
             linkIdentity: async (creds: unknown) => { h.state.linkIdentityCalls.push(creds); return h.state.oauthResult },
             signInWithOAuth: async (creds: unknown) => { h.state.oauthCalls.push(creds); return h.state.oauthResult },
+            signOut: async (opts?: { scope?: string }) => { h.state.steps.push(`signOut:${opts?.scope ?? 'global'}`); return { error: null } },
         },
         rpc: async (fn: string, args: unknown) => {
             h.state.rpcCalls.push({ fn, args })
-            return h.state.rpcResult
+            h.state.steps.push(`rpc:${fn}:${JSON.stringify(args ?? {})}`)
+            return h.state.rpcResults[`${fn}:${JSON.stringify(args ?? {})}`] ?? h.state.rpcResult
+        },
+        storage: {
+            from: (bucket: string) => ({
+                list: async (folder: string) => { h.state.steps.push(`list:${bucket}/${folder}`); return { data: h.state.avatarFiles, error: null } },
+                remove: async (paths: string[]) => { h.state.steps.push(`remove:${paths.join(',')}`); return { data: [], error: null } },
+            }),
         },
         from: () => {
             const b: Record<string, unknown> = {}
@@ -800,5 +815,49 @@ describe('claiming a guest account with Google in the app', () => {
         expect(result.success).toBe(true)
         expect(h.state.linkIdentityCalls).toEqual([{ provider: 'google', token: 'id-token-google', nonce: 'raw-nonce' }])
         expect(h.state.navigations).toEqual([])
+    })
+})
+
+describe('deleting an account', () => {
+    async function signedIn() {
+        h.state.getSession = async () => ({ data: { session: { user: { id: 'u-1' }, access_token: 't' } } })
+        const auth = useAuthStore()
+        await auth.initialize()
+        h.state.steps = []
+        return auth
+    }
+
+    // Storage only lets the owner delete the photo, so it has to go while the
+    // account still exists, and only once the server is known to have the
+    // function: a missing function must cost the player nothing.
+    it('removes the photo, then the account, then the session on this device', async () => {
+        h.state.avatarFiles = [{ name: '1700000000000' }]
+        const auth = await signedIn()
+
+        const result = await auth.deleteAccount()
+
+        expect(result.success).toBe(true)
+        expect(h.state.steps).toEqual([
+            'rpc:delete_my_account:{"dry_run":true}',
+            'list:avatars/u-1',
+            'remove:u-1/1700000000000',
+            'rpc:delete_my_account:{}',
+            'signOut:local',
+        ])
+        expect(auth.user).toBeNull()
+    })
+
+    it('touches nothing when the server cannot delete accounts', async () => {
+        h.state.rpcResults['delete_my_account:{"dry_run":true}'] = {
+            data: null,
+            error: { code: 'PGRST202', message: 'Could not find the function public.delete_my_account' },
+        }
+        const auth = await signedIn()
+
+        const result = await auth.deleteAccount()
+
+        expect(result.success).toBe(false)
+        expect(h.state.steps).toEqual(['rpc:delete_my_account:{"dry_run":true}'])
+        expect(auth.user?.id).toBe('u-1')
     })
 })

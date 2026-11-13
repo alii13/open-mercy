@@ -5,6 +5,7 @@ import { track, setAnalyticsUser } from '../utils/analytics'
 import { isFirstEmailChangeLink, readOAuthError, rememberReturnPath, takeReturnPath, urlWithoutOAuthError, type OAuthRedirectError } from '../utils/oauthRedirect'
 import { router } from '../utils/routes'
 import { randomHandle } from '@handles'
+import { deleteAvatarFolder } from '../composables/useAvatars'
 import type { OAuthResponse, User } from '@supabase/supabase-js'
 import { siteOrigin } from '../utils/siteOrigin'
 import { isNativeApp, nativeIdToken, SignInCancelled, type NativeProvider } from '../utils/nativeSignIn'
@@ -646,6 +647,35 @@ export const useAuthStore = defineStore('auth', () => {
         }
     }
 
+    /** Deletes the account and everything tied to it (supabase/delete-account.sql).
+     *  The dry run comes first, so a project without the function loses nothing,
+     *  and the photo goes while the account still owns it. */
+    async function deleteAccount(): Promise<{ success: boolean }> {
+        const id = user.value?.id
+        if (!id) return { success: false }
+        try {
+            const probe = await supabase.rpc('delete_my_account', { dry_run: true })
+            if (probe.error) throw probe.error
+            const photoError = await deleteAvatarFolder(id)
+            if (photoError) throw new Error(photoError)
+            const { error: deleteError } = await supabase.rpc('delete_my_account')
+            if (deleteError) throw deleteError
+        } catch (err) {
+            console.error('deleteAccount error:', err)
+            authNotice.value = "We couldn't delete your account. Try again in a minute."
+            return { success: false }
+        }
+        track('account_deleted', {})
+        // Deleting the user ended its sessions on the server. Its logout call
+        // answers "not found", which supabase-js ignores before clearing this
+        // device's stored session.
+        await supabase.auth.signOut({ scope: 'local' })
+        user.value = null
+        profile.value = null
+        authNotice.value = 'Your account and everything in it are deleted.'
+        return { success: true }
+    }
+
     return {
         user,
         profile,
@@ -667,6 +697,7 @@ export const useAuthStore = defineStore('auth', () => {
         signIn,
         signInAnonymously,
         claimAccount,
+        deleteAccount,
         linkGoogleIdentity,
         signInWithGoogle,
         signInWithApple,

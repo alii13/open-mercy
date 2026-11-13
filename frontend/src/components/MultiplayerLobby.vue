@@ -94,6 +94,7 @@
             <button v-if="avatarsAvailable" class="account-item" role="menuitem" @click="photoFromMenu">Profile photo</button>
             <button v-if="authStore.canChangeEmail" class="account-item" role="menuitem" @click="emailFromMenu">Change email</button>
             <button class="account-item account-item--out" role="menuitem" @click="signOutFromMenu">Sign out</button>
+            <button class="account-item account-item--delete" role="menuitem" @click="deleteFromMenu">Delete account</button>
           </div>
         </div>
         <!-- Stays in the bar rather than the menu on wide screens: it is the
@@ -575,6 +576,16 @@
     />
 
     <ConfirmDialog
+      :open="showDeleteConfirm"
+      title="Delete your account?"
+      message="This deletes your profile, stats, friends and photo. You can't undo it."
+      confirm-label="DELETE ACCOUNT"
+      cancel-label="KEEP IT"
+      @confirm="confirmDelete"
+      @cancel="showDeleteConfirm = false"
+    />
+
+    <ConfirmDialog
       :open="showLeaveConfirm"
       title="Leave the room?"
       message="Players you've invited will see the room close. You can create a new one anytime."
@@ -851,6 +862,7 @@ const loungeFailed = ref(false)
 const loungeLoaded = ref(false)
 const atTable = computed(() => !!mpStore.currentGame && (mpStore.gameStatus === 'waiting' || mpStore.loungeShow) && mpStore.isPublicRoom && !loungeFailed.value)
 const showSignOutConfirm = ref(false)
+const showDeleteConfirm = ref(false)
 const editingName = ref(false)
 const editTarget = ref<'bar' | 'room' | null>(null)
 const nameInput = ref('')
@@ -1169,6 +1181,16 @@ function emailFromMenu() {
 function signOutFromMenu() {
     closeAccount()
     requestSignOut()
+}
+
+function deleteFromMenu() {
+    closeAccount()
+    showDeleteConfirm.value = true
+}
+
+async function confirmDelete() {
+    showDeleteConfirm.value = false
+    await authStore.deleteAccount()
 }
 
 function upgradeAccount() {
@@ -2287,6 +2309,11 @@ function copyLink() {
 .account-item--out {
   margin-top: var(--spacing-1);
   border-top: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* Last in the menu, under Sign out, and just as quiet: rare and destructive. */
+.account-item--delete {
   border-radius: 0 0 var(--radius-sm) var(--radius-sm);
   color: rgba(255, 255, 255, 0.5);
 }
