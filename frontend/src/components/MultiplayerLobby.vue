@@ -1944,25 +1944,6 @@ function copyLink() {
   .daily-play { margin-top: auto; }
 }
 
-/* A laptop browser window is often under 860px tall. Trim the air around the
-   two card rows so the lobby and its footer fit in one screen without a
-   scroll. */
-@media (min-width: 1180px) and (max-height: 860px) {
-  .lobby-content--top {
-    padding-top: var(--spacing-4);
-    padding-bottom: var(--spacing-4);
-  }
-  .lobby-entry .entry-heading { margin-bottom: 0; }
-}
-
-@media (min-width: 1180px) and (max-height: 760px) {
-  .lobby-content--top {
-    padding-top: var(--spacing-2);
-    padding-bottom: var(--spacing-2);
-  }
-  .lobby-entry { row-gap: var(--spacing-3); }
-}
-
 
 /* Grouped on a neutral surface. Unboxing this left the rules control and its
    caption floating as loose fragments under a bare slab — the container was
