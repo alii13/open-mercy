@@ -273,7 +273,7 @@ section p a:hover,
   justify-content: center;
   column-gap: 2rem;
   row-gap: 0.5rem;
-  padding: 0.75rem 1.5rem;
+  padding: 0 1.5rem;
   background: var(--bg);
   border-top: 1px solid var(--surface);
   font-family: var(--body-font);

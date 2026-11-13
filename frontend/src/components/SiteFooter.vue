@@ -62,7 +62,9 @@ onMounted(() => { void privacySettingsAvailable().then(v => { privacySettings.va
   justify-content: center;
   column-gap: var(--spacing-8);
   row-gap: var(--spacing-2);
-  padding: var(--spacing-3) var(--spacing-6);
+  /* No vertical padding: each link is already a 44px tap target, so the
+     footer is one 44px row and the lobby above it fits a laptop screen. */
+  padding: 0 var(--spacing-6);
   background: var(--bg-concrete);
   border-top: 1px solid var(--bg-concrete-light);
   font-family: var(--font-body);
