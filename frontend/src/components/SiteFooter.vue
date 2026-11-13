@@ -102,14 +102,17 @@ onMounted(() => { void privacySettingsAvailable().then(v => { privacySettings.va
   display: flex;
   flex-direction: column;
   gap: var(--spacing-16);
-  padding: var(--spacing-24) var(--spacing-8) var(--spacing-8);
+  /* The 960px column the landing guide and the lobby use, so the footer's
+     edges line up with the sections above it. */
+  max-width: calc(960px + 2 * var(--spacing-6));
+  margin: 0 auto;
+  padding: var(--spacing-24) var(--spacing-6) var(--spacing-8);
 }
 
 .sf-top {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: var(--spacing-16);
+  flex-direction: column;
+  gap: var(--spacing-12);
 }
 
 .sf-community {
@@ -254,13 +257,6 @@ onMounted(() => { void privacySettingsAvailable().then(v => { privacySettings.va
   .sf-link:hover { color: var(--color-hazard); }
   .sf-oss-link:hover { text-decoration-color: var(--text-primary); }
   .sf-privacy:hover { color: var(--text-primary); }
-}
-
-@media (max-width: 960px) {
-  .sf-top {
-    flex-direction: column;
-    gap: var(--spacing-12);
-  }
 }
 
 @media (max-width: 640px) {

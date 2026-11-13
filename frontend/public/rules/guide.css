@@ -277,9 +277,12 @@ section p a:hover,
   display: flex;
   flex-direction: column;
   gap: 4rem;
-  padding: 6rem 2rem 2rem;
+  /* The pages' own 880px .container, so the footer lines up with the guide above it. */
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 6rem 1.5rem 2rem;
 }
-.sf-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 4rem; }
+.sf-top { display: flex; flex-direction: column; gap: 3rem; }
 .site-footer .sf-community { display: flex; flex-direction: column; gap: 1rem; margin: 0; }
 .site-footer .sf-title {
   margin: 0;
@@ -351,9 +354,6 @@ section p a:hover,
   .sf-link:hover { color: var(--yellow); }
   .sf-oss-link:hover { text-decoration-color: var(--text); }
   .sf-privacy:hover { color: var(--text); }
-}
-@media (max-width: 960px) {
-  .sf-top { flex-direction: column; gap: 3rem; }
 }
 @media (max-width: 640px) {
   .sf-inner { gap: 3rem; padding: 4rem 1.5rem 2rem; }
