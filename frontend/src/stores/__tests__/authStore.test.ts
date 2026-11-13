@@ -122,6 +122,8 @@ vi.mock('../../lib/supabase', () => ({
 // The iOS and Android apps sign in through the system sheet, which returns an ID token.
 vi.mock('../../utils/nativeSignIn', () => ({
     get isNativeApp() { return h.state.native },
+    get canSignInWithApple() { return h.state.native },
+    revokeAppleSignIn: async (token: string) => { h.state.steps.push(`apple-revoke:${token}`) },
     nativeIdToken: async (provider: string) => ({ token: `id-token-${provider}`, nonce: 'raw-nonce' }),
     SignInCancelled: class extends Error {},
 }))
@@ -859,5 +861,20 @@ describe('deleting an account', () => {
         expect(result.success).toBe(false)
         expect(h.state.steps).toEqual(['rpc:delete_my_account:{"dry_run":true}'])
         expect(auth.user?.id).toBe('u-1')
+    })
+
+    // Apple requires its tokens revoked with the account, and the revoke needs
+    // the session that deleting ends, so it has to come before anything else goes.
+    it('in the iPhone app, revokes Sign in with Apple before deleting anything', async () => {
+        h.state.native = true
+        h.state.getSession = async () => ({ data: { session: { user: { id: 'u-1', identities: [{ provider: 'apple' }] }, access_token: 't' } } })
+        const auth = useAuthStore()
+        await auth.initialize()
+        h.state.steps = []
+
+        const result = await auth.deleteAccount()
+
+        expect(result.success).toBe(true)
+        expect(h.state.steps.slice(0, 3)).toEqual(['rpc:delete_my_account:{"dry_run":true}', 'apple-revoke:t', 'list:avatars/u-1'])
     })
 })

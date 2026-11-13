@@ -14,6 +14,8 @@ import { SocialLogin } from '@capgo/capacitor-social-login'
 const GOOGLE_WEB_CLIENT_ID = '639479560095-2pcnvq8uq3ofqsvrvn9kbbulhrtdg5rj.apps.googleusercontent.com'
 const GOOGLE_IOS_CLIENT_ID = '639479560095-aniv3nddf3etr8idr8h0s7ngm83upnf8.apps.googleusercontent.com'
 
+const GAME_SERVER = (import.meta.env.VITE_GAME_SERVER_URL as string | undefined) || 'https://uno-game-server.shekhaliul44.workers.dev'
+
 export const isNativeApp = Capacitor.isNativePlatform()
 /** Apple requires Sign in with Apple beside Google on iOS. The web and Android keep Google and email. */
 export const canSignInWithApple = Capacitor.getPlatform() === 'ios'
@@ -43,6 +45,12 @@ function initialize(): Promise<void> {
     return initialized
 }
 
+// Apple's cancel (error 1001) never says "cancel"; the plugin's code does.
+function isCancel(err: unknown): boolean {
+    const e = err as { code?: string; message?: string }
+    return e?.code === 'USER_CANCELLED' || /cancel/i.test(String(e?.message ?? err))
+}
+
 /** A random nonce, and its SHA-256 hex. The provider puts the hash in the ID
  *  token; Supabase is given the raw value and hashes it to compare. */
 async function makeNonce(): Promise<{ raw: string; hashed: string }> {
@@ -62,12 +70,36 @@ export async function nativeIdToken(provider: NativeProvider): Promise<{ token: 
             ? await SocialLogin.login({ provider: 'apple', options: { scopes: ['email', 'name'], nonce: hashed } })
             : await SocialLogin.login({ provider: 'google', options: { nonce: hashed } })
     } catch (err) {
-        // Apple's cancel (error 1001) never says "cancel"; the plugin's code does.
-        const e = err as { code?: string; message?: string }
-        if (e?.code === 'USER_CANCELLED' || /cancel/i.test(String(e?.message ?? err))) throw new SignInCancelled()
+        if (isCancel(err)) throw new SignInCancelled()
         throw err
     }
     const token = 'idToken' in response.result ? response.result.idToken : null
     if (!token) throw new Error(`${provider} returned no ID token`)
     return { token, nonce: raw }
+}
+
+/**
+ * Revokes the player's Sign in with Apple tokens before their account is
+ * deleted, as Apple requires. Apple revokes only a token it is shown and
+ * Supabase keeps none, so the Apple sheet opens once more for a one-time
+ * code, which the game server exchanges and revokes (game-server/src/appleRevoke.ts).
+ */
+export async function revokeAppleSignIn(accessToken: string): Promise<void> {
+    await initialize()
+    let response
+    try {
+        response = await SocialLogin.login({ provider: 'apple', options: { scopes: ['email'] } })
+    } catch (err) {
+        if (isCancel(err)) throw new SignInCancelled()
+        throw err
+    }
+    // Without useProperTokenExchange the plugin returns the authorization code as accessToken.token.
+    const code = 'accessToken' in response.result ? response.result.accessToken?.token : undefined
+    if (!code) throw new Error('Apple returned no authorization code')
+    const res = await fetch(`${GAME_SERVER}/account/apple-revoke`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ code }),
+    })
+    if (!res.ok) throw new Error(`Apple revoke failed: ${res.status}`)
 }

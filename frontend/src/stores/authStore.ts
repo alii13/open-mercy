@@ -8,7 +8,7 @@ import { randomHandle } from '@handles'
 import { deleteAvatarFolder } from '../composables/useAvatars'
 import type { OAuthResponse, User } from '@supabase/supabase-js'
 import { siteOrigin } from '../utils/siteOrigin'
-import { isNativeApp, nativeIdToken, SignInCancelled, type NativeProvider } from '../utils/nativeSignIn'
+import { canSignInWithApple, isNativeApp, nativeIdToken, revokeAppleSignIn, SignInCancelled, type NativeProvider } from '../utils/nativeSignIn'
 
 export const useAuthStore = defineStore('auth', () => {
     const user = ref<User | null>(null)
@@ -656,11 +656,19 @@ export const useAuthStore = defineStore('auth', () => {
         try {
             const probe = await supabase.rpc('delete_my_account', { dry_run: true })
             if (probe.error) throw probe.error
+            // Apple requires its tokens revoked with the account. Only the iOS
+            // app has Apple sign-in, and the revoke needs the live session.
+            if (canSignInWithApple && user.value?.identities?.some(i => i.provider === 'apple')) {
+                const { data: { session } } = await supabase.auth.getSession()
+                await revokeAppleSignIn(session?.access_token ?? '')
+            }
             const photoError = await deleteAvatarFolder(id)
             if (photoError) throw new Error(photoError)
             const { error: deleteError } = await supabase.rpc('delete_my_account')
             if (deleteError) throw deleteError
         } catch (err) {
+            // Closing the Apple sheet is a change of mind, not an error.
+            if (err instanceof SignInCancelled) return { success: false }
             console.error('deleteAccount error:', err)
             authNotice.value = "We couldn't delete your account. Try again in a minute."
             return { success: false }
