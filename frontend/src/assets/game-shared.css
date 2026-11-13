@@ -398,6 +398,10 @@ body.fx-ko-desat .game-view {
   transform: scale(1.12);
 }
 
+.opponent-card.reportable {
+  cursor: pointer;
+}
+
 /* Voice mute on a seat — host cuts their mic for everyone, non-hosts
    silence them locally. Sits opposite the kick badge. */
 .opp-voice-btn {

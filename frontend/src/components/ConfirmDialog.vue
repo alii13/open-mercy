@@ -12,6 +12,7 @@
         <div class="confirm-card">
           <h2 class="confirm-title">{{ title }}</h2>
           <p class="confirm-message">{{ message }}</p>
+          <slot />
           <div class="confirm-actions">
             <button
               type="button"
@@ -24,6 +25,7 @@
             <button
               type="button"
               class="confirm-btn confirm-danger"
+              :disabled="confirmDisabled"
               @click="$emit('confirm')"
             >
               {{ confirmLabel }}
@@ -43,6 +45,7 @@ withDefaults(
     message: string
     confirmLabel?: string
     cancelLabel?: string
+    confirmDisabled?: boolean
   }>(),
   {
     confirmLabel: 'CONFIRM',
@@ -135,8 +138,12 @@ defineEmits<{
   color: var(--color-alert);
   background: rgba(255, 42, 42, 0.06);
 }
-.confirm-danger:hover,
-.confirm-danger:focus-visible {
+.confirm-danger:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.confirm-danger:not(:disabled):hover,
+.confirm-danger:not(:disabled):focus-visible {
   background: rgba(255, 42, 42, 0.15);
   color: #ffffff;
   outline: none;

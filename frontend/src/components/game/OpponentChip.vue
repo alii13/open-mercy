@@ -7,13 +7,13 @@
   <div
     class="opponent-card"
     :data-uid="uid"
-    :class="{ active: isActive, selectable: isSelectable, eliminated: isEliminated, disconnected: isDisconnected, danger: !isEliminated && cardCount >= 20 }"
-    :role="isSelectable ? 'button' : undefined"
-    :tabindex="isSelectable ? 0 : undefined"
-    :aria-label="`${name}, ${cardCount} cards${isActive ? ', current turn' : ''}`"
+    :class="{ active: isActive, selectable: isSelectable, reportable: reportable && !isSelectable, eliminated: isEliminated, disconnected: isDisconnected, danger: !isEliminated && cardCount >= 20 }"
+    :role="isSelectable || reportable ? 'button' : undefined"
+    :tabindex="isSelectable || reportable ? 0 : undefined"
+    :aria-label="`${name}, ${cardCount} cards${isActive ? ', current turn' : ''}${reportable && !isSelectable ? '. Report or block' : ''}`"
     @click="$emit('click')"
-    @keydown.enter.prevent="isSelectable && $emit('click')"
-    @keydown.space.prevent="isSelectable && $emit('click')"
+    @keydown.enter.prevent="(isSelectable || reportable) && $emit('click')"
+    @keydown.space.prevent="(isSelectable || reportable) && $emit('click')"
   >
     <Avatar
       :uid="uid"
@@ -82,6 +82,8 @@ const props = defineProps<{
   inVoice?: boolean
   isSpeaking?: boolean
   canVoiceMute?: boolean
+  /** Tapping the seat opens the report dialog (multiplayer, where players are real people). */
+  reportable?: boolean
   voiceMuted?: boolean
   voiceMuteTitle?: string
   /** Multiplayer turn clock: turns in a row this seat ran out the clock. */
