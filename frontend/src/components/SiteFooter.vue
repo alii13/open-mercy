@@ -10,6 +10,8 @@ onMounted(() => { void privacySettingsAvailable().then(v => { privacySettings.va
 </script>
 
 <template>
+  <!-- The static pages under public/ carry this footer as plain HTML, styled
+       in public/rules/guide.css. A change here goes there too. -->
   <footer class="site-footer">
     <div class="sf-inner">
       <div class="sf-top">
@@ -61,6 +63,7 @@ onMounted(() => { void privacySettingsAvailable().then(v => { privacySettings.va
             <h3 class="sf-col-label">Learn</h3>
             <a href="/how-to-play/" class="sf-link">How to play</a>
             <a href="/rules/" class="sf-link">Rules guide</a>
+            <a href="/strategy/" class="sf-link">Strategy</a>
             <a href="/faq/" class="sf-link">FAQ</a>
           </div>
           <div class="sf-col">

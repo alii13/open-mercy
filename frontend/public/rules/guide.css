@@ -264,20 +264,109 @@ section p a:hover,
 .final-cta h2 { border: none; padding: 0; margin-bottom: 0.75rem; }
 .final-cta p { margin-bottom: 1.5rem; }
 
-/* Footer */
-footer {
-  background: rgba(0,0,0,0.7);
-  border-top: 1px solid var(--border);
-  padding: 1rem 1.5rem;
-  text-align: center;
-  font-family: var(--mono-font);
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  line-height: 2;
+/* Footer — the same footer as the app's SiteFooter.vue; keep the two in step.
+   The overrides reset this file's global h2, h3, p and section rules. */
+.site-footer {
   margin-top: 3rem;
+  background: var(--bg);
+  border-top: 1px solid var(--surface);
+  font-family: var(--body-font);
+  line-height: 1.5;
 }
-footer a { color: var(--text); font-weight: bold; text-decoration: none; }
-footer a:hover { color: var(--yellow); }
+.sf-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 4rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 6rem 1.5rem 2rem;
+}
+.sf-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 4rem; }
+.site-footer .sf-community { display: flex; flex-direction: column; gap: 1rem; margin: 0; }
+.site-footer .sf-title {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-family: var(--display-font);
+  font-weight: 400;
+  font-size: 3rem;
+  line-height: 1.12;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+.sf-alert { color: var(--red); }
+.site-footer .sf-lead { margin: 0; max-width: 34ch; font-size: 1.125rem; line-height: 1.55; color: var(--text-dim); }
+.sf-socials { display: flex; flex-wrap: wrap; gap: 0.75rem; padding-top: 1rem; }
+.sf-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  min-height: 56px;
+  padding: 0 1.5rem 0 1rem;
+  border-radius: 9999px;
+  background: var(--surface);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--text);
+  transition: background-color 180ms cubic-bezier(0.33, 1, 0.68, 1);
+}
+.sf-pill svg { flex-shrink: 0; }
+.sf-discord { padding-left: 1.5rem; background: #5865f2; color: #fff; }
+.sf-discord svg { fill: #fff; }
+.sf-telegram { fill: #26a5e4; }
+.sf-links { display: flex; gap: 3rem; }
+.sf-col { display: flex; flex-direction: column; min-width: 7.5rem; }
+.site-footer .sf-col-label {
+  margin: 0 0 0.5rem;
+  font-family: var(--body-font);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #808089;
+}
+/* 28px of line plus 8px above and below: a 44px tap target per link. */
+.sf-link {
+  padding: 0.5rem 0;
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 1.75;
+  text-decoration: none;
+  color: var(--text);
+  transition: color 180ms cubic-bezier(0.33, 1, 0.68, 1);
+}
+.sf-bottom { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+.site-footer .sf-oss { display: flex; align-items: center; gap: 0.5rem; margin: 0; font-size: 0.875rem; color: var(--text-dim); }
+.sf-oss svg { flex-shrink: 0; fill: var(--text); }
+.sf-oss-link { font-weight: 600; color: var(--text); text-decoration: underline; text-decoration-color: #808089; text-underline-offset: 3px; }
+.sf-privacy { display: inline-flex; align-items: center; min-height: 44px; font-size: 0.875rem; font-weight: 500; text-decoration: none; color: var(--text-dim); }
+.sf-privacy[hidden] { display: none; }
+/* Mouse only: on a phone a tapped link keeps its hover colour after the tap. */
+@media (hover: hover) {
+  .sf-pill:hover { background: #1f2226; }
+  .sf-discord:hover { background: #4752c4; }
+  .sf-link:hover { color: var(--yellow); }
+  .sf-oss-link:hover { text-decoration-color: var(--text); }
+  .sf-privacy:hover { color: var(--text); }
+}
+@media (max-width: 960px) {
+  .sf-top { flex-direction: column; gap: 3rem; }
+}
+@media (max-width: 640px) {
+  .sf-inner { gap: 3rem; padding-top: 4rem; }
+  .site-footer .sf-title { font-size: 2rem; }
+  .site-footer .sf-lead { font-size: 1rem; }
+  /* Discord takes the row; Telegram and Instagram share the one below it. */
+  .sf-discord { flex-basis: 100%; }
+  .sf-pill:not(.sf-discord) { flex: 1 1 0; padding: 0 1rem 0 0.75rem; font-size: 0.875rem; letter-spacing: 0.12em; }
+  .sf-links { flex-wrap: wrap; column-gap: 3rem; row-gap: 2rem; }
+  .sf-col { flex: 0 0 calc(50% - 1.5rem); }
+}
 
 @media (max-width: 600px) {
   h1 { font-size: 2rem; }
