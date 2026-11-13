@@ -7,6 +7,7 @@
  * say "your 4-day streak" truthfully.
  */
 import { ref } from 'vue'
+import { Capacitor } from '@capacitor/core'
 import { useRetentionStore } from '../stores/retentionStore'
 import { track } from '../utils/analytics'
 import { needsHomeScreen } from '../utils/reminderAsk'
@@ -18,8 +19,9 @@ export function remindersSupported(): boolean {
     return typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window
 }
 
-/** An iPhone or iPad tab, where reminders need Add to Home Screen first. */
-export const reminderNeedsHomeScreen = typeof navigator !== 'undefined' && needsHomeScreen({
+/** An iPhone or iPad tab, where reminders need Add to Home Screen first. Never
+ *  the iOS app: it is installed already, and its web view has no web push. */
+export const reminderNeedsHomeScreen = !Capacitor.isNativePlatform() && typeof navigator !== 'undefined' && needsHomeScreen({
     userAgent: navigator.userAgent,
     maxTouchPoints: navigator.maxTouchPoints,
     standalone: (navigator as Navigator & { standalone?: boolean }).standalone,
