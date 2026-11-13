@@ -12,10 +12,6 @@ onMounted(() => { void privacySettingsAvailable().then(v => { privacySettings.va
        in public/rules/guide.css. A change here goes there too. -->
   <footer class="site-footer">
     <nav class="sf-links" aria-label="Site">
-      <a href="https://github.com/alii13/open-mercy" target="_blank" rel="noopener noreferrer" class="sf-link sf-oss">
-        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path :d="siGithub.path" /></svg>
-        Open source
-      </a>
       <!-- Crawlable links into the guides: the rules guide was once reachable
            only from the settings drawer, which left it orphaned for search. -->
       <a href="/how-to-play/" class="sf-link">How to play</a>
@@ -27,26 +23,20 @@ onMounted(() => { void privacySettingsAvailable().then(v => { privacySettings.va
       <button v-if="privacySettings" type="button" class="sf-link sf-button" @click="openPrivacySettings()">Privacy settings</button>
     </nav>
 
+    <span class="sf-divider" aria-hidden="true"></span>
+
     <div class="sf-socials">
-      <a href="https://discord.gg/4hwKGhJak9" target="_blank" rel="noopener noreferrer" class="sf-social" aria-label="Open Mercy on Discord">
-        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" class="sf-discord"><path :d="siDiscord.path" /></svg>
+      <a href="https://discord.gg/4hwKGhJak9" target="_blank" rel="noopener noreferrer" class="sf-social sf-discord" aria-label="Open Mercy on Discord">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path :d="siDiscord.path" /></svg>
       </a>
-      <a href="https://t.me/openmercy" target="_blank" rel="noopener noreferrer" class="sf-social" aria-label="Open Mercy on Telegram">
-        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" class="sf-telegram"><path :d="siTelegram.path" /></svg>
+      <a href="https://t.me/openmercy" target="_blank" rel="noopener noreferrer" class="sf-social sf-telegram" aria-label="Open Mercy on Telegram">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path :d="siTelegram.path" /></svg>
       </a>
-      <a href="https://www.instagram.com/openmercyy" target="_blank" rel="noopener noreferrer" class="sf-social" aria-label="Open Mercy on Instagram">
-        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-          <defs>
-            <linearGradient id="sf-instagram" x1="0" y1="1" x2="1" y2="0">
-              <stop offset="0" stop-color="#feda75" />
-              <stop offset="0.35" stop-color="#fa7e1e" />
-              <stop offset="0.6" stop-color="#d62976" />
-              <stop offset="0.85" stop-color="#962fbf" />
-              <stop offset="1" stop-color="#4f5bd5" />
-            </linearGradient>
-          </defs>
-          <path fill="url(#sf-instagram)" :d="siInstagram.path" />
-        </svg>
+      <a href="https://www.instagram.com/openmercyy" target="_blank" rel="noopener noreferrer" class="sf-social sf-instagram" aria-label="Open Mercy on Instagram">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path :d="siInstagram.path" /></svg>
+      </a>
+      <a href="https://github.com/alii13/open-mercy" target="_blank" rel="noopener noreferrer" class="sf-social sf-github" aria-label="Open Mercy's code on GitHub">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path :d="siGithub.path" /></svg>
       </a>
     </div>
   </footer>
@@ -60,7 +50,7 @@ onMounted(() => { void privacySettingsAvailable().then(v => { privacySettings.va
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  column-gap: var(--spacing-8);
+  column-gap: var(--spacing-6);
   row-gap: var(--spacing-2);
   /* No vertical padding: each link is already a 44px tap target, so the
      footer is one 44px row and the lobby above it fits a laptop screen. */
@@ -90,8 +80,6 @@ onMounted(() => { void privacySettingsAvailable().then(v => { privacySettings.va
   transition: color var(--duration-snap) var(--ease-snap);
 }
 
-.sf-oss { color: var(--text-primary); }
-.sf-oss svg { fill: currentColor; }
 
 .sf-button {
   padding: 0;
@@ -113,15 +101,32 @@ onMounted(() => { void privacySettingsAvailable().then(v => { privacySettings.va
   width: 44px;
   height: 44px;
   border-radius: var(--radius-pill);
-  transition: background-color var(--duration-snap) var(--ease-snap);
+  color: var(--text-secondary);
+  transition: background var(--duration-snap) var(--ease-snap), color var(--duration-snap) var(--ease-snap);
 }
 
-.sf-discord { fill: #5865f2; }
-.sf-telegram { fill: #26a5e4; }
+/* Grey like the links until hovered, so the icons do not outshout the page. */
+.sf-social svg { fill: currentColor; }
+
+/* Splits the page links from the social icons while they share one row. */
+.sf-divider {
+  width: 1px;
+  height: var(--spacing-6);
+  background: color-mix(in srgb, var(--text-muted) 45%, transparent);
+}
 
 /* Mouse only: on a phone a tapped link keeps its hover colour after the tap. */
 @media (hover: hover) {
   .sf-link:hover { color: var(--text-primary); }
-  .sf-social:hover { background: var(--bg-concrete-light); }
+  .sf-social:hover { color: #fff; }
+  .sf-discord:hover { background: #5865f2; }
+  .sf-telegram:hover { background: #26a5e4; }
+  .sf-instagram:hover { background: linear-gradient(45deg, #feda75, #fa7e1e 35%, #d62976 60%, #962fbf 85%, #4f5bd5); }
+  .sf-github:hover { background: var(--text-primary); color: #181717; }
+}
+
+/* Once the icons wrap below the links there is nothing beside them to split. */
+@media (max-width: 960px) {
+  .sf-divider { display: none; }
 }
 </style>

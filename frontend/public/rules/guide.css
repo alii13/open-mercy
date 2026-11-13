@@ -271,7 +271,7 @@ section p a:hover,
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  column-gap: 2rem;
+  column-gap: 1.5rem;
   row-gap: 0.5rem;
   padding: 0 1.5rem;
   background: var(--bg);
@@ -292,8 +292,6 @@ section p a:hover,
   transition: color 180ms cubic-bezier(0.33, 1, 0.68, 1);
 }
 .sf-link[hidden] { display: none; }
-.sf-oss { color: var(--text); }
-.sf-oss svg { fill: currentColor; }
 .sf-socials { display: flex; align-items: center; }
 .sf-social {
   display: inline-flex;
@@ -302,14 +300,25 @@ section p a:hover,
   width: 44px;
   height: 44px;
   border-radius: 9999px;
-  transition: background-color 180ms cubic-bezier(0.33, 1, 0.68, 1);
+  color: var(--text-dim);
+  transition: background 180ms cubic-bezier(0.33, 1, 0.68, 1), color 180ms cubic-bezier(0.33, 1, 0.68, 1);
 }
-.sf-discord { fill: #5865f2; }
-.sf-telegram { fill: #26a5e4; }
+/* Grey like the links until hovered, so the icons do not outshout the page. */
+.sf-social svg { fill: currentColor; }
+/* Splits the page links from the social icons while they share one row. */
+.sf-divider { width: 1px; height: 1.5rem; background: rgba(128, 128, 137, 0.45); }
 /* Mouse only: on a phone a tapped link keeps its hover colour after the tap. */
 @media (hover: hover) {
   .sf-link:hover { color: var(--text); }
-  .sf-social:hover { background: var(--surface); }
+  .sf-social:hover { color: #fff; }
+  .sf-discord:hover { background: #5865f2; }
+  .sf-telegram:hover { background: #26a5e4; }
+  .sf-instagram:hover { background: linear-gradient(45deg, #feda75, #fa7e1e 35%, #d62976 60%, #962fbf 85%, #4f5bd5); }
+  .sf-github:hover { background: var(--text); color: #181717; }
+}
+/* Once the icons wrap below the links there is nothing beside them to split. */
+@media (max-width: 960px) {
+  .sf-divider { display: none; }
 }
 
 @media (max-width: 600px) {
