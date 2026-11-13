@@ -96,6 +96,9 @@
  * Moving an email account to a new address (settings drawer):
  *   email_change_sent          {}                  — links mailed to the old and new address
  *   email_change_completed     {}                  — the new address landed in this browser
+ *
+ * Deleting an account (account menu):
+ *   account_deleted            {}                  — sent after the server delete succeeds
  */
 
 /**

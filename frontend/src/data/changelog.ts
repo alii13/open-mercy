@@ -69,6 +69,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: '2026-11-14',
+        level: 'quiet',
+        tag: 'NEW',
+        title: 'Delete your account from the menu',
+        body: 'Open the menu and tap Delete account. It removes your profile, stats, friends and photo for good.',
+    },
+    {
         id: '2026-11-13',
         level: 'loud',
         tag: 'NEW',
