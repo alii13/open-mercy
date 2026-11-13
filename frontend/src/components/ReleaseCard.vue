@@ -305,7 +305,9 @@ function go() {
 }
 
 .rc-discord svg { fill: currentColor; }
-.rc-discord:hover { background: #4752c4; }
+@media (hover: hover) {
+  .rc-discord:hover { background: #4752c4; }
+}
 
 /* The card's other buttons carry their case in the copy ("SEE YOUR RANK").
    An option is also a stored value, so it is written as words and shouted

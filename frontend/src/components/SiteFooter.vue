@@ -2,7 +2,9 @@
 import { onMounted, ref } from 'vue'
 import { siDiscord, siGithub, siInstagram, siTelegram } from 'simple-icons'
 import { openPrivacySettings, privacySettingsAvailable } from '../utils/consent'
+import { useAuthStore } from '../stores/authStore'
 
+const authStore = useAuthStore()
 const privacySettings = ref(false)
 onMounted(() => { void privacySettingsAvailable().then(v => { privacySettings.value = v }) })
 </script>
@@ -44,8 +46,13 @@ onMounted(() => { void privacySettingsAvailable().then(v => { privacySettings.va
         <nav class="sf-links" aria-label="Site">
           <div class="sf-col">
             <h3 class="sf-col-label">Play</h3>
-            <a href="/public" class="sf-link">Public table</a>
-            <a href="/bot" class="sf-link">Vs bot</a>
+            <!-- Players only. Signed out, /public has nothing to seat and /bot
+                 deals a game that is never saved; the landing page's PLAY
+                 signs a visitor in first. -->
+            <template v-if="authStore.isAuthenticated">
+              <a href="/public" class="sf-link">Public table</a>
+              <a href="/bot" class="sf-link">Vs bot</a>
+            </template>
             <a href="/leaderboard" class="sf-link">Leaderboard</a>
           </div>
           <!-- Crawlable links into the guides: the rules guide was once reachable
