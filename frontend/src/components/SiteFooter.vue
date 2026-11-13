@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { siDiscord, siGithub, siInstagram, siTelegram } from 'simple-icons'
 import { openPrivacySettings, privacySettingsAvailable } from '../utils/consent'
 
 const privacySettings = ref(false)
@@ -8,127 +9,276 @@ onMounted(() => { void privacySettingsAvailable().then(v => { privacySettings.va
 
 <template>
   <footer class="site-footer">
-    <span class="footer-text">Built by</span>
-    <a href="https://github.com/alii13" target="_blank" rel="noopener noreferrer" class="footer-link">
-      <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.4 3-.405 1.02.005 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
-      alii13
-    </a>
-    <span class="footer-sep">·</span>
-    <!-- Sitewide crawlable link into the rules guide. It was reachable only
-         from the settings drawer, which left a 1,800-word page effectively
-         orphaned for search. -->
-    <a href="/how-to-play/" class="footer-link">How to play</a>
-    <span class="footer-sep">·</span>
-    <a href="/rules/" class="footer-link">Rules guide</a>
-    <span class="footer-sep">·</span>
-    <a href="/faq/" class="footer-link">FAQ</a>
-    <span class="footer-sep">·</span>
-    <a href="/about/" class="footer-link">About</a>
-    <span class="footer-sep">·</span>
-    <a href="/contact/" class="footer-link">Contact</a>
-    <span class="footer-sep">·</span>
-    <a href="https://t.me/openmercy" target="_blank" rel="noopener noreferrer" class="footer-link">
-      <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14" aria-hidden="true"><path d="M21.7 2.3a1 1 0 0 0-1.05-.23L2.6 9.1a1 1 0 0 0 .06 1.9l4.9 1.63 1.9 5.9a1 1 0 0 0 1.7.4l2.7-2.9 4.4 3.3a1 1 0 0 0 1.57-.6l3-15.2a1 1 0 0 0-.13-.73ZM9.9 14.2l-.9 3.1-1.2-3.7 8.9-6.3Z"/></svg>
-      Telegram
-    </a>
-    <span class="footer-sep">·</span>
-    <a href="/privacy/" class="footer-link">Privacy</a>
-    <span class="footer-sep">·</span>
-    <a href="/terms/" class="footer-link">Terms</a>
-    <span class="footer-sep">·</span>
-    <template v-if="privacySettings">
-      <button type="button" class="footer-link footer-button" @click="openPrivacySettings()">Privacy settings</button>
-      <span class="footer-sep">·</span>
-    </template>
-    <span class="footer-attribution">
-      Music: <a href="https://incompetech.com/" target="_blank" rel="noopener noreferrer" class="footer-attribution-link">Kevin MacLeod</a>
-      (<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer" class="footer-attribution-link">CC BY 4.0</a>)
-      ·
-      SFX: <a href="https://kenney.nl/assets/casino-audio" target="_blank" rel="noopener noreferrer" class="footer-attribution-link">Kenney</a>
-      (CC0)
-    </span>
+    <div class="sf-inner">
+      <div class="sf-top">
+        <section class="sf-community">
+          <h2 class="sf-title">The game ends.<br>The table <span class="sf-alert">doesn't.</span></h2>
+          <p class="sf-lead">Find people to play with, call a rematch, and hear about new rules before anyone else.</p>
+          <div class="sf-socials">
+            <a class="sf-pill sf-discord" href="https://discord.gg/4hwKGhJak9" target="_blank" rel="noopener noreferrer">
+              <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path :d="siDiscord.path" /></svg>
+              Join the Discord
+            </a>
+            <a class="sf-pill" href="https://t.me/openmercy" target="_blank" rel="noopener noreferrer">
+              <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" class="sf-telegram"><path :d="siTelegram.path" /></svg>
+              Telegram
+            </a>
+            <a class="sf-pill" href="https://www.instagram.com/openmercyy" target="_blank" rel="noopener noreferrer">
+              <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+                <defs>
+                  <linearGradient id="sf-instagram" x1="0" y1="1" x2="1" y2="0">
+                    <stop offset="0" stop-color="#feda75" />
+                    <stop offset="0.35" stop-color="#fa7e1e" />
+                    <stop offset="0.6" stop-color="#d62976" />
+                    <stop offset="0.85" stop-color="#962fbf" />
+                    <stop offset="1" stop-color="#4f5bd5" />
+                  </linearGradient>
+                </defs>
+                <path fill="url(#sf-instagram)" :d="siInstagram.path" />
+              </svg>
+              Instagram
+            </a>
+          </div>
+        </section>
+
+        <nav class="sf-links" aria-label="Site">
+          <div class="sf-col">
+            <h3 class="sf-col-label">Play</h3>
+            <a href="/public" class="sf-link">Public table</a>
+            <a href="/bot" class="sf-link">Vs bot</a>
+            <a href="/leaderboard" class="sf-link">Leaderboard</a>
+          </div>
+          <!-- Crawlable links into the guides: the rules guide was once reachable
+               only from the settings drawer, which left it orphaned for search. -->
+          <div class="sf-col">
+            <h3 class="sf-col-label">Learn</h3>
+            <a href="/how-to-play/" class="sf-link">How to play</a>
+            <a href="/rules/" class="sf-link">Rules guide</a>
+            <a href="/faq/" class="sf-link">FAQ</a>
+          </div>
+          <div class="sf-col">
+            <h3 class="sf-col-label">Open Mercy</h3>
+            <a href="/about/" class="sf-link">About</a>
+            <a href="/contact/" class="sf-link">Contact</a>
+            <a href="/privacy/" class="sf-link">Privacy</a>
+            <a href="/terms/" class="sf-link">Terms</a>
+          </div>
+        </nav>
+      </div>
+
+      <div class="sf-bottom">
+        <p class="sf-oss">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path :d="siGithub.path" /></svg>
+          <span>Open Mercy is <a href="https://github.com/alii13/open-mercy" target="_blank" rel="noopener noreferrer" class="sf-oss-link">open source</a>.</span>
+        </p>
+        <button v-if="privacySettings" type="button" class="sf-privacy" @click="openPrivacySettings()">Privacy settings</button>
+      </div>
+    </div>
   </footer>
 </template>
 
 <style scoped>
 .site-footer {
-  background: rgba(0, 0, 0, 0.7);
-  border-top: 1px solid #2a2a2a;
-  padding: 0.75rem 1rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  letter-spacing: 1px;
+  --discord: #5865f2;
+  --discord-hover: #4752c4;
   position: relative;
   z-index: 5;
+  background: var(--bg-concrete);
+  border-top: 1px solid var(--bg-concrete-light);
+  font-family: var(--font-body);
 }
 
-.footer-text {
-  line-height: 1;
+.sf-inner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-16);
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: var(--spacing-24) var(--spacing-6) var(--spacing-8);
 }
 
-.footer-link {
+.sf-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--spacing-16);
+}
+
+.sf-community {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+}
+
+.sf-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: var(--text-display);
+  line-height: 1.12;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+}
+
+.sf-alert { color: var(--color-alert); }
+
+.sf-lead {
+  margin: 0;
+  max-width: 34ch;
+  font-size: var(--text-lg);
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.sf-socials {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-3);
+  padding-top: var(--spacing-4);
+}
+
+.sf-pill {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  color: var(--text-primary);
+  justify-content: center;
+  gap: var(--spacing-3);
+  min-height: 56px;
+  padding: 0 var(--spacing-6) 0 var(--spacing-4);
+  border-radius: var(--radius-pill);
+  background: var(--bg-concrete-light);
+  font-size: var(--text-base);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   text-decoration: none;
-  font-weight: bold;
-  transition: color 0.2s;
+  color: var(--text-primary);
+  transition: background-color var(--duration-snap) var(--ease-snap);
 }
 
-.footer-button {
+.sf-pill svg { flex-shrink: 0; }
+
+.sf-discord {
+  padding-left: var(--spacing-6);
+  background: var(--discord);
+  color: #fff;
+}
+
+.sf-discord svg { fill: #fff; }
+.sf-telegram { fill: #26a5e4; }
+
+.sf-links {
+  display: flex;
+  gap: var(--spacing-12);
+}
+
+.sf-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 7.5rem;
+}
+
+.sf-col-label {
+  margin: 0 0 var(--spacing-2);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* 28px of line plus 8px above and below: a 44px tap target per link. */
+.sf-link {
+  padding: var(--spacing-2) 0;
+  font-size: var(--text-base);
+  font-weight: 500;
+  line-height: 1.75;
+  text-decoration: none;
+  color: var(--text-primary);
+  transition: color var(--duration-snap) var(--ease-snap);
+}
+
+.sf-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--spacing-4);
+}
+
+.sf-oss {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.sf-oss svg {
+  flex-shrink: 0;
+  fill: var(--text-primary);
+}
+
+.sf-oss-link {
+  font-weight: 600;
+  color: var(--text-primary);
+  text-decoration: underline;
+  text-decoration-color: var(--text-muted);
+  text-underline-offset: 3px;
+}
+
+.sf-privacy {
+  min-height: 44px;
+  padding: 0;
   background: none;
   border: 0;
-  padding: 0;
   font: inherit;
-  font-weight: bold;
-  letter-spacing: inherit;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-secondary);
   cursor: pointer;
 }
 
-.footer-link:hover {
-  color: var(--color-hazard);
+/* Mouse only: on a phone a tapped link keeps its hover colour after the tap. */
+@media (hover: hover) {
+  .sf-pill:hover { background: var(--surface-metal); }
+  .sf-discord:hover { background: var(--discord-hover); }
+  .sf-link:hover { color: var(--color-hazard); }
+  .sf-oss-link:hover { text-decoration-color: var(--text-primary); }
+  .sf-privacy:hover { color: var(--text-primary); }
 }
 
-.footer-sep {
-  color: #2a2a2a;
-  margin: 0 0.25rem;
-}
-
-.footer-attribution {
-  font-size: 0.68rem;
-  color: var(--text-muted);
-  letter-spacing: 0.5px;
-}
-
-.footer-attribution-link {
-  color: var(--text-muted);
-  text-decoration: none;
-  border-bottom: 1px dotted rgba(255, 255, 255, 0.15);
-}
-
-.footer-attribution-link:hover {
-  color: var(--text-primary);
-  border-bottom-color: var(--text-primary);
+@media (max-width: 960px) {
+  .sf-top {
+    flex-direction: column;
+    gap: var(--spacing-12);
+  }
 }
 
 @media (max-width: 640px) {
-  .site-footer {
+  .sf-inner {
+    gap: var(--spacing-12);
+    padding-top: var(--spacing-16);
+  }
+
+  .sf-title { font-size: var(--text-3xl); }
+  .sf-lead { font-size: var(--text-base); }
+
+  /* Discord takes the row; Telegram and Instagram share the one below it. */
+  .sf-discord { flex-basis: 100%; }
+  .sf-pill:not(.sf-discord) {
+    flex: 1 1 0;
+    padding: 0 var(--spacing-4) 0 var(--spacing-3);
+    font-size: var(--text-sm);
+    letter-spacing: 0.12em;
+  }
+
+  .sf-links {
     flex-wrap: wrap;
-    row-gap: 0.4rem;
+    column-gap: var(--spacing-12);
+    row-gap: var(--spacing-8);
   }
-  .footer-attribution {
-    flex-basis: 100%;
-    text-align: center;
-    margin-top: 0;
-  }
-  .footer-sep {
-    display: none;
-  }
+
+  .sf-col { flex: 0 0 calc(50% - var(--spacing-6)); }
 }
 </style>

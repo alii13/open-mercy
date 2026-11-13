@@ -18,7 +18,8 @@
       </p>
 
       <div class="rc-actions">
-        <button v-if="entry.cta" class="rc-go" type="button" @click="go">
+        <button v-if="entry.cta" class="rc-go" :class="{ 'rc-discord': isDiscord }" type="button" @click="go">
+          <svg v-if="isDiscord" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path :d="siDiscord.path" /></svg>
           {{ (!signedIn && entry.ctaSignedOut) || entry.cta.label }}
         </button>
         <button class="rc-later" type="button" @click="dismiss">NOT NOW</button>
@@ -58,6 +59,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { X } from 'lucide-vue-next'
+import { siDiscord } from 'simple-icons'
 import { useWhatsNew } from '../composables/useWhatsNew'
 import { usePoll } from '../composables/usePoll'
 import type { Poll } from '../data/polls'
@@ -76,6 +78,10 @@ const mp = useMultiplayerStore()
 const takeSeat = () => void mp.quickMatch(PUBLIC_TABLE_RULES)
 
 const entry = computed(() => card.value)
+const isDiscord = computed(() => {
+    const cta = entry.value?.cta
+    return !!cta && 'brand' in cta && cta.brand === 'discord'
+})
 const signedIn = computed(() => authStore.isAuthenticated)
 const stat = ref<{ value: string; label: string } | null>(null)
 
@@ -291,6 +297,15 @@ function go() {
   color: var(--bg-concrete, #0a0a0b);
   cursor: pointer;
 }
+
+.rc-discord {
+  gap: var(--spacing-2);
+  background: #5865f2;
+  color: #fff;
+}
+
+.rc-discord svg { fill: currentColor; }
+.rc-discord:hover { background: #4752c4; }
 
 /* The card's other buttons carry their case in the copy ("SEE YOUR RANK").
    An option is also a stored value, so it is written as words and shouted

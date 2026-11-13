@@ -23,7 +23,8 @@ export type ChangelogTag = 'NEW' | 'IMPROVED' | 'FIXED'
 
 export type ChangelogCta =
     | { label: string; route: Route }
-    | { label: string; href: string }
+    /** `brand` dresses the release card's button in that service's colour and logo. */
+    | { label: string; href: string; brand?: 'discord' }
     /** The reader's own profile page, which no fixed route can name. */
     | { label: string; ownProfile: true }
     /** An element on the home screen, by id; from another page it goes home. */
@@ -67,6 +68,14 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+    {
+        id: '2026-11-13',
+        level: 'loud',
+        tag: 'NEW',
+        title: 'Join Open Mercy on Discord',
+        body: 'We opened a Discord for players. Find people for a game, call a rematch, and tell us what to fix or add next.',
+        cta: { label: 'JOIN THE DISCORD', href: 'https://discord.gg/4hwKGhJak9', brand: 'discord' },
+    },
     {
         // A second entry on the same day: a full timestamp still parses as a
         // date and sorts after the plain 2026-11-11 above it.
