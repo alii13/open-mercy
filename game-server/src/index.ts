@@ -18,10 +18,11 @@ import { chatAllowed, loungeAllowed } from './chatLimit'
 import { cleanLoungeAct, LOUNGE_FACES, LOUNGE_TABLE, type LoungeAct } from '../../shared/lounge'
 import { sendRoomInvite } from './invites'
 import { deleteSubscription, pushConfigured, saveSubscription, sendNudges, type PushEnv } from './push'
+import { appleRevokeConfigured, revokeAppleTokens, type AppleEnv } from './appleRevoke'
 import { quickChatPhrase } from '../../shared/quickChat'
 import type { StackingMode } from '../../shared/engine'
 
-interface Env extends AuthEnv, VoiceEnv, PushEnv {
+interface Env extends AuthEnv, VoiceEnv, PushEnv, AppleEnv {
     ROOM: DurableObjectNamespace
     /** Optional wrangler secret; enables server-side game_results persistence. */
     SUPABASE_SERVICE_KEY?: string
@@ -185,6 +186,20 @@ export default {
         // null tells the client reminders are off on this deploy.
         if (url.pathname === '/push/key') {
             return withCors(Response.json({ key: pushConfigured(env) ? env.VAPID_PUBLIC_KEY : null }), req)
+        }
+        // Account deletion in the iOS app: revoke the player's Sign in with
+        // Apple tokens first, as Apple requires (appleRevoke.ts).
+        if (req.method === 'POST' && url.pathname === '/account/apple-revoke') {
+            if (!appleRevokeConfigured(env)) return withCors(new Response('not configured', { status: 503 }), req)
+            if (Number(req.headers.get('content-length') ?? 0) > 4096) return withCors(new Response('too large', { status: 413 }), req)
+            const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '')
+            const user = await verifySupabaseToken(token, env)
+            if (!user) return withCors(new Response('unauthorized', { status: 401 }), req)
+            const body = await req.json<{ code?: unknown }>().catch(() => null)
+            const code = typeof body?.code === 'string' ? body.code : ''
+            if (!code || code.length > 1024) return withCors(new Response('bad request', { status: 400 }), req)
+            const status = await revokeAppleTokens(code, { APPLE_KEY_ID: env.APPLE_KEY_ID!, APPLE_PRIVATE_KEY: env.APPLE_PRIVATE_KEY! })
+            return withCors(new Response(null, { status }), req)
         }
         if (req.method === 'POST' && (url.pathname === '/push/subscribe' || url.pathname === '/push/unsubscribe')) {
             if (Number(req.headers.get('content-length') ?? 0) > 4096) return withCors(new Response('too large', { status: 413 }), req)
