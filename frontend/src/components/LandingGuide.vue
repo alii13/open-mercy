@@ -1,15 +1,11 @@
 <template>
   <!-- Static on purpose: no scroll-in animation, so crawlers and slow phones
-       always get the text that explains the game and links into the guides.
-       Closed by default but never hidden: text in a <details> is in the page
-       and counts for search, while CSS-hidden text reads as spam to Google. -->
+       always get the text that explains the game and links into the guides. -->
   <section class="guide-section" aria-labelledby="guide-heading">
-    <details class="guide-inner">
-      <summary class="guide-summary">
-        <h2 id="guide-heading" class="guide-summary-title">What is Open Mercy?</h2>
-        <ChevronDown :size="16" :stroke-width="2" class="guide-chevron" aria-hidden="true" />
-      </summary>
-      <div class="guide-body">
+    <div class="guide-inner">
+      <h2 id="guide-heading" class="guide-heading">
+        WHAT IS <span class="accent-yellow">OPEN MERCY?</span>
+      </h2>
       <p class="guide-intro">
         Open Mercy is a free card game you play in your browser, built on the No Mercy rules:
         bigger draw cards, stacking, and a hard limit on how many cards you can hold.
@@ -67,20 +63,15 @@
         <a href="/faq/">FAQ</a>
         <a href="/about/">About</a>
       </nav>
-      </div>
-    </details>
+    </div>
   </section>
 </template>
-
-<script setup lang="ts">
-import { ChevronDown } from 'lucide-vue-next'
-</script>
 
 <style scoped>
 .guide-section {
   position: relative;
   z-index: 5;
-  padding: var(--spacing-8) var(--spacing-6);
+  padding: 6rem 2rem;
 }
 
 .guide-inner {
@@ -88,36 +79,18 @@ import { ChevronDown } from 'lucide-vue-next'
   margin: 0 auto;
 }
 
-.guide-summary {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--spacing-2);
-  min-height: 44px;
-  color: var(--text-muted);
-  cursor: pointer;
-  list-style: none;
+.guide-heading {
+  font-family: var(--font-display);
+  font-size: 3.2rem;
+  margin: 0 0 1.5rem;
+  color: var(--text-primary);
+  line-height: 1;
+  text-align: center;
 }
 
-.guide-summary::-webkit-details-marker { display: none; }
-
-.guide-summary-title {
-  margin: 0;
-  font-family: var(--font-body);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+.accent-yellow {
+  color: var(--color-hazard);
 }
-
-.guide-chevron { transition: transform var(--duration-snap) var(--ease-snap); }
-.guide-inner[open] .guide-chevron { transform: rotate(180deg); }
-
-@media (hover: hover) {
-  .guide-summary:hover { color: var(--text-secondary); }
-}
-
-.guide-body { padding-top: var(--spacing-6); }
 
 .guide-intro {
   color: var(--text-secondary);
@@ -197,12 +170,24 @@ import { ChevronDown } from 'lucide-vue-next'
 }
 
 @media (max-width: 768px) {
+  .guide-section {
+    padding: 4rem 1.5rem;
+  }
+  .guide-heading {
+    font-size: 2.4rem;
+  }
   .guide-grid {
     grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 480px) {
+  .guide-section {
+    padding: 3rem 1rem;
+  }
+  .guide-heading {
+    font-size: 1.9rem;
+  }
   .guide-intro {
     font-size: 1rem;
   }
