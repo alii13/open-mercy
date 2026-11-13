@@ -190,14 +190,9 @@
     }
     </script>
 
-    <!-- AdSense site verification without ad serving: ads run only on the static
-         guide pages, never beside the game. The app still loads Google's consent
-         message (the AdSense Privacy & messaging CMP) so EEA/UK consent and the
-         footer's Privacy settings keep working here. -->
-    <meta name="google-adsense-account" content="ca-pub-5481263585202262">
     <script>
-      // Consent Mode v2: Google tags start denied in the EEA, UK and Switzerland
-      // until the AdSense consent message (Google's certified CMP) records a choice.
+      // Consent Mode v2: Google tags run without cookies in the EEA, UK and
+      // Switzerland. There is no consent message, so they stay that way.
       // Queued before any Google script is requested, so nothing runs ahead of it.
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
@@ -210,18 +205,6 @@
         wait_for_update: 500
       });
 
-      // The consent message loads once the app's code has run, so a visitor who has
-      // to answer it sees it while the landing page settles. Waiting for the first
-      // tap put it on top of the game, because that tap was usually Play. Loading it
-      // before the app's code cost slow phones about 0.5 s of startup. The hero intro
-      // keeps PLAY NOW hidden for 3 s after this point, except with reduced motion,
-      // where a quick tap on a slow connection can beat it.
-      document.addEventListener('DOMContentLoaded', function () {
-        var s = document.createElement('script');
-        s.async = true;
-        s.src = 'https://fundingchoicesmessages.google.com/i/pub-5481263585202262?ers=1';
-        document.head.appendChild(s);
-      });
 
       // gtag.js for GA and Ads was most of the page's remaining blocking time in
       // PageSpeed, so it still waits for the first scroll, tap or key press, or
@@ -241,7 +224,6 @@
         setTimeout(run, 15000);
       };
     </script>
-    <script>(function() {function signalGooglefcPresent() {if (!window.frames['googlefcPresent']) {if (document.body) {const iframe = document.createElement('iframe'); iframe.style = 'width: 0; height: 0; border: none; z-index: -1000; left: -1000px; top: -1000px;'; iframe.style.display = 'none'; iframe.name = 'googlefcPresent'; document.body.appendChild(iframe);} else {setTimeout(signalGooglefcPresent, 0);}}}signalGooglefcPresent();})();</script>
 
     <!-- Google Analytics + Google Ads. Production hostnames only: keeps
          forks running our measurement id, per-branch previews, and localhost

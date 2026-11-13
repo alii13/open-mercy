@@ -1,10 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
 import { siDiscord, siGithub, siInstagram, siTelegram } from 'simple-icons'
-import { openPrivacySettings, privacySettingsAvailable } from '../utils/consent'
-
-const privacySettings = ref(false)
-onMounted(() => { void privacySettingsAvailable().then(v => { privacySettings.value = v }) })
 </script>
 
 <template>
@@ -20,7 +15,6 @@ onMounted(() => { void privacySettingsAvailable().then(v => { privacySettings.va
       <a href="/contact/" class="sf-link">Contact</a>
       <a href="/privacy/" class="sf-link">Privacy</a>
       <a href="/terms/" class="sf-link">Terms</a>
-      <button v-if="privacySettings" type="button" class="sf-link sf-button" @click="openPrivacySettings()">Privacy settings</button>
     </nav>
 
     <span class="sf-divider" aria-hidden="true"></span>
@@ -90,14 +84,6 @@ onMounted(() => { void privacySettingsAvailable().then(v => { privacySettings.va
   transition: color var(--duration-snap) var(--ease-snap);
 }
 
-
-.sf-button {
-  padding: 0;
-  background: none;
-  border: 0;
-  font-family: inherit;
-  cursor: pointer;
-}
 
 .sf-socials {
   display: flex;
