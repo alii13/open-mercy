@@ -2,6 +2,32 @@
   "schema": "permlock/v0",
   "profile": "node",
   "packages": {
+    "@capacitor/core": {
+      "version": "8.6.0",
+      "observed": {
+        "net": [
+          {
+            "file": "dist/index.js",
+            "line": 507,
+            "via": "fetch"
+          }
+        ]
+      },
+      "declared": null
+    },
+    "@capgo/capacitor-social-login": {
+      "version": "8.7.7",
+      "observed": {
+        "net": [
+          {
+            "file": "dist/esm/google-provider.js",
+            "line": 184,
+            "via": "fetch"
+          }
+        ]
+      },
+      "declared": null
+    },
     "@cloudflare/realtimekit": {
       "version": "2.0.0",
       "observed": {
