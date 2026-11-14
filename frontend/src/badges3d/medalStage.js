@@ -190,29 +190,62 @@ function tubeAlong(points, radius, closed) {
   return new THREE.TubeGeometry(path, segs, radius, 10, false);
 }
 
+// Even-odd point-in-polygon, for "does this layer rest on that one".
+function inside(p, poly) {
+  let hit = false
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const a = poly[i], b = poly[j]
+    if ((a.y > p.y) !== (b.y > p.y) && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) hit = !hit
+  }
+  return hit
+}
+function footprint(polys) {
+  const pts = polys.flat()
+  return { polys, pts, box: new THREE.Box2().setFromPoints(pts) }
+}
+// Two layers touch when one's outline reaches inside the other's.
+const touches = (a, b) => a.box.intersectsBox(b.box) &&
+  (a.pts.some((p) => b.polys.some((poly) => poly.length > 2 && inside(p, poly))) ||
+   b.pts.some((p) => a.polys.some((poly) => poly.length > 2 && inside(p, poly))))
+
 function buildBadge(svgText) {
   const grads = gradientTable(svgText);
   const data = new SVGLoader().parse(svgText);
   const group = new THREE.Group();
-  let zTop = 0;
   let first = true;
+
+  // Every badge stands on a medal disc in its own metal, unless its artwork already has one.
+  const hasDisc = data.paths.some((p) => p.subPaths.some((sp) => {
+    const pts = sp.getPoints(); if (pts.length < 8) return false;
+    const box = new THREE.Box2().setFromPoints(pts);
+    return box.max.x - box.min.x > 60 && Math.abs((box.max.x - box.min.x) - (box.max.y - box.min.y)) < 4;
+  }));
+
+  // Each layer rests on the highest layer it actually overlaps, so from the side the medal reads as one
+  // piece of stacked metal; stacking every layer on the one drawn before left parts floating in mid-air.
+  const placed = [];
+  const DISC_FACE = 1.7;   // the top of the added disc below
+  const restOn = (fp) => placed.reduce((z, l) => (touches(fp, l) ? Math.max(z, l.top) : z), hasDisc ? 0 : DISC_FACE);
 
   for (const path of data.paths) {
     const style = path.userData.style;
     const fill = resolveColor(style.fill, grads);
-    let layerTop = zTop;
+    const shapes = SVGLoader.createShapes(path);
+    const fp = footprint(shapes.length ? shapes.map((sh) => sh.getPoints(4)) : path.subPaths.map((sp) => sp.getPoints(4)));
+    const base = first && fill ? 0 : restOn(fp);
+    let layerTop = base;
 
     // Translucent fills are 2D shading tricks; real light does that job in 3D, so they are skipped.
     if (fill && (style.fillOpacity ?? 1) > 0.5 && (style.opacity ?? 1) > 0.5) {
       const mat = materialFor(fill);
       const depth = first ? BASE_DEPTH : LAYER_DEPTH;
-      for (const shape of SVGLoader.createShapes(path)) {
+      for (const shape of shapes) {
         const bevel = bevelFor(shape, first);
         const geo = new THREE.ExtrudeGeometry(shape, { depth, curveSegments: 16, ...bevel });
         const mesh = new THREE.Mesh(geo, mat);
         mesh.userData.tag = tagOf(style.fill);
-        // Each layer sits on the face of the one under it, overlapping a little so no seam shows.
-        mesh.position.z = zTop + bevel.bevelThickness - (first ? 0 : 0.25);
+        // Sunk a little into what it rests on, so no seam shows.
+        mesh.position.z = base + bevel.bevelThickness - (first ? 0 : 0.25);
         layerTop = Math.max(layerTop, mesh.position.z + depth + bevel.bevelThickness);
         group.add(mesh);
       }
@@ -239,15 +272,9 @@ function buildBadge(svgText) {
       }
       if (!fill) layerTop += r * 1.2;
     }
-    zTop = layerTop;
+    if (layerTop > base) placed.push({ ...fp, top: layerTop });
   }
 
-  // Every badge stands on a medal disc in its own metal, unless its artwork already has one.
-  const hasDisc = data.paths.some((p) => p.subPaths.some((sp) => {
-    const pts = sp.getPoints(); if (pts.length < 8) return false;
-    const box = new THREE.Box2().setFromPoints(pts);
-    return box.max.x - box.min.x > 60 && Math.abs((box.max.x - box.min.x) - (box.max.y - box.min.y)) < 4;
-  }));
   if (!hasDisc) {
     const main = Object.entries(grads).find(([, g]) => g.kind === 'metal')?.[1] ?? Object.values(grads)[0];
     const base = main ? metalColor(main.avg) : new THREE.Color(0.7, 0.7, 0.72);
@@ -450,10 +477,12 @@ export function createMedalStage({ canvas, mode = 'hero', reducedMotion = false 
   controls.minPolarAngle = Math.PI / 2 - 0.55
   controls.maxPolarAngle = Math.PI / 2 + 0.55
   controls.autoRotate = mode === 'hero' && !reducedMotion
-  controls.autoRotateSpeed = 2.4
+  controls.autoRotateSpeed = 0.8   // one turn every 75 s
   let resume = 0
-  const onStart = () => { clearTimeout(resume); controls.autoRotate = false }
+  const onStart = () => { clearTimeout(resume); controls.autoRotate = false; turn = null }
   const onEnd = () => { if (mode === 'hero' && !reducedMotion) resume = window.setTimeout(() => { controls.autoRotate = true }, 3000) }
+  // While a new medal slides in, the camera swings back to face it square on.
+  let turn = null
   controls.addEventListener('start', onStart)
   controls.addEventListener('end', onEnd)
 
@@ -478,8 +507,8 @@ export function createMedalStage({ canvas, mode = 'hero', reducedMotion = false 
   const t0 = performance.now()
   const elapsed = () => (performance.now() - t0) / 1000
 
-  /** dir: -1 or 1 slides the old medal out and the new one in from that side; the camera, and so the
-   *  angle the player turned it to, stays put. 0 swaps in place. */
+  /** dir: -1 or 1 slides the old medal out and the new one in from that side, with the camera turning
+   *  back to the front so the new medal arrives face on. 0 swaps in place. */
   async function show(tier, { locked = false, dir = 0 } = {}) {
     const mine = ++token
     const key = `${tier}${locked ? ':locked' : ''}`
@@ -511,6 +540,13 @@ export function createMedalStage({ canvas, mode = 'hero', reducedMotion = false 
     scene.add(current)
     shownAt = elapsed()
     enterDir = reducedMotion ? 0 : dir
+    if (enterDir) {
+      clearTimeout(resume)
+      controls.autoRotate = false
+      // Shortest way back to the front, whichever way the camera had wandered.
+      const az = Math.atan2(Math.sin(controls.getAzimuthalAngle()), Math.cos(controls.getAzimuthalAngle()))
+      turn = { az, polar: controls.getPolarAngle(), t0: shownAt }
+    }
   }
 
   /** Where a point on the badge (SVG units, 96 box) is on screen, in CSS px from the canvas's top left,
@@ -570,6 +606,11 @@ export function createMedalStage({ canvas, mode = 'hero', reducedMotion = false 
       current.rotation.y = mode === 'showcase' && !reducedMotion ? Math.sin(since * 0.5) * 0.3 : 0
       current.position.y = reducedMotion ? 0 : Math.sin(t * 1.1) * 0.04
       current.userData.charmUpdate?.(reducedMotion ? 2.3 : t)
+    }
+    if (turn) {
+      const k = easeOut((t - turn.t0) / 0.5)
+      camera.position.setFromSphericalCoords(camera.position.length(), turn.polar + (Math.PI / 2 - turn.polar) * k, turn.az * (1 - k))
+      if (k >= 1) { turn = null; onEnd() }
     }
     controls.update()
     renderer.render(scene, camera)

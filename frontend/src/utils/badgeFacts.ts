@@ -57,3 +57,27 @@ export function badgeFacts(tier: number, holders: Holders): BadgeFact[] {
     }
     return facts
 }
+
+/** What each badge says about the player who holds it, for the shelf tooltip. No counts, so nothing goes stale. */
+export const BADGE_MEANING: Record<number, string> = {
+    1: "Everyone's first badge. It's yours the moment you sit down.",
+    2: "You came back for a second round. That's how it starts.",
+    3: "You've played enough to have a style, and people are starting to notice it.",
+    4: 'The point where you stop trying the game and start playing it.',
+    5: "You've taken a few +4s to the face and kept going. Regulars know your name.",
+    6: 'Your first crown. The table sees it before they see your hand.',
+    7: 'Few players make it this far. The ones who see it across the table start playing carefully.',
+    8: "Past the point where most players stop. If you hold this, you don't lose quietly.",
+    9: 'One step from royalty. The name says the rest.',
+    10: 'The halfway mark. Ten badges behind you and a real crown to show for it.',
+    11: "You've passed the king. From here up, the ladder is nearly empty.",
+    12: 'Hardly anyone has held this one. People remember the ones who do.',
+    13: 'This is where the stories start. Players will talk about the game they lost to you.',
+    14: "The helm grows wings. When the table sees them, they know what's coming.",
+    15: 'Made for the player who ends tables. Nobody wants the seat next to you.',
+    16: "So high up the ladder that most players think it isn't real.",
+    17: 'Three badges from the top. Every hand you hold feels like a threat.',
+    18: "Two from the top, and the only badge on the ladder that's still on fire.",
+    19: "One step from the top. After this, there's only one badge left.",
+    20: "The top of the ladder. There's nothing after this one, and most players never even see it.",
+}

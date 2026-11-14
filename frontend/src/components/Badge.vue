@@ -45,7 +45,7 @@
                 <span v-if="points != null" class="badge-tip-line">{{ points.toLocaleString() }} points</span>
                 <span v-if="progress && progress.next" class="badge-tip-line">{{ needed }} to {{ progress.next.title }}</span>
                 <span v-else-if="points != null" class="badge-tip-line badge-tip-apex">Top rank reached</span>
-                <button v-if="link" type="button" class="badge-tip-cta" @click="goToBadges">How badges work <ArrowRight :size="14" :stroke-width="2" aria-hidden="true" /></button>
+                <button v-if="link" type="button" class="badge-tip-cta" @click="goToBadges">See {{ badge.title }} <ArrowRight :size="14" :stroke-width="2" aria-hidden="true" /></button>
             </span>
         </Teleport>
     </span>
@@ -56,7 +56,7 @@ import { ArrowRight } from 'lucide-vue-next'
 import { computed, ref, onUnmounted } from 'vue'
 import type { Badge, Progress } from '../utils/badges'
 import { BADGE_ART } from '../utils/badgeArt'
-import { BADGES } from '../utils/badges'
+import { BADGES, badgeSlug } from '../utils/badges'
 import { navigate } from '../utils/routes'
 import PresenceDot from './PresenceDot.vue'
 import { presenceLabel, presenceState } from '../utils/relativeTime'
@@ -73,7 +73,7 @@ const props = withDefaults(
         progress?: Progress
         /** Apex-only: an idle No Mercy King renders dimmed. */
         dormant?: boolean
-        /** Make the badge a button that opens the /badges explainer. */
+        /** Make the badge a button that opens its own page, /badges/<its name>. */
         link?: boolean
         /**
          * Last-seen timestamp for the badge's owner, or null for someone who
@@ -96,7 +96,7 @@ const ariaLabel = computed(() => {
     if (props.points != null) parts.push(`${props.points} points`)
     if (props.progress?.next) parts.push(`${props.progress.needed} to ${props.progress.next.title}`)
     if (props.dormant) parts.push('dormant')
-    if (props.link) parts.push('opens how badges work')
+    if (props.link) parts.push(`opens ${props.badge.title}`)
     return parts.join(', ')
 })
 
@@ -133,14 +133,14 @@ function scheduleClose() {
 function goToBadges() {
     cancelClose()
     tipOpen.value = false
-    navigate({ name: 'badges' })
+    navigate({ name: 'badges', badge: badgeSlug(props.badge) })
 }
 function onActivate(e: Event) {
     if (!props.link) return
     e.stopPropagation()
     cancelClose()
     tipOpen.value = false
-    navigate({ name: 'badges' })
+    navigate({ name: 'badges', badge: badgeSlug(props.badge) })
 }
 onUnmounted(cancelClose)
 </script>

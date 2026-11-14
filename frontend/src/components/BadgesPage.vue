@@ -21,7 +21,7 @@
         </div>
         <div class="bp-medal-wrap">
           <span class="bp-glow" :class="`bp-glow--${stateOf(sel)}`" aria-hidden="true"></span>
-          <MedalView class="bp-medal" :tier="sel" :locked="stateOf(sel) === 'locked'" :facts="facts" :label="`${tierOf(sel).title}: next fact`">
+          <MedalView class="bp-medal" :tier="sel" :locked="stateOf(sel) === 'locked'" :facts="facts" :sides="wide" :label="wide ? tierOf(sel).title : `${tierOf(sel).title}: next fact`">
             <button v-if="sel > 1" type="button" class="bp-arrow bp-arrow--prev" :aria-label="`Previous badge, ${tierOf(sel - 1).title}`" @click="select(sel - 1)">
               <ChevronLeft :size="20" :stroke-width="2" aria-hidden="true" />
             </button>
@@ -32,16 +32,32 @@
         </div>
       </section>
 
-      <BadgeShelf :tier="badge.tier" :sel="sel" :points="badgePoints" :holders="holders" :dates="dates" @select="pick" />
-
-      <footer class="bp-foot">
+      <!-- Desktop puts the count above the wall; the phone puts it under the cabinet. -->
+      <footer v-if="wide" class="bp-foot">
         <div>
           <p class="bp-foot-title">{{ badge.tier }} of 20 on your shelf</p>
           <p v-if="rarityLine" class="bp-foot-sub">{{ rarityLine }}</p>
         </div>
         <button type="button" class="bp-how" @click="sheetOpen = true">
-          How points work
-          <ChevronRight :size="14" :stroke-width="2" aria-hidden="true" />
+          <span class="bp-how-in">
+            How you climb
+            <ChevronRight :size="14" :stroke-width="2" aria-hidden="true" />
+          </span>
+        </button>
+      </footer>
+
+      <BadgeShelf :tier="badge.tier" :sel="sel" :points="badgePoints" :holders="holders" :dates="dates" :cols="wide ? 5 : 3" @select="pick" />
+
+      <footer v-if="!wide" class="bp-foot">
+        <div>
+          <p class="bp-foot-title">{{ badge.tier }} of 20 on your shelf</p>
+          <p v-if="rarityLine" class="bp-foot-sub">{{ rarityLine }}</p>
+        </div>
+        <button type="button" class="bp-how" @click="sheetOpen = true">
+          <span class="bp-how-in">
+            How you climb
+            <ChevronRight :size="14" :stroke-width="2" aria-hidden="true" />
+          </span>
         </button>
       </footer>
     </main>
@@ -54,8 +70,10 @@
 <script setup lang="ts">
 import { ChevronLeft, ChevronRight, Share } from 'lucide-vue-next'
 import gsap from 'gsap'
+import { useMediaQuery } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
-import { BADGES, applyDecay, badgeFor, pointsFromRetention } from '../utils/badges'
+import { BADGES, applyDecay, badgeFor, badgeSlug, pointsFromRetention, tierFromSlug } from '../utils/badges'
+import { currentRoute, router } from '../utils/routes'
 import { useBadges } from '../composables/useBadges'
 import { useAuthStore } from '../stores/authStore'
 import { useRetentionStore } from '../stores/retentionStore'
@@ -130,13 +148,26 @@ const rarityLine = computed(() => {
 
 // ---- moving through the ladder: arrows, the shelf, or a swipe on the name
 const sel = ref(1)
-// Follow the player's own tier (it changes when their points load) until they pick one themselves.
+// Follow the player's own tier (it changes when their points load) until they pick one themselves,
+// or until a link like /badges/god-of-no-mercy names one.
 let picked = false
 watch(() => badge.value.tier, (t) => { if (!picked) sel.value = t }, { immediate: true })
+watch(() => currentRoute.value.name === 'badges' ? currentRoute.value.badge : undefined, (slug) => {
+  const t = slug ? tierFromSlug(slug) : null
+  if (slug && !t) void router.replace({ path: '/badges', query: router.currentRoute.value.query })
+  else if (t && t !== sel.value) { picked = true; sel.value = t }
+}, { immediate: true })
 function select(n: number) {
   picked = true
   sel.value = Math.min(20, Math.max(1, n))
 }
+// The address bar names the badge on show, so copying it shares that badge. Replace, not push:
+// flicking through badges should not fill the back button.
+watch(sel, (n) => {
+  if (!picked) return
+  const path = `/badges/${badgeSlug(tierOf(n))}`
+  if (router.currentRoute.value.path !== path) void router.replace({ path, query: router.currentRoute.value.query })
+})
 function pick(n: number) {
   select(n)
   nameEl.value?.scrollIntoView({ block: 'start', behavior: 'smooth' })
@@ -159,11 +190,12 @@ watch(sel, (n, prev) => {
 })
 
 const sheetOpen = ref(false)
+const wide = useMediaQuery('(min-width: 1024px)')
 
 const copied = ref(false)
 async function share() {
   const b = tierOf(sel.value)
-  const url = `${location.origin}/badges`
+  const url = `${location.origin}/badges/${badgeSlug(b)}`
   const text = stateOf(sel.value) === 'locked'
     ? `On my way to ${b.title} on Open Mercy. Come try and stop me. ${url}`
     : `Just hit ${b.title} on Open Mercy, tier ${b.tier} of 20. Bet you can't catch me. ${url}`
@@ -232,8 +264,33 @@ async function share() {
 .bp-arrow--next { right: 0; }
 
 .bp-hero + * { margin-top: var(--spacing-6); }
-.bp-foot { display: flex; justify-content: space-between; align-items: center; gap: var(--spacing-4); padding: var(--spacing-4) 0 var(--spacing-8); }
-.bp-foot-title { margin: 0; font-size: var(--text-base); font-weight: 700; color: var(--text-primary); }
+
+.bp-foot { --bp-foot-lh: 24px; display: flex; justify-content: space-between; align-items: flex-start; gap: var(--spacing-4); padding: var(--spacing-4) 0 var(--spacing-8); }
+.bp-foot-title { margin: 0; line-height: var(--bp-foot-lh); font-family: var(--font-display); font-size: var(--text-lg); font-weight: 400; color: var(--text-primary); }
 .bp-foot-sub { margin: 2px 0 0; font-size: var(--text-sm); color: var(--text-secondary); }
-.bp-how { flex-shrink: 0; min-height: 44px; display: flex; align-items: center; gap: var(--spacing-1); background: none; border: 0; font-size: var(--text-sm); color: var(--text-secondary); cursor: pointer; }
+.bp-how { flex-shrink: 0; min-height: 44px; display: flex; align-items: flex-start; padding: 0; gap: var(--spacing-1); background: none; border: 0; font-family: var(--font-display); font-size: var(--text-base); color: var(--text-secondary); cursor: pointer; }
+/* Text on the title's line; the rest of the 44 px tap area hangs below it. */
+.bp-how-in { height: var(--bp-foot-lh); display: inline-flex; align-items: center; gap: var(--spacing-1); }
+@media (hover: hover) { .bp-how:hover { color: var(--text-primary); } }
+
+/* Phones: one centred line after another, the link last. */
+@media (max-width: 640px) {
+  .bp-foot { flex-direction: column; align-items: center; gap: var(--spacing-2); text-align: center; }
+}
+
+/* Desktop: the trophy wall. Facts either side of the medal, every badge on show. */
+@media (min-width: 1024px) {
+  .bp-col { max-width: calc(1200px + 2 * var(--spacing-4)); }
+  .bp-hero { padding-top: var(--spacing-8); }
+  .bp-name { font-size: var(--text-display); }
+  .bp-medal-wrap { height: 480px; margin-top: var(--spacing-4); --mv-medal: 480px; }
+  .bp-glow { top: 50%; width: 440px; height: 440px; margin: -220px 0 0 -220px; }
+  .bp-arrow { width: 56px; height: 56px; margin-top: -28px; }
+  .bp-arrow--prev { left: calc(50% - 296px); }
+  .bp-arrow--next { right: calc(50% - 296px); }
+  .bp-foot { padding: var(--spacing-4) 0 var(--spacing-8); }
+  .bp-foot { --bp-foot-lh: 32px; }
+  .bp-foot-title { font-size: var(--text-2xl); }
+  .bp-foot + .bs { margin-bottom: var(--spacing-16); }
+}
 </style>

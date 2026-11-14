@@ -8,39 +8,43 @@
           <button type="button" class="pts-close" aria-label="Close" @click="emit('close')"><X :size="20" :stroke-width="2" aria-hidden="true" /></button>
         </div>
 
-        <div class="pts-hero">
-          <span class="pts-hero-num">+{{ POINT_WEIGHTS.win }}</span>
-          <span class="pts-hero-label">for every<br />win</span>
-        </div>
+        <div class="pts-body">
+          <div class="pts-hero">
+            <span class="pts-hero-num">+{{ POINT_WEIGHTS.win }}</span>
+            <span class="pts-hero-label">for every <br />win</span>
+          </div>
 
-        <ul class="pts-rows">
-          <li class="pts-row">
-            <span class="pts-icon"><CalendarCheck :size="20" :stroke-width="2" aria-hidden="true" /></span>
-            <span class="pts-label">Show up and play<small>once a day</small></span>
-            <span class="pts-num">+{{ POINT_WEIGHTS.dayPlayed }}</span>
-          </li>
-          <li class="pts-row">
-            <span class="pts-icon"><Flag :size="20" :stroke-width="2" aria-hidden="true" /></span>
-            <span class="pts-label">Stick out a game you're losing</span>
-            <span class="pts-num">+{{ POINT_WEIGHTS.completedLoss }}</span>
-          </li>
-          <li class="pts-row">
-            <span class="pts-icon"><Megaphone :size="20" :stroke-width="2" aria-hidden="true" /></span>
-            <span class="pts-label">Call "Mercy!"</span>
-            <span class="pts-num">+{{ POINT_WEIGHTS.unoCall }}</span>
-          </li>
-          <li class="pts-row">
-            <span class="pts-card"><img :src="stackCard" alt="" width="32" height="49" class="pts-card-img pts-card-img--left" /></span>
-            <span class="pts-label">Every card in the biggest stack you survive</span>
-            <span class="pts-num">+{{ POINT_WEIGHTS.stackSurvived }}</span>
-          </li>
-          <li class="pts-row">
-            <span class="pts-card"><img :src="drawCard" alt="" width="32" height="49" class="pts-card-img pts-card-img--right" /></span>
-            <span class="pts-label">Every draw card you throw down</span>
-            <span class="pts-num">+{{ POINT_WEIGHTS.drawCard }}</span>
-          </li>
-        </ul>
-        <p class="pts-fine">Quitting early or winning because everyone left scores nothing.</p>
+          <div>
+            <ul class="pts-rows">
+              <li class="pts-row">
+                <span class="pts-icon"><CalendarCheck :size="20" :stroke-width="2" aria-hidden="true" /></span>
+                <span class="pts-label">Show up and play<small>once a day</small></span>
+                <span class="pts-num">+{{ POINT_WEIGHTS.dayPlayed }}</span>
+              </li>
+              <li class="pts-row">
+                <span class="pts-icon"><Flag :size="20" :stroke-width="2" aria-hidden="true" /></span>
+                <span class="pts-label">Stick out a game you're losing</span>
+                <span class="pts-num">+{{ POINT_WEIGHTS.completedLoss }}</span>
+              </li>
+              <li class="pts-row">
+                <span class="pts-icon"><Megaphone :size="20" :stroke-width="2" aria-hidden="true" /></span>
+                <span class="pts-label">Call "Mercy!"</span>
+                <span class="pts-num">+{{ POINT_WEIGHTS.unoCall }}</span>
+              </li>
+              <li class="pts-row">
+                <span class="pts-card"><img :src="stackCard" alt="" width="32" height="49" class="pts-card-img pts-card-img--left" /></span>
+                <span class="pts-label">Every card in the biggest stack you survive</span>
+                <span class="pts-num">+{{ POINT_WEIGHTS.stackSurvived }}</span>
+              </li>
+              <li class="pts-row">
+                <span class="pts-card"><img :src="drawCard" alt="" width="32" height="49" class="pts-card-img pts-card-img--right" /></span>
+                <span class="pts-label">Every draw card you throw down</span>
+                <span class="pts-num">+{{ POINT_WEIGHTS.drawCard }}</span>
+              </li>
+            </ul>
+            <p class="pts-fine">Quitting early or winning because everyone left scores nothing.</p>
+          </div>
+        </div>
 
         <div class="pts-kept">
           <img :src="BADGE_RENDERS[tier]" alt="" width="64" height="64" class="pts-kept-img" />
@@ -106,6 +110,20 @@ onBeforeUnmount(() => {
 .pts-kept-img { width: 64px; height: 64px; flex-shrink: 0; object-fit: contain; }
 .pts-kept-title { margin: 0; font-size: var(--text-base); font-weight: 700; }
 .pts-kept-text { margin: var(--spacing-1) 0 0; font-size: var(--text-sm); line-height: 1.45; color: var(--text-secondary); }
+
+/* Wide screens: the +100 on the left, the smaller ways to score on the right, the promise across the bottom. */
+@media (min-width: 768px) {
+  .pts-sheet { max-width: 840px; padding: var(--spacing-4) var(--spacing-8) var(--spacing-8); }
+  .pts-title { font-size: var(--text-xl); }
+  .pts-body { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 56px; padding-top: var(--spacing-4); }
+  .pts-hero { flex-direction: column; align-items: flex-start; justify-content: center; gap: var(--spacing-2); padding: 0 0 var(--spacing-6); }
+  .pts-hero-num { font-size: 6.5rem; white-space: nowrap; }
+  .pts-hero-label { padding: 0; font-size: var(--text-xl); }
+  .pts-hero-label br { display: none; }
+  .pts-row { min-height: 64px; }
+  .pts-kept { align-items: center; gap: var(--spacing-6); margin-top: var(--spacing-8); padding: var(--spacing-6); border-radius: var(--radius-md); background: var(--surface-metal-dark); }
+  .pts-kept-img { width: 72px; height: 72px; }
+}
 
 /* Phones get a bottom sheet. */
 @media (max-width: 480px) {
