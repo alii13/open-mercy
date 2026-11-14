@@ -1,6 +1,6 @@
 <template>
   <div class="bp-page">
-    <header class="bp-topbar">
+    <header class="bp-topbar" :inert="!!detailTier">
       <button class="back-link" @click="$emit('back')">
         <ChevronLeft :size="14" :stroke-width="2" aria-hidden="true" />
         BACK
@@ -10,7 +10,7 @@
     </header>
 
     <!-- The ladder as a carousel: one live medal, the neighbours peeking, a rail of all twenty. -->
-    <section class="bp-carousel" aria-label="Your badges">
+    <section class="bp-carousel" aria-label="Your badges" :inert="!!detailTier">
       <div class="bp-stage">
         <span class="bp-glow" :class="`bp-glow--${stateOf(sel)}`" aria-hidden="true"></span>
         <span v-if="sel > 1" class="bp-peek bp-peek--left" :class="{ 'bp-peek--locked': stateOf(sel - 1) === 'locked' }" :style="{ backgroundImage: artUrl(sel - 1) }" aria-hidden="true"></span>
@@ -43,7 +43,7 @@
           type="button"
           class="bp-rv"
           :class="{ 'bp-rv--sel': t.tier === sel, 'bp-rv--you': t.tier === badge.tier }"
-          :aria-label="t.title"
+          :aria-label="`${t.title}, ${STATE_LABEL[stateOf(t.tier)]}`"
           :aria-pressed="t.tier === sel"
           @click="select(t.tier)"
         >
@@ -80,7 +80,7 @@
       </div>
     </div>
 
-    <div class="bp-body">
+    <div class="bp-body" :inert="!!detailTier">
       <!-- Plain-language intro -->
       <section class="bp-intro">
         <h2 class="bp-h2">How it works</h2>
@@ -194,6 +194,7 @@ type TierState = 'earned' | 'current' | 'locked'
 const sel = ref(1)
 watch(() => badge.value.tier, (t) => { sel.value = t }, { immediate: true })
 const tierOf = (n: number) => BADGES[Math.min(19, Math.max(0, n - 1))]!
+const STATE_LABEL: Record<TierState, string> = { earned: 'earned', current: 'your badge', locked: 'locked' }
 const stateOf = (n: number): TierState => (n < badge.value.tier ? 'earned' : n === badge.value.tier ? 'current' : 'locked')
 
 const { holders, fetchHolders } = useBadgeHolders()
@@ -233,7 +234,10 @@ function openDetail() {
   detailTier.value = sel.value
   void nextTick(() => detailBack.value?.focus())
 }
-function closeDetail() { detailTier.value = null }
+function closeDetail() {
+  detailTier.value = null
+  void nextTick(() => (rail.value?.children[sel.value - 1] as HTMLElement | undefined)?.focus())
+}
 function play() { void router.push('/public') }
 
 const EARN = [

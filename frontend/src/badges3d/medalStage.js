@@ -334,7 +334,7 @@ function particles({ type, color, count, size, speed = 0.3 }) {
     seed.forEach((q, i) => {
       let x, y, z;
       const k = (q.p + t * speed * q.v) % 1;
-      if (type === 'rise' || type === 'smoke') { x = Math.cos(q.a) * q.r * 0.75 + Math.sin(t * 2 + i) * 0.05; y = -1.3 + k * 3; z = smoke ? -0.5 : rand(0.1, 0.5); }
+      if (type === 'rise' || type === 'smoke') { x = Math.cos(q.a) * q.r * 0.75 + Math.sin(t * 2 + i) * 0.05; y = -1.3 + k * 3; z = smoke ? -0.5 : 0.1 + q.v * 0.28; }
       else if (type === 'fall') { x = Math.cos(q.a) * q.r * 0.8; y = 1.5 - k * 3; z = 0.45; }
       else if (type === 'orbit') { const a = q.a + t * speed * q.v; x = Math.cos(a) * (1.25 + q.r * 0.08); y = Math.sin(a) * (1.25 + q.r * 0.08); z = Math.sin(a * 2) * 0.15; }
       else if (type === 'spark') { const on = Math.sin(t * 9 * q.v + i * 3.1) > 0.75; const a = q.a + Math.floor(t * 3 + i) * 1.7; x = Math.cos(a) * 1.25; y = Math.sin(a) * 1.25; z = on ? 0.2 : 99; }
@@ -430,9 +430,12 @@ export function createMedalStage({ canvas, mode = 'hero', reducedMotion = false 
   scene.environment = studio(renderer)
   scene.add(shadowPlane())
   const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100)
-  camera.position.set(0, 0, mode === 'hero' ? 5.6 : 7)
+  const BASE_DISTANCE = mode === 'hero' ? 5.6 : 7
+  camera.position.set(0, 0, BASE_DISTANCE)
 
   const controls = new OrbitControls(camera, canvas)
+  // OrbitControls sets touch-action: none; a vertical swipe on the medal should still scroll the page.
+  canvas.style.touchAction = 'pan-y'
   controls.enableDamping = true
   controls.dampingFactor = 0.08
   controls.enableZoom = false
@@ -471,7 +474,9 @@ export function createMedalStage({ canvas, mode = 'hero', reducedMotion = false 
     const key = `${tier}${locked ? ':locked' : ''}`
     let badge = cache.get(key)
     if (!badge) {
-      badge = buildBadge(await svgFor(tier))
+      const svg = await svgFor(tier)
+      if (mine !== token) return   // a newer request came in while this one loaded; skip the build
+      badge = buildBadge(svg)
       if (locked) badge.traverse((m) => { if (m.isMesh) m.material = LOCKED_MAT })
       else applyCharm(badge, CHARMS[tier])
       badge.userData.anchors = new Map()
@@ -524,12 +529,15 @@ export function createMedalStage({ canvas, mode = 'hero', reducedMotion = false 
     renderer.setSize(w, h, false)
     camera.aspect = w / h
     camera.updateProjectionMatrix()
+    // On a narrow canvas the width is the limit: back off until the medal (radius about 1.2, plus a margin) fits.
+    const tan = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))
+    camera.position.setLength(Math.max(BASE_DISTANCE, 1.3 / (tan * Math.min(camera.aspect, 1))))
   }
   const ro = new ResizeObserver(fit)
   ro.observe(canvas)
   fit()
 
-  renderer.setAnimationLoop(() => {
+  const frame = () => {
     const t = elapsed()
     updateShine(t)
     if (current) {
@@ -543,7 +551,10 @@ export function createMedalStage({ canvas, mode = 'hero', reducedMotion = false 
     }
     controls.update()
     renderer.render(scene, camera)
-  })
+  }
+  // Render only while the medal is on screen.
+  const io = new IntersectionObserver(([e]) => renderer.setAnimationLoop(e.isIntersecting ? frame : null))
+  io.observe(canvas)
 
   return {
     show,
@@ -553,6 +564,7 @@ export function createMedalStage({ canvas, mode = 'hero', reducedMotion = false 
       renderer.setAnimationLoop(null)
       clearTimeout(resume)
       ro.disconnect()
+      io.disconnect()
       canvas.removeEventListener('pointerdown', onDown)
       canvas.removeEventListener('pointerup', onUp)
       controls.removeEventListener('start', onStart)
@@ -561,6 +573,8 @@ export function createMedalStage({ canvas, mode = 'hero', reducedMotion = false 
       for (const b of cache.values()) disposeBadge(b)
       disposeBadge(scene)
       scene.environment.dispose()
+      // The shared texture and material hold a dispose listener per renderer; firing it lets this one go.
+      BRUSHED.dispose(); DOT.dispose(); LOCKED_MAT.dispose()
       renderer.dispose()
       // Free the context now: each visit to the medal close-up makes a new one, and browsers cap them.
       renderer.forceContextLoss()

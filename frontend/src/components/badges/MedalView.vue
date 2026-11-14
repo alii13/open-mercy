@@ -1,6 +1,6 @@
 <template>
   <div ref="root" class="mv" :class="{ 'mv--fact': !!fact }">
-    <canvas v-show="!flat" ref="canvas" class="mv-canvas" />
+    <canvas v-show="!flat" ref="canvas" class="mv-canvas" :tabindex="label ? 0 : undefined" :role="label ? 'button' : undefined" :aria-label="label" @keydown.enter="emit('tap')" @keydown.space.prevent="emit('tap')" />
     <!-- No WebGL: the flat badge art, so the screen still works. -->
     <button v-if="flat" type="button" class="mv-flat" :class="{ 'mv-flat--locked': locked }" :style="{ backgroundImage: artUrl(tier) }" :aria-label="label" @click="emit('tap')" />
     <svg v-if="fact && line" class="mv-line" aria-hidden="true">
@@ -42,6 +42,7 @@ onMounted(async () => {
     stage = createMedalStage({ canvas: canvas.value, mode: props.mode ?? 'hero', reducedMotion })
     stage.onTap(() => emit('tap'))
     await stage.show(props.tier, { locked: props.locked })
+    if (disposed) return
   } catch {
     flat.value = true
     return
@@ -57,7 +58,8 @@ onMounted(async () => {
     const c = card.value.getBoundingClientRect()
     const tx = Math.min(Math.max(a.x, c.left - r.left + 28), c.right - r.left - 28)
     const ty = c.top - r.top
-    line.value = { points: `${a.x},${a.y} ${tx},${ty - 18} ${tx},${ty}`, ax: a.x, ay: a.y }
+    const points = `${a.x},${a.y} ${tx},${ty - 18} ${tx},${ty}`
+    if (points !== line.value?.points) line.value = { points, ax: a.x, ay: a.y }
   }
   tick()
 })
@@ -75,6 +77,7 @@ onBeforeUnmount(() => {
 .mv { position: relative; width: 100%; height: 100%; }
 .mv-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: pan-y; cursor: grab; }
 .mv-canvas:active { cursor: grabbing; }
+.mv-canvas:focus-visible { outline: 2px solid var(--focus-ring-color, var(--color-neon-blue)); outline-offset: -2px; border-radius: var(--radius-md); }
 .mv--fact .mv-canvas { height: calc(100% - 112px); }
 .mv-flat { position: absolute; inset: 15%; background: center / contain no-repeat; border: 0; cursor: pointer; }
 .mv-flat--locked { filter: grayscale(1) brightness(0.35); }
