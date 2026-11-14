@@ -70,8 +70,7 @@
 <script setup lang="ts">
 import { ChevronLeft, ChevronRight, Share } from 'lucide-vue-next'
 import gsap from 'gsap'
-import { useMediaQuery } from '@vueuse/core'
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { BADGES, applyDecay, badgeFor, badgeSlug, pointsFromRetention, tierFromSlug } from '../utils/badges'
 import { currentRoute, router } from '../utils/routes'
 import { useBadges } from '../composables/useBadges'
@@ -193,7 +192,12 @@ watch(sel, (n, prev) => {
 })
 
 const sheetOpen = ref(false)
-const wide = useMediaQuery('(min-width: 1024px)')
+// The desktop trophy wall. Plain matchMedia: @vueuse/core would pull its network and worker code into the bundle.
+const wideQuery = matchMedia('(min-width: 1024px)')
+const wide = ref(wideQuery.matches)
+const onWide = (e: MediaQueryListEvent) => { wide.value = e.matches }
+wideQuery.addEventListener('change', onWide)
+onBeforeUnmount(() => wideQuery.removeEventListener('change', onWide))
 
 const copied = ref(false)
 async function share() {
