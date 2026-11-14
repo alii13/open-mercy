@@ -1,6 +1,6 @@
 <template>
   <div class="ai" :class="{ 'ai--wide': wide }">
-    <div v-if="!hideAvatar" class="ai-avatar">
+    <div class="ai-avatar">
       <Avatar :uid="authStore.user?.id" :name="authStore.username" :size="wide ? 128 : 96" />
       <button
         v-if="avatarsAvailable"
@@ -76,12 +76,7 @@ import { useMultiplayerStore } from '../../stores/multiplayerStore'
 import { avatarsAvailable } from '../../composables/useAvatars'
 import { track } from '../../utils/analytics'
 
-defineProps<{
-  wide?: boolean
-  hideClaim?: boolean
-  /** The desktop Profile tab shows the photo editor instead. */
-  hideAvatar?: boolean
-}>()
+defineProps<{ wide?: boolean; hideClaim?: boolean }>()
 defineEmits<{ claim: []; viewProfile: []; photo: [] }>()
 
 const authStore = useAuthStore()
