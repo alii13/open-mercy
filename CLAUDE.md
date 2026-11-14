@@ -11,6 +11,16 @@ Guidance for working in this repo. Hard-won - read before changing CSS, raising 
 - Legitimate inline `<svg>` is limited to: brand marks Lucide does not carry (Google, GitHub, X, WhatsApp - prefer `simple-icons` paths), custom artwork (`CardBack`, `AutoStartRing`, the landing strike line), and genuinely two-tone icons Lucide cannot express (the `VoiceMicCluster` mic, whose slash is styled `--color-alert` separately).
 - Concerns are color-zoned with the deck palette: hazard yellow = daily/streak loop (and CLAIM ACCOUNT, and the public table), alert red = primary create action, neon cyan = multiplayer, neutral = practice/meta.
 
+## Interface skills
+
+`.claude/skills/` carries the interface skills from [jakubkrehel/skills](https://github.com/jakubkrehel/skills) (commit a72290d, MIT, license in `.claude/skills/LICENSE-interfaces`). Use them on every piece of UI work, in this order of precedence: this file and `docs/design-guidelines.md` first, then the skill. When a skill's value disagrees with ours (icon sizes, spacing, radius, tokens, writing style), ours wins.
+
+- **Building or changing UI:** `better-ui` (surfaces, icons, motion), `better-layout`, `better-typography`, `better-colors`, `better-accessibility`, `better-writing`. Load the ones the change touches before writing code.
+- **Reviewing:** `better-interface` for a screen or flow; `interface-review` for a branch or PR, run alongside `github-pr-review`.
+- **Working on one component:** `state-machine` to render all its states, `break` to stress it, `variant` to try options.
+- **From a design:** `build-design` for a Figma file or image; `explain-interface` for how an effect or site was built.
+- **`afk`** only when the owner asks for it. It never commits, pushes or opens a PR without asking, same as every other task here.
+
 ## CSS tokens
 
 - The spacing scale in `frontend/src/style.css` is `--spacing-0..4`, then jumps to `6, 8, 12, 16, 24`. **There is no `--spacing-5`** (or 7, 9-11, etc.).
