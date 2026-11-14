@@ -107,14 +107,6 @@
       @claim-account="handleShowAuth('claim')"
     />
 
-    <!-- A signed-in guest claiming their account in place: same user id,
-         so their stats, badges and profile link stay attached. -->
-    <AuthView
-      v-else-if="showAuthView"
-      initial-mode="claim"
-      @back="showAuthView = false"
-    />
-
     <!-- Friends: its own screen, reachable from the account menu -->
     <FriendsPage
       v-else-if="currentRoute.name === 'friends'"
@@ -127,11 +119,15 @@
       @playLocal="startLocalGame"
       @playDaily="startDailyGame('lobby')"
       @showAuth="handleShowAuth('claim')"
-      @showFriends="navigate({ name: 'friends' })"
     />
 
     <!-- Always-mounted global settings drawer (Teleport'd to body) -->
     <SettingsDrawer />
+
+    <!-- Account: name, photo, friends, email, claiming and deleting, in one modal.
+         A signed-in guest claims here too, in place: same user id, so their
+         stats, badges and profile link stay attached. -->
+    <AccountModal v-if="authStore.isAuthenticated && accountStep" />
 
     <!-- Profile photo: opened from the profile page and the account menu. -->
     <PhotoSheet v-if="authStore.isAuthenticated && photoSheetOpen" @claim="claimForPhoto" />
@@ -222,6 +218,7 @@ const ProfilePage = defineAsyncComponent(() => import('./components/ProfilePage.
 const ChangelogPage = defineAsyncComponent(() => import('./components/ChangelogPage.vue'))
 const PhotoSheet = defineAsyncComponent(() => import('./components/PhotoSheet.vue'))
 const EmailSheet = defineAsyncComponent(() => import('./components/EmailSheet.vue'))
+const AccountModal = defineAsyncComponent(() => import('./components/account/AccountModal.vue'))
 // A game screen that fails to download must never leave a blank page: in a
 // multiplayer room the turns keep running and time the player out. The
 // fallback screen is bundled here, since a lazy one would fail the same way.
@@ -257,6 +254,7 @@ import {
   takePhotoAfterClaim,
 } from './composables/usePhotoSheet'
 import { emailSheetOpen } from './composables/useEmailSheet'
+import { accountStep, closeAccountModal, openAccountModal } from './composables/useAccountModal'
 
 const authStore = useAuthStore()
 const mpStore = useMultiplayerStore()
@@ -278,11 +276,14 @@ const authMode = ref<'login' | 'signup' | 'claim'>('signup')
 // auth view has no reason to stay up. AuthView's own back-emit can't be trusted
 // for this: login flips isAuthenticated, which unmounts the signed-out branch
 // hosting the view, and an emit from an unmounted component never reaches this
-// parent — the stale flag would mount the signed-in fallback AuthView (claim
-// mode) and greet a plain sign-in with "ACCOUNT CLAIMED". Guest claims are
-// untouched: a guest is already signed in, so claiming never transitions here.
+// parent — the stale flag would reopen the auth view at the next sign-out.
+// Guest claims are untouched: a guest is already signed in, so claiming never
+// transitions here (they claim in the account modal).
 watch(() => authStore.isAuthenticated, (is, was) => {
   if (is && !was) showAuthView.value = false
+  // Signing out or deleting the account ends the modal, or it would reopen
+  // on whichever step it was on at the next sign-in.
+  if (!is) closeAccountModal()
 })
 const showPasswordReset = ref(false)
 const newPassword = ref('')
@@ -298,17 +299,21 @@ const inMpMatch = computed(() => {
   const s = mpStore.currentGame?.status
   return s === 'playing' || s === 'finished'
 })
+// A match starting under the account modal (a private room's host pressed
+// START) takes the screen, as the old full-screen claim page used to give way.
+watch(inMpMatch, (m) => { if (m) closeAccountModal() })
 
 const currentScreen = computed(() => {
   if (authStore.loading) return null
   if (showPasswordReset.value) return 'password_reset'
   if (localGameStore.gameState !== 'LOBBY') return 'sp_game'
+  // The account modal floats over any screen, so its claim step outranks the route.
+  if (accountStep.value === 'claim') return 'claim_account'
   if (currentRoute.value.name === 'leaderboard' && !inMpMatch.value) return 'leaderboard'
   if (currentRoute.value.name === 'profile' && !inMpMatch.value) return 'profile'
   if (currentRoute.value.name === 'changelog' && !inMpMatch.value) return 'changelog'
   if (!authStore.isAuthenticated) return showAuthView.value ? 'auth' : 'landing'
   if (inMpMatch.value) return 'mp_game'
-  if (showAuthView.value) return 'claim_account'
   if (mpStore.currentGame?.status === 'waiting') return 'waiting_room'
   if (currentRoute.value.name === 'friends') return 'friends'
   return 'lobby'
@@ -350,8 +355,11 @@ onMounted(async () => {
   // explain why. Reopen the claim screen so the reason is visible and the
   // sign-in-instead route is one tap away.
   if (authStore.oauthError) {
-    authMode.value = 'claim'
-    showAuthView.value = true
+    if (authStore.isAuthenticated) openAccountModal('claim')
+    else {
+      authMode.value = 'claim'
+      showAuthView.value = true
+    }
   }
 
   // A reload back into a room happens in the lobby, which enters the room the
@@ -416,6 +424,11 @@ async function handlePasswordUpdate() {
 }
 
 function handleShowAuth(mode: 'login' | 'signup' | 'claim') {
+  // A signed-in guest claims inside the account modal, over whatever screen asked.
+  if (mode === 'claim' && authStore.isAuthenticated) {
+    openAccountModal('claim')
+    return
+  }
   authMode.value = mode
   showAuthView.value = true
 }
@@ -432,7 +445,10 @@ function claimForPhoto() {
 watch(
   () => authStore.isAuthenticated && !authStore.isAnonymous,
   (claimed) => {
-    if (claimed && takePhotoAfterClaim()) openPhotoSheet()
+    if (!claimed || !takePhotoAfterClaim()) return
+    // Claimed inside the account modal: the photo step opens in the same frame.
+    if (accountStep.value) openAccountModal('photo')
+    else openPhotoSheet()
   },
   { immediate: true },
 )

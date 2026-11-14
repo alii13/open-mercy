@@ -9,40 +9,11 @@
 
       <div class="top-bar-cta">
         <WhatsNew ref="whatsNewRef" class="bar-whatsnew" />
-        <div v-if="editingName && editTarget === 'bar'" class="name-edit">
-          <input
-            ref="barNameEl"
-            v-model="nameInput"
-            v-focus-ring
-            class="username-edit-input"
-            :class="{ 'has-error': nameError }"
-            maxlength="20"
-            aria-label="Edit nickname"
-            :aria-invalid="!!nameError"
-            aria-describedby="name-error-bar"
-            @input="nameError = ''; nameSuggestions = []"
-            @keyup.enter="saveName"
-            @keyup.esc="closeNameEdit"
-            @blur="onNameBlur"
-          />
-          <p v-if="nameError" id="name-error-bar" class="name-error" role="alert">{{ nameError }}</p>
-          <div v-if="nameSuggestions.length" class="name-suggestions">
-            <span class="name-suggestions-label">Free:</span>
-            <button
-              v-for="s in nameSuggestions"
-              :key="s"
-              type="button"
-              class="name-suggestion"
-              @mousedown.prevent
-              @click="applySuggestion(s)"
-            >{{ s }}</button>
-          </div>
-        </div>
         <!-- One account surface for guests and signed-in users alike: the name
              is the control, and everything about "you" hangs off it. Stats used
              to need its own header slot; nesting it here costs no width, which
              matters most on a phone. -->
-        <div v-else class="account" ref="accountRef">
+        <div class="account" ref="accountRef">
           <!-- Phones: one burger holds everything about "you", so the bar
                never wraps to a second row. The dot is What's new, unread. -->
           <button
@@ -86,15 +57,12 @@
               <span v-if="whatsNewUnread" class="menu-new">{{ whatsNewUnread }} NEW</span>
             </button>
             <button v-if="authStore.profile?.share_code" class="account-item" role="menuitem" @click="viewProfile">View profile</button>
-            <button v-if="!social.unavailable" class="account-item" role="menuitem" @click="openFriends">
-              Friends
+            <!-- Name, photo, friends, email and deleting live in the account modal. -->
+            <button class="account-item" role="menuitem" @click="accountFromMenu">
+              Account
               <span v-if="social.incoming.length" class="account-count">{{ social.incoming.length }}</span>
             </button>
-            <button class="account-item" role="menuitem" @click="editNameFromMenu">Edit name</button>
-            <button v-if="avatarsAvailable" class="account-item" role="menuitem" @click="photoFromMenu">Profile photo</button>
-            <button v-if="authStore.canChangeEmail" class="account-item" role="menuitem" @click="emailFromMenu">Change email</button>
             <button class="account-item account-item--out" role="menuitem" @click="signOutFromMenu">Sign out</button>
-            <button class="account-item account-item--delete" role="menuitem" @click="deleteFromMenu">Delete account</button>
           </div>
         </div>
         <!-- Stays in the bar rather than the menu on wide screens: it is the
@@ -576,16 +544,6 @@
     />
 
     <ConfirmDialog
-      :open="showDeleteConfirm"
-      title="Delete your account?"
-      message="This deletes your profile, stats, friends and photo. You can't undo it."
-      confirm-label="DELETE ACCOUNT"
-      cancel-label="KEEP IT"
-      @confirm="confirmDelete"
-      @cancel="showDeleteConfirm = false"
-    />
-
-    <ConfirmDialog
       :open="showLeaveConfirm"
       title="Leave the room?"
       message="Players you've invited will see the room close. You can create a new one anytime."
@@ -655,7 +613,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, defineAsyncComponent, onMounted, onUnmounted, watch } from 'vue'
 import { ArrowRight, Bot, Check, ChevronDown, ChevronRight, Copy, Flame, Hash, HelpCircle, Menu as MenuIcon, Minus, Pencil, Share2, Shield, Skull, Users, Volume1, VolumeX, X } from 'lucide-vue-next'
 import { useRetentionStore } from '../stores/retentionStore'
 import {
@@ -680,6 +638,7 @@ const PublicTableLounge = defineAsyncComponent({
   onError: (_err, _retry, fail) => { loungeFailed.value = true; fail() },
 })
 import { publicTableView, PUBLIC_TABLE_RULES } from '../utils/publicTable'
+import { openAccountModal } from '../composables/useAccountModal'
 import { useWhatsNew } from '../composables/useWhatsNew'
 import { nextBot, ladderProgress, isLadderComplete } from '../utils/botLadder'
 import { currentRoute, navigate, routePath } from '../utils/routes'
@@ -687,13 +646,9 @@ import { enterRoomUrl } from '../composables/useRoomUrl'
 import { track } from '../utils/analytics'
 import { normalizeRoomCode, roomCodeProblem } from '@roomCode'
 import { useBadges } from '../composables/useBadges'
-import { openPhotoSheet } from '../composables/usePhotoSheet'
-import { openEmailSheet } from '../composables/useEmailSheet'
-import { avatarsAvailable } from '../composables/useAvatars'
 import Avatar from './Avatar.vue'
 import AutoStartRing from './AutoStartRing.vue'
 import QuickChat from './QuickChat.vue'
-import { vFocusRing } from '../directives/focusRing'
 import { preloadCardImages } from '../utils/preloadCardImages'
 import { useAuthStore } from '../stores/authStore'
 import { useMultiplayerStore } from '../stores/multiplayerStore'
@@ -710,7 +665,6 @@ const emit = defineEmits<{
   (e: 'playLocal', mode: StackingMode): void
   (e: 'playDaily'): void
   (e: 'showAuth'): void
-  (e: 'showFriends'): void
 }>()
 
 const authStore = useAuthStore()
@@ -862,13 +816,11 @@ const loungeFailed = ref(false)
 const loungeLoaded = ref(false)
 const atTable = computed(() => !!mpStore.currentGame && (mpStore.gameStatus === 'waiting' || mpStore.loungeShow) && mpStore.isPublicRoom && !loungeFailed.value)
 const showSignOutConfirm = ref(false)
-const showDeleteConfirm = ref(false)
 const editingName = ref(false)
-const editTarget = ref<'bar' | 'room' | null>(null)
+const editTarget = ref<'room' | null>(null)
 const nameInput = ref('')
 const nameError = ref('')
 const nameSuggestions = ref<string[]>([])
-const barNameEl = ref<HTMLInputElement | null>(null)
 const joinCode = ref('')
 const joinCodeError = ref('')
 const copied = ref(false)
@@ -991,10 +943,6 @@ const online = useOnlineCount()
 const social = useSocialStore()
 onMounted(() => { if (authStore.isAuthenticated) void social.catchUp() })
 
-function openFriends() {
-    closeAccount()
-    emit('showFriends')
-}
 onMounted(() => live.start())
 
 const tableView = computed(() => publicTableView(live.joinable.value, live.loaded.value))
@@ -1047,17 +995,14 @@ async function confirmLeave() {
   await mpStore.leaveGame()
 }
 
-// Rename can be triggered from the top-bar chip ('bar') or the waiting-room
-// seat ('room'); editTarget controls which one shows the inline input.
-function startEditName(target: 'bar' | 'room' = 'bar') {
+// Rename here happens on the waiting-room seat; everywhere else it lives in
+// the account modal. editTarget says which seat shows the inline input.
+function startEditName(target: 'room' = 'room') {
   nameError.value = ''
   const current = authStore.username
   nameInput.value = current && current !== 'Player' ? current : ''
   editTarget.value = target
   editingName.value = true
-  // On a phone the bar editor replaces the burger, so it takes focus at once:
-  // tapping away then saves and brings the burger back.
-  if (target === 'bar') void nextTick(() => barNameEl.value?.focus())
 }
 
 function closeNameEdit() {
@@ -1163,34 +1108,14 @@ function viewProfile() {
     if (code) navigate({ name: 'profile', code })
 }
 
-function editNameFromMenu() {
+function accountFromMenu() {
     closeAccount()
-    startEditName('bar')
-}
-
-function photoFromMenu() {
-    closeAccount()
-    openPhotoSheet()
-}
-
-function emailFromMenu() {
-    closeAccount()
-    openEmailSheet()
+    openAccountModal()
 }
 
 function signOutFromMenu() {
     closeAccount()
     requestSignOut()
-}
-
-function deleteFromMenu() {
-    closeAccount()
-    showDeleteConfirm.value = true
-}
-
-async function confirmDelete() {
-    showDeleteConfirm.value = false
-    await authStore.deleteAccount()
 }
 
 function upgradeAccount() {
@@ -2309,11 +2234,6 @@ function copyLink() {
 .account-item--out {
   margin-top: var(--spacing-1);
   border-top: 1px solid rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.5);
-}
-
-/* Last in the menu, under Sign out, and just as quiet: rare and destructive. */
-.account-item--delete {
   border-radius: 0 0 var(--radius-sm) var(--radius-sm);
   color: rgba(255, 255, 255, 0.5);
 }

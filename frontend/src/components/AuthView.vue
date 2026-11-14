@@ -1,12 +1,12 @@
 <template>
-  <div class="auth-container">
+  <div class="auth-container" :class="{ 'auth-embedded': embedded }">
     <div class="auth-card">
-      <button class="back-link" @click="$emit('back')">
+      <button v-if="!embedded" class="back-link" @click="$emit('back')">
         <ChevronLeft :size="14" :stroke-width="2" aria-hidden="true" />
         BACK
       </button>
 
-      <header class="auth-header">
+      <header v-if="!embedded" class="auth-header">
         <h1 class="auth-brand">
           <span class="auth-brand-uno">OPEN</span>
           <span class="auth-brand-nomercy">MERCY</span>
@@ -282,6 +282,8 @@ import Button from './ui/Button.vue'
 
 const props = defineProps<{
   initialMode?: 'login' | 'signup' | 'claim'
+  /** Inside the account modal: no page frame, back link or brand header. */
+  embedded?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -487,6 +489,21 @@ async function handleForgotPassword() {
   align-items: center;
   background: var(--bg-concrete);
   padding: var(--spacing-4);
+}
+
+.auth-container.auth-embedded {
+  min-height: 0;
+  display: block;
+  background: none;
+  padding: 0;
+}
+
+.auth-embedded .auth-card {
+  max-width: none;
+  background: none;
+  border: none;
+  border-radius: 0;
+  padding: 0;
 }
 
 .auth-card {

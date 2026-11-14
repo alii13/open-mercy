@@ -80,6 +80,7 @@ const social = useSocialStore()
 .fp-body {
   flex: 1;
   width: 100%;
+  container-type: inline-size;
   max-width: 65rem;
   margin: 0 auto;
   padding: var(--spacing-8) var(--spacing-4);
