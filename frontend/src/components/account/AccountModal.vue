@@ -13,7 +13,7 @@
         </aside>
 
         <section class="acct-main">
-          <header class="acct-head">
+          <header class="acct-head" :class="{ 'acct-head--tabs': wide && step === 'home' }">
             <!-- Desktop home: Friends and Sign-in are separate screens, one tab each. -->
             <div v-if="wide && step === 'home'" class="acct-tabs" role="tablist" aria-label="Account sections">
               <button
@@ -76,7 +76,7 @@
             <template v-else-if="step === 'home'">
               <AccountIdentity class="acct-identity" @claim="go('claim')" @photo="go('photo')" />
 
-              <button v-if="!social.unavailable" type="button" class="acct-row" @click="openFriends">
+              <button v-if="!social.unavailable" type="button" class="acct-row" @click="go('friends')">
                 <Users class="acct-row-icon acct-row-icon--friends" :size="20" :stroke-width="2" aria-hidden="true" />
                 <span class="acct-row-label">Friends</span>
                 <span v-if="social.incoming.length" class="acct-pill">{{ requestLabel }}</span>
@@ -96,6 +96,9 @@
                 </button>
               </div>
             </template>
+
+            <!-- Phones: Friends opens in this sheet, like every other row. -->
+            <FriendsSection v-else-if="step === 'friends'" @opened-room="closeAccountModal" />
 
             <DeleteAccountStep v-else-if="step === 'delete'" :wide="wide" @keep="go('home')" />
 
@@ -174,6 +177,15 @@ const opener = document.activeElement as HTMLElement | null
 const appEl = document.getElementById('app')
 watch(step, () => void nextTick(() => (backEl.value ?? closeEl.value)?.focus()))
 
+// Desktop has no Friends screen of its own: it is the home's Friends tab. A
+// window that widens while Friends is open lands on that tab.
+watch([step, wide], ([s, w]) => {
+  if (w && s === 'friends') {
+    homeTab.value = 'friends'
+    go('home')
+  }
+}, { immediate: true })
+
 // Anything that navigates (a friend's profile, a room) leaves the modal behind.
 const stopRouteWatch = watch(() => router.currentRoute.value.fullPath, () => closeAccountModal())
 
@@ -208,10 +220,6 @@ const maskedEmail = computed(() => {
 function claimForPhoto() {
   rememberPhotoAfterClaim()
   go('claim')
-}
-
-function openFriends() {
-  void navigate({ name: 'friends' })
 }
 
 function viewProfile() {
@@ -279,11 +287,23 @@ function viewProfile() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--spacing-3) var(--spacing-4) 0 var(--spacing-6);
+  padding: var(--spacing-3) var(--spacing-6) 0;
 }
 
 .acct--wide .acct-head {
-  padding: var(--spacing-4) var(--spacing-6) 0 var(--spacing-8);
+  padding: var(--spacing-4) var(--spacing-8) 0;
+}
+
+/* The tab bar rule spans the content width; the active tab's underline sits on it. */
+.acct--wide .acct-head.acct-head--tabs {
+  margin: 0 var(--spacing-8);
+  padding-left: 0;
+  padding-right: 0;
+  border-bottom: 1px solid var(--surface-metal);
+}
+
+.acct--wide .acct-head--tabs .acct-tab {
+  margin-bottom: -1px;
 }
 
 .acct-label,
@@ -353,6 +373,7 @@ function viewProfile() {
 .acct-close {
   width: 44px;
   height: 44px;
+  margin-right: calc(-1 * var(--spacing-3));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -374,7 +395,7 @@ function viewProfile() {
 }
 
 .acct--wide .acct-body {
-  padding: var(--spacing-2) var(--spacing-8) var(--spacing-8);
+  padding: var(--spacing-6) var(--spacing-8) var(--spacing-8);
 }
 
 .acct-identity {

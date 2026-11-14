@@ -383,7 +383,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 var(--spacing-1) var(--spacing-2);
+  padding: 0 0 var(--spacing-2);
   font-family: var(--font-body);
   font-size: 0.82rem;
   color: var(--text-secondary);
