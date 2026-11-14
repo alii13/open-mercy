@@ -61,7 +61,7 @@ function lineOf(b: Badge): string {
   const h = props.holders
   if (!h?.total) return ''
   const n = h.byTier[b.tier] ?? 0
-  return n === 0 ? 'Nobody yet' : n === 1 ? '1 player' : `1 in ${Math.round(h.total / n).toLocaleString()} players`
+  return n === 0 ? 'Nobody yet' : n === 1 ? 'Just 1 player' : `1 in ${Math.round(h.total / n).toLocaleString()} have it`
 }
 const labelOf = (b: Badge) => [b.title, b.tier <= props.tier ? 'earned' : 'locked', lineOf(b)].filter(Boolean).join(', ')
 

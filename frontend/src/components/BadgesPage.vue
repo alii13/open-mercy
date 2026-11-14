@@ -112,7 +112,7 @@ void fetchHolders()
 const facts = computed(() => badgeFacts(sel.value, holders.value))
 
 function metaLine(n: number): string {
-  if (stateOf(n) === 'locked') return `TIER ${n} OF 20 · LOCKED · ${tierOf(n).threshold.toLocaleString()} POINTS`
+  if (stateOf(n) === 'locked') return `TIER ${n} OF 20 · UNLOCKS AT ${tierOf(n).threshold.toLocaleString()}`
   const on = dates.value[n]
   return `TIER ${n} OF 20 · EARNED${on ? ` ${on.toUpperCase()}` : ''}`
 }
@@ -123,9 +123,9 @@ const rarityLine = computed(() => {
   const h = holders.value
   if (!next || !h?.total) return ''
   const n = h.byTier[next.tier] ?? 0
-  if (n === 0) return `Nobody has ${next.title} yet`
-  if (n === 1) return `1 player has ${next.title}`
-  return `1 in ${Math.round(h.total / n).toLocaleString()} players has ${next.title}`
+  if (n === 0) return `Nobody has ${next.title} yet. Be the first.`
+  if (n === 1) return `Only one player has ${next.title}`
+  return `Only 1 in ${Math.round(h.total / n).toLocaleString()} players has ${next.title}`
 })
 
 // ---- moving through the ladder: arrows, the shelf, or a swipe on the name
@@ -165,8 +165,8 @@ async function share() {
   const b = tierOf(sel.value)
   const url = `${location.origin}/badges`
   const text = stateOf(sel.value) === 'locked'
-    ? `I'm climbing to ${b.title} on Open Mercy. ${url}`
-    : `I earned ${b.title} on Open Mercy, tier ${b.tier} of 20. Think you can climb higher? ${url}`
+    ? `On my way to ${b.title} on Open Mercy. Come try and stop me. ${url}`
+    : `Just hit ${b.title} on Open Mercy, tier ${b.tier} of 20. Bet you can't catch me. ${url}`
   if ((await shareText(text)) === 'copied') {
     copied.value = true
     setTimeout(() => { copied.value = false }, 2000)
@@ -193,6 +193,7 @@ async function share() {
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 .back-link {
+  width: 72px;
   display: inline-flex;
   align-items: center;
   gap: var(--spacing-1);
@@ -214,7 +215,7 @@ async function share() {
 
 /* One phone-width column, centred on wider screens. */
 .bp-col { width: 100%; max-width: 480px; margin: 0 auto; padding: 0 var(--spacing-4); display: flex; flex-direction: column; flex: 1; }
-.bp-share { position: relative; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: none; border: 0; color: var(--text-primary); cursor: pointer; }
+.bp-share { position: relative; width: 72px; height: 44px; display: flex; align-items: center; justify-content: flex-end; background: none; border: 0; color: var(--text-primary); cursor: pointer; }
 .bp-copied { position: absolute; top: 100%; right: 0; padding: var(--spacing-1) var(--spacing-2); border-radius: var(--radius-sm); background: var(--surface-metal); font-size: var(--text-xs); white-space: nowrap; }
 
 .bp-hero { display: flex; flex-direction: column; padding-top: var(--spacing-4); }

@@ -4,7 +4,7 @@
       <div class="pts-sheet">
         <span class="pts-grabber" aria-hidden="true"></span>
         <div class="pts-head">
-          <h2 id="pts-title" class="pts-title">How points work</h2>
+          <h2 id="pts-title" class="pts-title">How you climb</h2>
           <button type="button" class="pts-close" aria-label="Close" @click="emit('close')"><X :size="20" :stroke-width="2" aria-hidden="true" /></button>
         </div>
 
@@ -21,7 +21,7 @@
           </li>
           <li class="pts-row">
             <span class="pts-icon"><Flag :size="20" :stroke-width="2" aria-hidden="true" /></span>
-            <span class="pts-label">Finish a game you're losing</span>
+            <span class="pts-label">Stick out a game you're losing</span>
             <span class="pts-num">+{{ POINT_WEIGHTS.completedLoss }}</span>
           </li>
           <li class="pts-row">
@@ -31,22 +31,22 @@
           </li>
           <li class="pts-row">
             <span class="pts-card"><img :src="stackCard" alt="" width="32" height="49" class="pts-card-img pts-card-img--left" /></span>
-            <span class="pts-label">Each card in the biggest stack you survive</span>
+            <span class="pts-label">Every card in the biggest stack you survive</span>
             <span class="pts-num">+{{ POINT_WEIGHTS.stackSurvived }}</span>
           </li>
           <li class="pts-row">
             <span class="pts-card"><img :src="drawCard" alt="" width="32" height="49" class="pts-card-img pts-card-img--right" /></span>
-            <span class="pts-label">Each draw card you play</span>
+            <span class="pts-label">Every draw card you throw down</span>
             <span class="pts-num">+{{ POINT_WEIGHTS.drawCard }}</span>
           </li>
         </ul>
-        <p class="pts-fine">Quit games and walkovers don't count.</p>
+        <p class="pts-fine">Quitting early or winning because everyone left scores nothing.</p>
 
         <div class="pts-kept">
           <img :src="BADGE_RENDERS[tier]" alt="" width="64" height="64" class="pts-kept-img" />
           <div>
             <p class="pts-kept-title">Your badge is yours for good.</p>
-            <p class="pts-kept-text">Miss a week and only your climb to the next one slips, {{ dailyLoss }}% a day. One game brings it back.</p>
+            <p class="pts-kept-text">Take a break and nothing you've earned goes away. After a week off, progress toward your next badge drops {{ dailyLoss }}% a day, and one game brings it all back.</p>
           </div>
         </div>
       </div>
