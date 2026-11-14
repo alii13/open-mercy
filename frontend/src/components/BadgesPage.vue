@@ -261,7 +261,8 @@ async function share() {
 .bp-name-block { display: flex; flex-direction: column; align-items: center; gap: var(--spacing-1); touch-action: pan-y; }
 .bp-name { margin: 0; font-family: var(--font-display); font-size: var(--text-3xl); line-height: 1.15; font-weight: 400; color: #fff; }
 .bp-meta { margin: 0; font-size: var(--text-xs); font-weight: 700; letter-spacing: 0.12em; color: #ffcf99; }
-.bp-medal-wrap { position: relative; height: 540px; margin-top: var(--spacing-2); }
+/* Phones: a fixed 380 px stage for the medal, with the fact card under it at its own height. */
+.bp-medal-wrap { position: relative; margin-top: var(--spacing-2); }
 .bp-medal { position: relative; }
 .bp-glow { position: absolute; left: 50%; top: 190px; width: 320px; height: 320px; margin: -160px 0 0 -160px; border-radius: var(--radius-pill); pointer-events: none; }
 .bp-glow--earned, .bp-glow--current { background: radial-gradient(circle, rgba(255, 150, 60, 0.28) 0%, transparent 62%); }

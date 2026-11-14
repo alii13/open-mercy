@@ -25,10 +25,20 @@
       <div v-if="facts.length > 1" class="mv-pips">
         <button v-for="(_, i) in facts" :key="i" type="button" class="mv-pip" :class="{ 'mv-pip--on': i === idx }" :aria-label="`Fact ${i + 1} of ${facts.length}`" :aria-pressed="i === idx" @click="idx = i"><i></i></button>
       </div>
-      <div v-if="fact" ref="card" class="mv-fact">
-        <div class="mv-fact-title">{{ fact.title }}</div>
-        <div v-if="fact.big" class="mv-fact-big">{{ fact.big }}</div>
-        <div class="mv-fact-text">{{ fact.text }}</div>
+      <!-- Every fact sits in the same grid cell, so the card is always as tall as the tallest one and
+           nothing above it moves when the fact changes. Swipe sideways to change fact. -->
+      <div v-if="fact" ref="card" class="mv-fact" @pointerdown="swipeStart" @pointerup="swipeEnd" @pointercancel="swipeFrom = null">
+        <div
+          v-for="(f, i) in facts"
+          :key="`${tier}-${i}`"
+          class="mv-fact-item"
+          :class="{ 'mv-fact-item--on': i === idx, 'mv-fact-item--before': i < idx }"
+          :aria-hidden="i !== idx"
+        >
+          <div class="mv-fact-title">{{ f.title }}</div>
+          <div v-if="f.big" class="mv-fact-big">{{ f.big }}</div>
+          <div class="mv-fact-text">{{ f.text }}</div>
+        </div>
       </div>
     </template>
   </div>
@@ -76,6 +86,18 @@ function measure() {
 watch(() => [props.facts, idx.value, props.sides], () => nextTick(() => { layout = null }))
 let stage: MedalStage | null = null
 let disposed = false
+
+// A sideways swipe on the fact card turns to the next or previous fact.
+let swipeFrom: { x: number; y: number } | null = null
+const swipeStart = (e: PointerEvent) => { swipeFrom = { x: e.clientX, y: e.clientY } }
+function swipeEnd(e: PointerEvent) {
+  if (!swipeFrom) return
+  const dx = e.clientX - swipeFrom.x
+  const dy = e.clientY - swipeFrom.y
+  swipeFrom = null
+  if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return
+  idx.value = Math.min(props.facts.length - 1, Math.max(0, idx.value + (dx < 0 ? 1 : -1)))
+}
 
 // A tap turns to the next fact; the page decides anything else.
 function onTap() {
@@ -174,7 +196,14 @@ onBeforeUnmount(() => {
 .mv-pip { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: none; border: 0; cursor: pointer; }
 .mv-pip i { width: 18px; height: 3px; border-radius: var(--radius-pill); background: var(--surface-metal); }
 .mv-pip--on i { background: #ffcf99; }
-.mv-fact { padding: var(--spacing-3) var(--spacing-4); background: var(--surface-metal-dark); border: 1px solid var(--surface-metal); border-radius: var(--radius-md); }
+.mv:not(.mv--sides) .mv-stage { flex: none; height: var(--mv-stage, 380px); }
+.mv-fact { display: grid; overflow: hidden; touch-action: pan-y; user-select: none; padding: var(--spacing-3) var(--spacing-4); background: var(--surface-metal-dark); border: 1px solid var(--surface-metal); border-radius: var(--radius-md); }
+.mv-fact-item { grid-area: 1 / 1; visibility: hidden; opacity: 0; translate: var(--spacing-6) 0; }
+.mv-fact-item--before { translate: calc(-1 * var(--spacing-6)) 0; }
+.mv-fact-item--on { visibility: visible; opacity: 1; translate: 0 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .mv-fact-item { transition: opacity var(--duration-soft) var(--ease-snap), translate var(--duration-soft) var(--ease-snap), visibility var(--duration-soft); }
+}
 .mv-fact-title { font-size: var(--text-xs); font-weight: 700; letter-spacing: 0.12em; color: #ffcf99; }
 .mv-fact-big { margin-top: var(--spacing-1); font-size: var(--text-2xl); font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums; }
 .mv-fact-text { margin-top: var(--spacing-1); font-size: var(--text-sm); line-height: 1.45; color: var(--text-primary); }
