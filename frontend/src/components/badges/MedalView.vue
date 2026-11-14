@@ -198,8 +198,8 @@ onBeforeUnmount(() => {
 .mv-pip--on i { background: #ffcf99; }
 .mv:not(.mv--sides) .mv-stage { flex: none; height: var(--mv-stage, 380px); }
 .mv-fact { display: grid; overflow: hidden; touch-action: pan-y; user-select: none; padding: var(--spacing-3) var(--spacing-4); background: var(--surface-metal-dark); border: 1px solid var(--surface-metal); border-radius: var(--radius-md); }
-.mv-fact-item { grid-area: 1 / 1; visibility: hidden; opacity: 0; translate: 24px 0; }
-.mv-fact-item--before { translate: -24px 0; }
+.mv-fact-item { grid-area: 1 / 1; visibility: hidden; opacity: 0; translate: var(--spacing-6) 0; }
+.mv-fact-item--before { translate: calc(-1 * var(--spacing-6)) 0; }
 .mv-fact-item--on { visibility: visible; opacity: 1; translate: 0 0; }
 @media (prefers-reduced-motion: no-preference) {
   .mv-fact-item { transition: opacity var(--duration-soft) var(--ease-snap), translate var(--duration-soft) var(--ease-snap), visibility var(--duration-soft); }
