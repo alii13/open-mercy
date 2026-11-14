@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
     BADGES,
+    badgeSlug,
+    tierFromSlug,
     badgeFor,
     botBadge,
     earnedPoints,
@@ -240,5 +242,13 @@ describe('progressToNext', () => {
         expect(p.current.title).toBe('God of No Mercy')
         expect(p.next).toBeNull()
         expect(p.pct).toBe(1)
+    })
+})
+
+describe('badge links', () => {
+    it('gives every badge its own slug that leads back to it', () => {
+        expect(badgeSlug(BADGES[19]!)).toBe('god-of-no-mercy')
+        for (const b of BADGES) expect(tierFromSlug(badgeSlug(b))).toBe(b.tier)
+        expect(tierFromSlug('not-a-badge')).toBeNull()
     })
 })

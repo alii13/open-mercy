@@ -18,7 +18,7 @@ export type LeaderboardTab = 'daily' | 'weekly' | 'alltime'
 export type Route =
     | { name: 'home' }
     | { name: 'leaderboard'; tab?: LeaderboardTab }
-    | { name: 'badges' }
+    | { name: 'badges'; badge?: string }
     | { name: 'changelog' }
     | { name: 'profile'; code: string }
     | { name: 'public' }
@@ -54,7 +54,8 @@ export const router = createRouter({
         { path: `/r/:code([${ROOM_CODE_ALPHABET}]{${ROOM_CODE_MIN},${ROOM_CODE_MAX}})`, name: 'room', component: Screen },
         // /leaderboard/alltime, so a deep link can name the board it means.
         { path: '/leaderboard/:tab(daily|weekly|alltime)?', name: 'leaderboard', component: Screen },
-        { path: '/badges', name: 'badges', component: Screen },
+        // /badges/god-of-no-mercy opens on that badge; the page checks the slug is a real one.
+        { path: '/badges/:badge([a-z-]+)?', name: 'badges', component: Screen },
         { path: '/changelog', name: 'changelog', component: Screen },
         { path: '/p/:code([A-Za-z0-9]{4,32})', name: 'profile', component: Screen },
         // Keeps the query and hash, where invite codes and auth redirects ride.
@@ -65,7 +66,7 @@ export const router = createRouter({
 export function toRoute(r: Pick<RouteLocationGeneric, 'name' | 'params'>): Route {
     const p = r.params as Record<string, string | undefined>
     if (r.name === 'leaderboard') return p.tab ? { name: 'leaderboard', tab: p.tab as LeaderboardTab } : { name: 'leaderboard' }
-    if (r.name === 'badges') return { name: 'badges' }
+    if (r.name === 'badges') return p.badge ? { name: 'badges', badge: p.badge.toLowerCase() } : { name: 'badges' }
     if (r.name === 'changelog') return { name: 'changelog' }
     if (r.name === 'profile') return { name: 'profile', code: p.code! }
     if (r.name === 'public' || r.name === 'daily' || r.name === 'bot' || r.name === 'friends') return { name: r.name }
@@ -80,6 +81,7 @@ export function routePath(route: Route): string {
     }
     if (route.name === 'profile') return `/p/${route.code}`
     if (route.name === 'room') return `/r/${route.code}`
+    if (route.name === 'badges' && route.badge) return `/badges/${route.badge}`
     if (route.name === 'home') return '/'
     return `/${route.name}`
 }

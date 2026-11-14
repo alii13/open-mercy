@@ -30,3 +30,6 @@ export const BADGE_ART: Record<number, string> = {
     1: t1, 2: t2, 3: t3, 4: t4, 5: t5, 6: t6, 7: t7, 8: t8, 9: t9, 10: t10,
     11: t11, 12: t12, 13: t13, 14: t14, 15: t15, 16: t16, 17: t17, 18: t18, 19: t19, 20: t20,
 }
+
+/** CSS `url()` for a tier's art. Quoted: small SVGs inline as data URIs that contain `'`. */
+export const artUrl = (tier: number) => `url("${BADGE_ART[tier]}")`

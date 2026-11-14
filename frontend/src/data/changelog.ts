@@ -17,6 +17,7 @@
 
 import type { Route } from '../utils/routes'
 import publicTableImage from '../assets/public-table.jpg'
+import badgesImage from '../assets/badges-card.jpg'
 
 export type ChangelogLevel = 'quiet' | 'loud'
 export type ChangelogTag = 'NEW' | 'IMPROVED' | 'FIXED'
@@ -68,6 +69,15 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+    {
+        id: '2026-11-14T18:00Z',
+        level: 'loud',
+        tag: 'NEW',
+        title: 'See every badge as a 3D medal',
+        body: "Your badges are real medals now. Spin yours, see what's carved into it, and line up everything you've earned on your shelf, with the day you got each one.",
+        image: badgesImage,
+        cta: { label: 'SEE YOUR BADGES', route: { name: 'badges' } },
+    },
     {
         id: '2026-11-14T12:00Z',
         level: 'quiet',

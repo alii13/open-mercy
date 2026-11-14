@@ -6,106 +6,83 @@
         BACK
       </button>
       <h1 class="bp-title">BADGES</h1>
-      <span class="bp-spacer" aria-hidden="true"></span>
+      <button type="button" class="bp-share" :aria-label="`Share ${tierOf(sel).title}`" @click="share">
+        <Share :size="20" :stroke-width="2" aria-hidden="true" />
+        <span v-if="copied" class="bp-copied" role="status">Copied</span>
+      </button>
     </header>
 
-    <div class="bp-body">
-      <!-- Your standing, if you've played -->
-      <section v-if="showOwn" class="bp-you">
-        <Badge :badge="badge" size="full" :progress="badgeProgress" />
-        <p class="bp-you-line">
-          You're a <strong :style="{ color: badge.color }">{{ badge.title }}</strong>
-          with {{ badgePoints.toLocaleString() }} points.
-          <template v-if="badgeProgress.next">
-            {{ badgeProgress.needed.toLocaleString() }} more to {{ badgeProgress.next.title }}.
-          </template>
-          <template v-else>You've hit the top. Respect.</template>
-        </p>
+    <main class="bp-col">
+      <!-- One medal up close: its name, the live 3D medal and two facts about it. -->
+      <section class="bp-hero">
+        <div ref="nameEl" class="bp-name-block" aria-live="polite" @pointerdown="swipeStart" @pointerup="swipeEnd">
+          <h2 class="bp-name">{{ tierOf(sel).title }}</h2>
+          <p class="bp-meta">{{ metaLine(sel) }}</p>
+        </div>
+        <div class="bp-medal-wrap">
+          <span class="bp-glow" :class="`bp-glow--${stateOf(sel)}`" aria-hidden="true"></span>
+          <MedalView v-if="pointsLoaded" class="bp-medal" :tier="sel" :locked="stateOf(sel) === 'locked'" :facts="facts" :sides="wide" :label="wide ? tierOf(sel).title : `${tierOf(sel).title}: next fact`">
+            <button v-if="sel > 1" type="button" class="bp-arrow bp-arrow--prev" :aria-label="`Previous badge, ${tierOf(sel - 1).title}`" @click="select(sel - 1)">
+              <ChevronLeft :size="20" :stroke-width="2" aria-hidden="true" />
+            </button>
+            <button v-if="sel < 20" type="button" class="bp-arrow bp-arrow--next" :aria-label="`Next badge, ${tierOf(sel + 1).title}`" @click="select(sel + 1)">
+              <ChevronRight :size="20" :stroke-width="2" aria-hidden="true" />
+            </button>
+          </MedalView>
+        </div>
       </section>
 
-      <!-- Plain-language intro -->
-      <section class="bp-intro">
-        <h2 class="bp-h2">How it works</h2>
-        <p>
-          Every game you play earns points. Points add up over time and lift you
-          through twenty badges, from Recruit to God of No Mercy. Your badge shows on
-          every table you sit at, so everyone sees how far you've climbed.
-        </p>
-        <p>
-          A badge is yours to keep - you never drop one you've earned. But if you
-          stop showing up, your progress toward the <em>next</em> badge slips a
-          little each day. Play again and it starts building right back.
-        </p>
-      </section>
+      <!-- Desktop puts the count above the wall; the phone puts it under the cabinet. -->
+      <footer v-if="wide" class="bp-foot">
+        <div>
+          <p class="bp-foot-title">{{ badge.tier }} of 20 on your shelf</p>
+          <p v-if="rarityLine" class="bp-foot-sub">{{ rarityLine }}</p>
+        </div>
+        <button type="button" class="bp-how" @click="sheetOpen = true">
+          <span class="bp-how-in">
+            How you climb
+            <ChevronRight :size="14" :stroke-width="2" aria-hidden="true" />
+          </span>
+        </button>
+      </footer>
 
-      <!-- The ladder -->
-      <section class="bp-ladder">
-        <h2 class="bp-h2">The twenty badges</h2>
-        <ul class="bp-tiers">
-          <li v-for="t in BADGES" :key="t.tier" class="bp-tier" :class="{ here: showOwn && t.tier === badge.tier }">
-            <Badge :badge="t" size="chip" class="bp-tier-badge" />
-            <span class="bp-tier-pts">{{ t.threshold === 0 ? 'Start' : t.threshold.toLocaleString() + ' pts' }}</span>
-            <span class="bp-tier-feel">{{ FEEL[t.tier - 1] }}</span>
-          </li>
-        </ul>
-      </section>
+      <BadgeShelf :tier="badge.tier" :sel="sel" :points="badgePoints" :holders="holders" :dates="dates" :cols="wide ? 5 : 3" @select="pick" />
 
-      <!-- Earning table -->
-      <section class="bp-earn">
-        <h2 class="bp-h2">How you earn points</h2>
-        <ul class="bp-earn-list">
-          <li v-for="e in EARN" :key="e.label">
-            <span class="bp-earn-label">{{ e.label }}</span>
-            <span class="bp-earn-pts">+{{ e.points }}</span>
-          </li>
-        </ul>
-        <p class="bp-fine">
-          Quit games and walkovers don't count - a badge has to be earned at the table.
-        </p>
-      </section>
+      <footer v-if="!wide" class="bp-foot">
+        <div>
+          <p class="bp-foot-title">{{ badge.tier }} of 20 on your shelf</p>
+          <p v-if="rarityLine" class="bp-foot-sub">{{ rarityLine }}</p>
+        </div>
+        <button type="button" class="bp-how" @click="sheetOpen = true">
+          <span class="bp-how-in">
+            How you climb
+            <ChevronRight :size="14" :stroke-width="2" aria-hidden="true" />
+          </span>
+        </button>
+      </footer>
+    </main>
 
-      <!-- Inactivity decay -->
-      <section class="bp-intro">
-        <h2 class="bp-h2">If you go quiet</h2>
-        <p>
-          Your badge is permanent - once you reach a tier it's yours for good, and no
-          amount of time away takes it. Only your progress toward the <em>next</em> badge
-          can slip.
-        </p>
-        <p>
-          You get a <strong>one-week grace</strong>: play at least once every seven days
-          and nothing slips. After that, you lose <strong>5% of your progress toward the
-          next badge each day</strong> you don't play. It only ever touches that progress,
-          never the badge underneath.
-        </p>
-        <p class="bp-fine">Say you're 1,000 points into your climb toward the next badge:</p>
-        <table class="bp-table">
-          <thead>
-            <tr><th>Time away</th><th>Progress you keep</th></tr>
-          </thead>
-          <tbody>
-            <tr><td>Up to 1 week</td><td>1,000 - nothing slips</td></tr>
-            <tr><td>2 weeks</td><td>about 700</td></tr>
-            <tr><td>3 weeks</td><td>about 490</td></tr>
-            <tr><td>4 weeks</td><td>about 340</td></tr>
-          </tbody>
-        </table>
-        <p>Play a single game and it starts climbing back the same day.</p>
-      </section>
-
-      <SiteFooter />
-    </div>
+    <SiteFooter />
+    <PointsSheet v-if="sheetOpen" :tier="badge.tier" @close="sheetOpen = false" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ChevronLeft } from 'lucide-vue-next'
-import { computed, watch } from 'vue'
-import { BADGES, POINT_WEIGHTS, applyDecay, badgeFor, pointsFromRetention, progressToNext } from '../utils/badges'
+import { ChevronLeft, ChevronRight, Share } from 'lucide-vue-next'
+import gsap from 'gsap'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { BADGES, applyDecay, badgeFor, badgeSlug, pointsFromRetention, tierFromSlug } from '../utils/badges'
+import { currentRoute, router } from '../utils/routes'
 import { useBadges } from '../composables/useBadges'
 import { useAuthStore } from '../stores/authStore'
 import { useRetentionStore } from '../stores/retentionStore'
-import Badge from './Badge.vue'
+import MedalView from './badges/MedalView.vue'
+import BadgeShelf from './badges/BadgeShelf.vue'
+import PointsSheet from './badges/PointsSheet.vue'
+import { badgeFacts } from '../utils/badgeFacts'
+import { useBadgeHolders } from '../composables/useBadgeHolders'
+import { useBadgeDates } from '../composables/useBadgeDates'
+import { shareText } from '../utils/share'
 import SiteFooter from './SiteFooter.vue'
 
 defineEmits<{ (e: 'back'): void }>()
@@ -116,7 +93,15 @@ const retention = useRetentionStore()
 // the player's whole game history. Fresh, because the cache is per session and
 // this page is about the total after today's games.
 const { badges, fetchBadges } = useBadges()
-watch(() => auth.user?.id, (id) => { if (id) void fetchBadges([id], { fresh: true }) }, { immediate: true })
+const { dates, fetchDates } = useBadgeDates()
+// The medal waits for a signed-in player's points (or a failed read), so it is built once,
+// for the right tier and lock state, instead of building Recruit first.
+const pointsLoaded = ref(false)
+watch(() => auth.user?.id, (id) => {
+  void fetchDates(id ?? null)
+  pointsLoaded.value = !id
+  if (id) void fetchBadges([id], { fresh: true }).finally(() => { pointsLoaded.value = true })
+}, { immediate: true })
 
 function daysIdleFromDate(dateStr: string | null): number {
   if (!dateStr) return 0
@@ -137,40 +122,95 @@ const badgePoints = computed(() => {
   return applyDecay(earned, daysIdleFromDate(retention.lastPlayedDate))
 })
 const badge = computed(() => badgeFor(badgePoints.value))
-const badgeProgress = computed(() => progressToNext(badgePoints.value))
-const showOwn = computed(() => badgePoints.value > 0)
 
-const FEEL = [
-  'Everyone starts here',
-  'First few games in',
-  'Getting the hang of it',
-  'A regular at the table',
-  'Committed to the deck',
-  'A serious player',
-  'Rare at any table',
-  'Very rare',
-  'Notable across the board',
-  'Months of play',
-  'Past the King',
-  'Rarer than a King',
-  'Only the obsessed',
-  'Feared at every table',
-  'Over half a million points',
-  'Barely ever seen',
-  'A million points',
-  'Few will ever get here',
-  'One step from the top',
-  'The top. Nothing above it',
-]
+type TierState = 'earned' | 'current' | 'locked'
+const tierOf = (n: number) => BADGES[Math.min(19, Math.max(0, n - 1))]!
+const stateOf = (n: number): TierState => (n < badge.value.tier ? 'earned' : n === badge.value.tier ? 'current' : 'locked')
 
-const EARN = [
-  { label: 'Win a game', points: POINT_WEIGHTS.win },
-  { label: "Finish a game you're losing", points: POINT_WEIGHTS.completedLoss },
-  { label: 'Each draw card you play', points: POINT_WEIGHTS.drawCard },
-  { label: 'Per card in the biggest stack you survive', points: POINT_WEIGHTS.stackSurvived },
-  { label: 'Call "Mercy!"', points: POINT_WEIGHTS.unoCall },
-  { label: 'Show up and play (per day)', points: POINT_WEIGHTS.dayPlayed },
-]
+const { holders, fetchHolders } = useBadgeHolders()
+void fetchHolders()
+const facts = computed(() => badgeFacts(sel.value, holders.value))
+
+function metaLine(n: number): string {
+  if (stateOf(n) === 'locked') return `TIER ${n} OF 20 · UNLOCKS AT ${tierOf(n).threshold.toLocaleString()}`
+  const on = dates.value[n]
+  return `TIER ${n} OF 20 · EARNED${on ? ` ${on.toUpperCase()}` : ''}`
+}
+
+// How rare the next badge is, under the shelf count.
+const rarityLine = computed(() => {
+  const next = BADGES[badge.value.tier]
+  const h = holders.value
+  if (!next || !h?.total) return ''
+  const n = h.byTier[next.tier] ?? 0
+  if (n === 0) return `Nobody has ${next.title} yet. Be the first.`
+  if (n === 1) return `Only one player has ${next.title}`
+  return `Only 1 in ${Math.round(h.total / n).toLocaleString()} players has ${next.title}`
+})
+
+// ---- moving through the ladder: arrows, the shelf, or a swipe on the name
+const sel = ref(1)
+// Follow the player's own tier (it changes when their points load) until they pick one themselves,
+// or until a link like /badges/god-of-no-mercy names one.
+let picked = false
+watch(() => badge.value.tier, (t) => { if (!picked) sel.value = t }, { immediate: true })
+watch(() => currentRoute.value.name === 'badges' ? currentRoute.value.badge : undefined, (slug) => {
+  const t = slug ? tierFromSlug(slug) : null
+  if (slug && !t) void router.replace({ path: '/badges', query: router.currentRoute.value.query })
+  else if (t && t !== sel.value) { picked = true; sel.value = t }
+}, { immediate: true })
+function select(n: number) {
+  picked = true
+  sel.value = Math.min(20, Math.max(1, n))
+}
+// The address bar names the badge on show, so copying it shares that badge. Replace, not push:
+// flicking through badges should not fill the back button.
+watch(sel, (n) => {
+  if (!picked) return
+  const path = `/badges/${badgeSlug(tierOf(n))}`
+  if (router.currentRoute.value.path !== path) void router.replace({ path, query: router.currentRoute.value.query })
+})
+function pick(n: number) {
+  select(n)
+  nameEl.value?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+}
+let swipeX: number | null = null
+const swipeStart = (e: PointerEvent) => { swipeX = e.clientX }
+function swipeEnd(e: PointerEvent) {
+  if (swipeX === null) return
+  const dx = e.clientX - swipeX
+  swipeX = null
+  if (Math.abs(dx) > 40) select(sel.value + (dx < 0 ? 1 : -1))
+}
+
+// The name slides in from the side the medal comes from; the medal itself slides in the 3D stage.
+const nameEl = ref<HTMLElement | null>(null)
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches
+watch(sel, (n, prev) => {
+  if (reducedMotion || !nameEl.value) return
+  gsap.fromTo(nameEl.value, { x: Math.sign(n - prev) * 24, opacity: 0 }, { x: 0, opacity: 1, duration: 0.32, ease: 'power3.out', overwrite: true })
+})
+
+const sheetOpen = ref(false)
+// The desktop trophy wall. Plain matchMedia: @vueuse/core would pull its network and worker code into the bundle.
+const wideQuery = matchMedia('(min-width: 1024px)')
+const wide = ref(wideQuery.matches)
+const onWide = (e: MediaQueryListEvent) => { wide.value = e.matches }
+wideQuery.addEventListener('change', onWide)
+onBeforeUnmount(() => wideQuery.removeEventListener('change', onWide))
+
+const copied = ref(false)
+async function share() {
+  const b = tierOf(sel.value)
+  const url = `${location.origin}/badges/${badgeSlug(b)}`
+  const text = stateOf(sel.value) === 'locked'
+    ? `On my way to ${b.title} on Open Mercy. Come try and stop me. ${url}`
+    : `Just hit ${b.title} on Open Mercy, tier ${b.tier} of 20. Bet you can't catch me. ${url}`
+  if ((await shareText(text)) === 'copied') {
+    copied.value = true
+    setTimeout(() => { copied.value = false }, 2000)
+  }
+}
 </script>
 
 <style scoped>
@@ -192,6 +232,7 @@ const EARN = [
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 .back-link {
+  width: 72px;
   display: inline-flex;
   align-items: center;
   gap: var(--spacing-1);
@@ -210,135 +251,53 @@ const EARN = [
   letter-spacing: 0.18em;
   margin: 0;
 }
-.bp-spacer { width: 48px; }
 
-.bp-body {
-  width: 100%;
-  max-width: 640px;
-  margin: 0 auto;
-  padding: var(--spacing-6) var(--spacing-4) var(--spacing-8);
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-8);
-  flex: 1;
-}
+/* One phone-width column, centred on wider screens. */
+.bp-col { width: 100%; max-width: 480px; margin: 0 auto; padding: 0 var(--spacing-4); display: flex; flex-direction: column; flex: 1; }
+.bp-share { position: relative; width: 72px; height: 44px; display: flex; align-items: center; justify-content: flex-end; background: none; border: 0; color: var(--text-primary); cursor: pointer; }
+.bp-copied { position: absolute; top: 100%; right: 0; padding: var(--spacing-1) var(--spacing-2); border-radius: var(--radius-sm); background: var(--surface-metal); font-size: var(--text-xs); white-space: nowrap; }
 
-.bp-you {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--spacing-4);
-  padding: var(--spacing-6);
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  text-align: center;
-}
-.bp-you-line { margin: 0; color: #cfcfd4; font-size: 0.95rem; line-height: 1.5; }
+.bp-hero { display: flex; flex-direction: column; padding-top: var(--spacing-4); }
+.bp-name-block { display: flex; flex-direction: column; align-items: center; gap: var(--spacing-1); touch-action: pan-y; }
+.bp-name { margin: 0; font-family: var(--font-display); font-size: var(--text-3xl); line-height: 1.15; font-weight: 400; color: #fff; }
+.bp-meta { margin: 0; font-size: var(--text-xs); font-weight: 700; letter-spacing: 0.12em; color: #ffcf99; }
+.bp-medal-wrap { position: relative; height: 540px; margin-top: var(--spacing-2); }
+.bp-medal { position: relative; }
+.bp-glow { position: absolute; left: 50%; top: 190px; width: 320px; height: 320px; margin: -160px 0 0 -160px; border-radius: var(--radius-pill); pointer-events: none; }
+.bp-glow--earned, .bp-glow--current { background: radial-gradient(circle, rgba(255, 150, 60, 0.28) 0%, transparent 62%); }
+.bp-glow--locked { background: radial-gradient(circle, rgba(160, 160, 170, 0.08) 0%, transparent 62%); }
+.bp-arrow { position: absolute; top: 50%; width: 44px; height: 44px; margin-top: -22px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-pill); background: var(--surface-metal-dark); border: 1px solid var(--surface-metal); color: var(--text-primary); cursor: pointer; }
+.bp-arrow--prev { left: 0; }
+.bp-arrow--next { right: 0; }
 
-.bp-h2 {
-  font-family: var(--font-display), sans-serif;
-  font-size: 0.8rem;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: #ffcc00;
-  margin: 0 0 var(--spacing-3);
-}
-.bp-intro p {
-  margin: 0 0 var(--spacing-3);
-  color: #cfcfd4;
-  line-height: 1.6;
-}
-.bp-intro em { color: #e6e6e6; font-style: italic; }
+.bp-hero + * { margin-top: var(--spacing-6); }
 
-.bp-tiers {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-1);
-}
-.bp-tier {
-  display: grid;
-  grid-template-columns: minmax(120px, 1.2fr) auto 1.6fr;
-  align-items: center;
-  gap: var(--spacing-3);
-  padding: var(--spacing-3);
-  border-radius: 10px;
-  border: 1px solid transparent;
-}
-.bp-tier.here {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.14);
-}
-.bp-tier-pts {
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  color: #a1a1aa;
-  white-space: nowrap;
-  text-align: right;
-}
-.bp-tier-feel {
-  font-size: 0.8rem;
-  color: #8a8f98;
+.bp-foot { --bp-foot-lh: 24px; display: flex; justify-content: space-between; align-items: flex-start; gap: var(--spacing-4); padding: var(--spacing-4) 0 var(--spacing-8); }
+.bp-foot-title { margin: 0; line-height: var(--bp-foot-lh); font-family: var(--font-display); font-size: var(--text-lg); font-weight: 400; color: var(--text-primary); }
+.bp-foot-sub { margin: 2px 0 0; font-size: var(--text-sm); color: var(--text-secondary); }
+.bp-how { flex-shrink: 0; min-height: 44px; display: flex; align-items: flex-start; padding: 0; gap: var(--spacing-1); background: none; border: 0; font-family: var(--font-display); font-size: var(--text-base); color: var(--text-secondary); cursor: pointer; }
+/* Text on the title's line; the rest of the 44 px tap area hangs below it. */
+.bp-how-in { height: var(--bp-foot-lh); display: inline-flex; align-items: center; gap: var(--spacing-1); }
+@media (hover: hover) { .bp-how:hover { color: var(--text-primary); } }
+
+/* Phones: one centred line after another, the link last. */
+@media (max-width: 640px) {
+  .bp-foot { flex-direction: column; align-items: center; gap: var(--spacing-2); text-align: center; }
 }
 
-.bp-earn-list {
-  list-style: none;
-  margin: 0 0 var(--spacing-3);
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-}
-.bp-earn-list li {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: var(--spacing-3);
-  padding: var(--spacing-3) 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-}
-.bp-earn-label { color: #cfcfd4; font-size: 0.9rem; }
-.bp-earn-pts {
-  font-family: var(--font-mono);
-  font-weight: 700;
-  color: #5ed17c;
-  white-space: nowrap;
-}
-.bp-fine { margin: 0; color: #8a8f98; font-size: 0.8rem; line-height: 1.5; }
-
-.bp-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: var(--spacing-3) 0;
-  font-family: var(--font-mono);
-  font-size: 0.85rem;
-}
-.bp-table th,
-.bp-table td {
-  padding: var(--spacing-2) var(--spacing-3);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  text-align: left;
-}
-.bp-table th {
-  font-size: 0.6rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: #8a8f98;
-}
-.bp-table td { color: #cfcfd4; }
-.bp-table th:last-child,
-.bp-table td:last-child { text-align: right; color: #e6e6e6; }
-
-@media (max-width: 480px) {
-  .bp-tier {
-    grid-template-columns: 1fr auto;
-    grid-template-areas: 'badge pts' 'feel feel';
-    row-gap: var(--spacing-1);
-  }
-  .bp-tier-badge { grid-area: badge; }
-  .bp-tier-pts { grid-area: pts; }
-  .bp-tier-feel { grid-area: feel; }
+/* Desktop: the trophy wall. Facts either side of the medal, every badge on show. */
+@media (min-width: 1024px) {
+  .bp-col { max-width: calc(1200px + 2 * var(--spacing-4)); }
+  .bp-hero { padding-top: var(--spacing-8); }
+  .bp-name { font-size: var(--text-display); }
+  .bp-medal-wrap { height: 480px; margin-top: var(--spacing-4); --mv-medal: 480px; }
+  .bp-glow { top: 50%; width: 440px; height: 440px; margin: -220px 0 0 -220px; }
+  .bp-arrow { width: 56px; height: 56px; margin-top: -28px; }
+  .bp-arrow--prev { left: calc(50% - 296px); }
+  .bp-arrow--next { right: calc(50% - 296px); }
+  .bp-foot { padding: var(--spacing-4) 0 var(--spacing-8); }
+  .bp-foot { --bp-foot-lh: 32px; }
+  .bp-foot-title { font-size: var(--text-2xl); }
+  .bp-foot + .bs { margin-bottom: var(--spacing-16); }
 }
 </style>

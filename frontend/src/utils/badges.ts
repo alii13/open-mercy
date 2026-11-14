@@ -55,6 +55,10 @@ export const BADGES: Badge[] = [
     { tier: 20, threshold: 2_890_000, title: 'God of No Mercy', color: '#ffcc33' },
 ]
 
+/** The badge's part of its link, /badges/god-of-no-mercy, so a shared badge opens on itself. */
+export const badgeSlug = (b: Badge) => b.title.toLowerCase().replace(/\s+/g, '-')
+export const tierFromSlug = (slug: string) => BADGES.find(b => badgeSlug(b) === slug.toLowerCase())?.tier ?? null
+
 export function badgeFor(points: number): Badge {
     let current = BADGES[0]!
     for (const b of BADGES) {

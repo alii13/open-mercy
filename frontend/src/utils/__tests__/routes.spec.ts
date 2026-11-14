@@ -28,6 +28,11 @@ describe('parseRoute', () => {
         expect(parseRoute('/changelog')).toEqual({ name: 'changelog' })
     })
 
+    it('maps /badges/<slug> to that badge, so a shared badge opens on itself', () => {
+        expect(parseRoute('/badges/god-of-no-mercy')).toEqual({ name: 'badges', badge: 'god-of-no-mercy' })
+        expect(routePath({ name: 'badges', badge: 'god-of-no-mercy' })).toBe('/badges/god-of-no-mercy')
+    })
+
     it('maps /p/<code> to a profile', () => {
         expect(parseRoute('/p/9f3ac21b')).toEqual({ name: 'profile', code: '9f3ac21b' })
     })
