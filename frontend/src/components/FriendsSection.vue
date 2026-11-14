@@ -674,7 +674,9 @@ onUnmounted(() => {
   color: var(--text-secondary);
 }
 
-@media (max-width: 900px) {
+/* By the width it is given, not the window's: the same section sits on the
+   friends page and inside the account dialog. Both parents are containers. */
+@container (max-width: 900px) {
   .fs {
     flex-direction: column;
     gap: var(--spacing-6);

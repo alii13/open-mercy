@@ -2234,11 +2234,6 @@ function copyLink() {
 .account-item--out {
   margin-top: var(--spacing-1);
   border-top: 1px solid rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.5);
-}
-
-/* Last in the menu, under Sign out, and just as quiet: rare and destructive. */
-.account-item--delete {
   border-radius: 0 0 var(--radius-sm) var(--radius-sm);
   color: rgba(255, 255, 255, 0.5);
 }

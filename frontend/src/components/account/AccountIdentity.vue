@@ -29,7 +29,7 @@
         @keyup.esc="cancel"
         @blur="onBlur"
       />
-      <button v-else type="button" class="ai-name-btn" aria-label="Edit your name" @click="startEdit">
+      <button v-else type="button" class="ai-name-btn" :aria-label="`${authStore.username}, edit your name`" @click="startEdit">
         <span class="ai-name-text">{{ authStore.username }}</span>
         <Pencil :size="16" :stroke-width="2" aria-hidden="true" />
       </button>
@@ -254,7 +254,7 @@ async function save() {
 }
 
 .ai-suggestion {
-  min-height: 32px;
+  min-height: 40px;
   padding: 0 var(--spacing-3);
   border-radius: var(--radius-pill);
   border: 1px solid var(--surface-metal);
@@ -303,7 +303,6 @@ async function save() {
   font-family: var(--font-body);
   font-size: var(--text-sm);
   font-weight: 600;
-  letter-spacing: 0.04em;
   cursor: pointer;
 }
 

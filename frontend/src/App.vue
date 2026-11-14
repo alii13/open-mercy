@@ -299,16 +299,20 @@ const inMpMatch = computed(() => {
   const s = mpStore.currentGame?.status
   return s === 'playing' || s === 'finished'
 })
+// A match starting under the account modal (a private room's host pressed
+// START) takes the screen, as the old full-screen claim page used to give way.
+watch(inMpMatch, (m) => { if (m) closeAccountModal() })
 
 const currentScreen = computed(() => {
   if (authStore.loading) return null
   if (showPasswordReset.value) return 'password_reset'
   if (localGameStore.gameState !== 'LOBBY') return 'sp_game'
+  // The account modal floats over any screen, so its claim step outranks the route.
+  if (accountStep.value === 'claim') return 'claim_account'
   if (currentRoute.value.name === 'leaderboard' && !inMpMatch.value) return 'leaderboard'
   if (currentRoute.value.name === 'profile' && !inMpMatch.value) return 'profile'
   if (currentRoute.value.name === 'changelog' && !inMpMatch.value) return 'changelog'
   if (!authStore.isAuthenticated) return showAuthView.value ? 'auth' : 'landing'
-  if (accountStep.value === 'claim') return 'claim_account'
   if (inMpMatch.value) return 'mp_game'
   if (mpStore.currentGame?.status === 'waiting') return 'waiting_room'
   if (currentRoute.value.name === 'friends') return 'friends'

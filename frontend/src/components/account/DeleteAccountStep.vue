@@ -23,12 +23,12 @@
 
     <div class="del-actions">
       <template v-if="wide">
-        <button type="button" class="del-keep" @click="$emit('keep')">Keep my account</button>
+        <button type="button" class="del-keep" :disabled="busy" @click="$emit('keep')">Keep my account</button>
         <button type="button" class="del-go" :disabled="!matches || busy" @click="confirm">{{ busy ? 'DELETING…' : 'DELETE FOREVER' }}</button>
       </template>
       <template v-else>
         <button type="button" class="del-go" :disabled="!matches || busy" @click="confirm">{{ busy ? 'DELETING…' : 'DELETE FOREVER' }}</button>
-        <button type="button" class="del-keep" @click="$emit('keep')">Keep my account</button>
+        <button type="button" class="del-keep" :disabled="busy" @click="$emit('keep')">Keep my account</button>
       </template>
     </div>
   </div>
@@ -58,6 +58,8 @@ async function confirm() {
   if (!matches.value || busy.value) return
   busy.value = true
   failed.value = false
+  // A notice left from earlier would read as this delete failing.
+  authStore.clearAuthNotice()
   const res = await authStore.deleteAccount()
   busy.value = false
   // Success signs the player out, which closes the modal. A closed Apple sheet
