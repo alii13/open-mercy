@@ -30,13 +30,3 @@ export function useBadgeHolders() {
     }
     return { holders, fetchHolders }
 }
-
-/** "Held by 1 in 82 players", "Held by 1 player", "Nobody has it yet", or null without data. */
-export function heldByLine(tier: number, h: { byTier: Record<number, number>; total: number } | null): string | null {
-    if (!h || !h.total) return null
-    const n = h.byTier[tier] ?? 0
-    if (n === 0) return 'Nobody has it yet'
-    if (n === 1) return 'Held by 1 player'
-    const ratio = Math.round(h.total / n)
-    return ratio <= 1 ? `Held by ${n.toLocaleString()} players` : `Held by 1 in ${ratio.toLocaleString()} players`
-}

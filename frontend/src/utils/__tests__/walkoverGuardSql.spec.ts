@@ -3,6 +3,7 @@ import alltime from '../../../../supabase/leaderboards-alltime.sql?raw'
 import alltimeRanks from '../../../../supabase/alltime-ranks.sql?raw'
 import badges from '../../../../supabase/badges.sql?raw'
 import badgeHolders from '../../../../supabase/badge-holders.sql?raw'
+import badgeDates from '../../../../supabase/badge-dates.sql?raw'
 import dossier from '../../../../supabase/profile-dossier.sql?raw'
 import prestige from '../../../../supabase/badges-prestige.sql?raw'
 import pages from '../../../../supabase/profile-pages.sql?raw'
@@ -15,6 +16,7 @@ const files = {
     'alltime-ranks.sql': alltimeRanks,
     'badges.sql': badges,
     'badge-holders.sql': badgeHolders,
+    'badge-dates.sql': badgeDates,
     'profile-dossier.sql': dossier,
     'badges-prestige.sql': prestige,
     'profile-pages.sql': pages,

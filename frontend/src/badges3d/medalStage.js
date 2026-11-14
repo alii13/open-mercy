@@ -399,19 +399,26 @@ function anchorOnSurface(wrap, [x, y]) {
 }
 
 
-// A locked medal is cold: one dark metal, no charm, no particles.
-const LOCKED_MAT = new THREE.MeshPhysicalMaterial({ color: 0x55585e, metalness: 0.75, roughness: 0.62 })
+// A locked medal keeps its own metals and enamels with the light turned down: no glow, no charm.
+function dimBadge(wrap) {
+  wrap.traverse((m) => {
+    if (!m.isMesh) return
+    m.material.color.multiplyScalar(0.42)
+    if (m.material.emissive) m.material.emissiveIntensity *= 0.15
+  })
+}
 const SHARED_MAPS = new Set([BRUSHED, DOT])
 
 function disposeBadge(root) {
   root.traverse((m) => {
     m.geometry?.dispose()
-    if (!m.material || m.material === LOCKED_MAT) return
+    if (!m.material) return
     const map = m.material.map
     if (map && !SHARED_MAPS.has(map)) map.dispose()
     m.material.dispose()
   })
 }
+const SLIDE = 3.4   // world units: far enough to leave the frame on a phone
 const clamp01 = (x) => Math.min(1, Math.max(0, x))
 const easeOut = (x) => 1 - Math.pow(1 - clamp01(x), 3)
 
@@ -465,11 +472,15 @@ export function createMedalStage({ canvas, mode = 'hero', reducedMotion = false 
   const KEEP = 3
   let current = null
   let shownAt = 0
+  let enterDir = 0
+  let leaving = null
   let token = 0
   const t0 = performance.now()
   const elapsed = () => (performance.now() - t0) / 1000
 
-  async function show(tier, { locked = false } = {}) {
+  /** dir: -1 or 1 slides the old medal out and the new one in from that side; the camera, and so the
+   *  angle the player turned it to, stays put. 0 swaps in place. */
+  async function show(tier, { locked = false, dir = 0 } = {}) {
     const mine = ++token
     const key = `${tier}${locked ? ':locked' : ''}`
     let badge = cache.get(key)
@@ -477,7 +488,7 @@ export function createMedalStage({ canvas, mode = 'hero', reducedMotion = false 
       const svg = await svgFor(tier)
       if (mine !== token) return   // a newer request came in while this one loaded; skip the build
       badge = buildBadge(svg)
-      if (locked) badge.traverse((m) => { if (m.isMesh) m.material = LOCKED_MAT })
+      if (locked) dimBadge(badge)
       else applyCharm(badge, CHARMS[tier])
       badge.userData.anchors = new Map()
     }
@@ -485,15 +496,21 @@ export function createMedalStage({ canvas, mode = 'hero', reducedMotion = false 
     cache.set(key, badge)
     for (const [k, b] of cache) {
       if (cache.size <= KEEP) break
-      if (b !== current) { disposeBadge(b); cache.delete(k) }
+      if (b !== current && b !== leaving?.obj) { disposeBadge(b); cache.delete(k) }
     }
     if (mine !== token) return   // a newer request won the race
-    if (current) scene.remove(current)
+    const prev = current
     current = cache.get(key)
+    if (leaving) { scene.remove(leaving.obj); leaving.obj.position.x = 0; leaving = null }
+    if (prev && prev !== current) {
+      if (dir && !reducedMotion) leaving = { obj: prev, t0: elapsed(), dir }
+      else scene.remove(prev)
+    }
     current.rotation.set(0, 0, 0)
     current.position.set(0, 0, 0)
     scene.add(current)
     shownAt = elapsed()
+    enterDir = reducedMotion ? 0 : dir
   }
 
   /** Where a point on the badge (SVG units, 96 box) is on screen, in CSS px from the canvas's top left,
@@ -540,12 +557,17 @@ export function createMedalStage({ canvas, mode = 'hero', reducedMotion = false 
   const frame = () => {
     const t = elapsed()
     updateShine(t)
+    if (leaving) {
+      const k = clamp01((t - leaving.t0) / 0.26)
+      leaving.obj.position.x = -leaving.dir * SLIDE * k * k
+      if (k >= 1) { scene.remove(leaving.obj); leaving.obj.position.x = 0; leaving = null }
+    }
     if (current) {
       const since = t - shownAt
-      const enter = reducedMotion ? 1 : easeOut(since / 0.8)
-      current.scale.setScalar(0.86 + 0.14 * enter)
-      const sway = mode === 'showcase' && !reducedMotion ? Math.sin(since * 0.5) * 0.3 : 0
-      current.rotation.y = sway - (1 - enter) * 0.9
+      const enter = reducedMotion ? 1 : easeOut(since / (enterDir ? 0.55 : 0.8))
+      current.scale.setScalar(enterDir ? 1 : 0.86 + 0.14 * enter)
+      current.position.x = enterDir * SLIDE * (1 - enter)
+      current.rotation.y = mode === 'showcase' && !reducedMotion ? Math.sin(since * 0.5) * 0.3 : 0
       current.position.y = reducedMotion ? 0 : Math.sin(t * 1.1) * 0.04
       current.userData.charmUpdate?.(reducedMotion ? 2.3 : t)
     }
@@ -574,7 +596,7 @@ export function createMedalStage({ canvas, mode = 'hero', reducedMotion = false 
       disposeBadge(scene)
       scene.environment.dispose()
       // The shared texture and material hold a dispose listener per renderer; firing it lets this one go.
-      BRUSHED.dispose(); DOT.dispose(); LOCKED_MAT.dispose()
+      BRUSHED.dispose(); DOT.dispose()
       renderer.dispose()
       // Free the context now: each visit to the medal close-up makes a new one, and browsers cap them.
       renderer.forceContextLoss()

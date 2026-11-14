@@ -26,7 +26,11 @@ export function buildShareText(p: ShareInputs): string {
 /** Share via the native sheet when available, else copy to clipboard.
  *  Returns how it went out so the button can confirm. */
 export async function shareProfile(p: ShareInputs): Promise<'shared' | 'copied' | 'failed'> {
-    const text = buildShareText(p)
+    return shareText(buildShareText(p))
+}
+
+/** Any text out through the native share sheet, or the clipboard where there is none. */
+export async function shareText(text: string): Promise<'shared' | 'copied' | 'failed'> {
     if (navigator.share) {
         try {
             await navigator.share({ text })

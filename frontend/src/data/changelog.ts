@@ -73,7 +73,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         level: 'loud',
         tag: 'NEW',
         title: 'See every badge as a 3D medal',
-        body: 'Open Badges to spin your medal, swipe through all 20 tiers, and tap one to read its story. Locked medals show how far you are from them.',
+        body: 'Open Badges to spin your medal and read what it is made of. Every badge you have earned sits on your shelf, with the date you got it and how close the next one is.',
         cta: { label: 'SEE YOUR BADGES', route: { name: 'badges' } },
     },
     {
