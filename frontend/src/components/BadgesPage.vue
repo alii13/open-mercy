@@ -14,14 +14,14 @@
 
     <main class="bp-col">
       <!-- One medal up close: its name, the live 3D medal and two facts about it. -->
-      <section class="bp-hero" aria-live="polite">
-        <div ref="nameEl" class="bp-name-block" @pointerdown="swipeStart" @pointerup="swipeEnd">
+      <section class="bp-hero">
+        <div ref="nameEl" class="bp-name-block" aria-live="polite" @pointerdown="swipeStart" @pointerup="swipeEnd">
           <h2 class="bp-name">{{ tierOf(sel).title }}</h2>
           <p class="bp-meta">{{ metaLine(sel) }}</p>
         </div>
         <div class="bp-medal-wrap">
           <span class="bp-glow" :class="`bp-glow--${stateOf(sel)}`" aria-hidden="true"></span>
-          <MedalView class="bp-medal" :tier="sel" :locked="stateOf(sel) === 'locked'" :facts="facts" :sides="wide" :label="wide ? tierOf(sel).title : `${tierOf(sel).title}: next fact`">
+          <MedalView v-if="pointsLoaded" class="bp-medal" :tier="sel" :locked="stateOf(sel) === 'locked'" :facts="facts" :sides="wide" :label="wide ? tierOf(sel).title : `${tierOf(sel).title}: next fact`">
             <button v-if="sel > 1" type="button" class="bp-arrow bp-arrow--prev" :aria-label="`Previous badge, ${tierOf(sel - 1).title}`" @click="select(sel - 1)">
               <ChevronLeft :size="20" :stroke-width="2" aria-hidden="true" />
             </button>
@@ -95,9 +95,13 @@ const retention = useRetentionStore()
 // this page is about the total after today's games.
 const { badges, fetchBadges } = useBadges()
 const { dates, fetchDates } = useBadgeDates()
+// The medal waits for a signed-in player's points (or a failed read), so it is built once,
+// for the right tier and lock state, instead of building Recruit first.
+const pointsLoaded = ref(false)
 watch(() => auth.user?.id, (id) => {
   void fetchDates(id ?? null)
-  if (id) void fetchBadges([id], { fresh: true })
+  pointsLoaded.value = !id
+  if (id) void fetchBadges([id], { fresh: true }).finally(() => { pointsLoaded.value = true })
 }, { immediate: true })
 
 function daysIdleFromDate(dateStr: string | null): number {

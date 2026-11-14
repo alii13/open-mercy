@@ -561,8 +561,8 @@ export function createMedalStage({ canvas, mode = 'hero', reducedMotion = false 
     const front = new THREE.Vector3(0, 0, 1).applyQuaternion(current.getWorldQuaternion(new THREE.Quaternion()))
     const facing = clamp01((front.dot(camera.position.clone().sub(world).normalize()) - 0.3) / 0.25)
     const p = world.project(camera)
-    const r = canvas.getBoundingClientRect()
-    return { x: (p.x + 1) / 2 * r.width, y: (1 - p.y) / 2 * r.height, facing }
+    // The size fit() last saw: reading the canvas rect here would force a layout on every frame.
+    return { x: (p.x + 1) / 2 * viewW, y: (1 - p.y) / 2 * viewH, facing }
   }
 
   // A tap (not a drag) on the medal.
@@ -579,9 +579,11 @@ export function createMedalStage({ canvas, mode = 'hero', reducedMotion = false 
   canvas.addEventListener('pointerdown', onDown)
   canvas.addEventListener('pointerup', onUp)
 
+  let viewW = 0, viewH = 0
   const fit = () => {
     const w = canvas.clientWidth, h = canvas.clientHeight
     if (!w || !h) return
+    viewW = w; viewH = h
     renderer.setSize(w, h, false)
     camera.aspect = w / h
     camera.updateProjectionMatrix()

@@ -25,7 +25,7 @@
       <div v-if="facts.length > 1" class="mv-pips">
         <button v-for="(_, i) in facts" :key="i" type="button" class="mv-pip" :class="{ 'mv-pip--on': i === idx }" :aria-label="`Fact ${i + 1} of ${facts.length}`" :aria-pressed="i === idx" @click="idx = i"><i></i></button>
       </div>
-      <div v-if="fact" ref="card" class="mv-fact" aria-live="polite">
+      <div v-if="fact" ref="card" class="mv-fact">
         <div class="mv-fact-title">{{ fact.title }}</div>
         <div v-if="fact.big" class="mv-fact-big">{{ fact.big }}</div>
         <div class="mv-fact-text">{{ fact.text }}</div>
@@ -35,7 +35,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { MedalStage } from '../../badges3d/medalStage'
 import type { BadgeFact } from '../../utils/badgeFacts'
 import { artUrl } from '../../utils/badgeArt'
@@ -53,6 +53,27 @@ type Line = { points: string; ax: number; ay: number }
 const lines = ref<Line[]>([])
 const sideEls: (HTMLElement | null)[] = []
 let lastKey = ''
+// Where the canvas and the fact text sit inside the root. Scrolling moves them together, so they are
+// measured only after a resize or a fact change, never per frame.
+type Box = { left: number; right: number; top: number; bottom: number }
+let layout: { ox: number; oy: number; boxes: (Box | null)[] } | null = null
+let resizeObs: ResizeObserver | null = null
+function measure() {
+  if (!root.value || !canvas.value) return
+  const r = root.value.getBoundingClientRect()
+  const cv = canvas.value.getBoundingClientRect()
+  const els = props.sides ? sideEls.slice(0, 2) : [card.value]
+  layout = {
+    ox: cv.left - r.left,
+    oy: cv.top - r.top,
+    boxes: els.map((el) => {
+      if (!el) return null
+      const c = el.getBoundingClientRect()
+      return { left: c.left - r.left, right: c.right - r.left, top: c.top - r.top, bottom: c.bottom - r.top }
+    }),
+  }
+}
+watch(() => [props.facts, idx.value, props.sides], () => nextTick(() => { layout = null }))
 let stage: MedalStage | null = null
 let disposed = false
 
@@ -81,34 +102,33 @@ onMounted(async () => {
   // Each fact gets a line from its part of the medal to its text, redrawn as the medal turns.
   const tick = () => {
     const next: Line[] = []
-    if (stage && root.value && canvas.value) {
-      const r = root.value.getBoundingClientRect()
-      const cv = canvas.value.getBoundingClientRect()
+    if (!layout) measure()
+    if (stage && layout) {
+      const { ox, oy, boxes } = layout
       const shown = props.sides ? props.facts.slice(0, 2) : fact.value ? [fact.value] : []
       shown.forEach((f, i) => {
-        const el = props.sides ? sideEls[i] : card.value
+        const c = boxes[i]
         const a = f.at && stage!.project(f.at)
-        if (!el || !a || a.facing < 0.2) return
-        const ax = a.x + cv.left - r.left
-        const ay = a.y + cv.top - r.top
-        const c = el.getBoundingClientRect()
+        if (!c || !a || a.facing < 0.2) return
+        const ax = a.x + ox
+        const ay = a.y + oy
         if (!props.sides) {
-          const tx = Math.min(Math.max(ax, c.left - r.left + 28), c.right - r.left - 28)
-          const ty = c.top - r.top
-          next.push({ points: `${ax},${ay} ${tx},${ty - 18} ${tx},${ty}`, ax, ay })
+          const tx = Math.min(Math.max(ax, c.left + 28), c.right - 28)
+          next.push({ points: `${ax},${ay} ${tx},${c.top - 18} ${tx},${c.top}`, ax, ay })
           return
         }
         // Left text sits above its line, right text below it; the line bends once to reach the medal.
         const left = i === 0
-        const y = left ? c.bottom - r.top + 14 : c.top - r.top - 14
-        const edge = left ? c.left - r.left : c.right - r.left
+        const y = left ? c.bottom + 14 : c.top - 14
         const knee = left ? ax - 32 : ax + 32
-        next.push({ points: `${edge},${y} ${knee},${y} ${ax},${ay}`, ax, ay })
+        next.push({ points: `${left ? c.left : c.right},${y} ${knee},${y} ${ax},${ay}`, ax, ay })
       })
     }
     const key = next.map(l => l.points).join('|')
     if (key !== lastKey) { lastKey = key; lines.value = next }
   }
+  resizeObs = new ResizeObserver(() => { layout = null })
+  if (root.value) resizeObs.observe(root.value)
   stage?.onFrame(tick)
 })
 
@@ -124,6 +144,7 @@ watch(() => [props.tier, props.locked] as const, ([tier, locked], [prevTier]) =>
 
 onBeforeUnmount(() => {
   disposed = true
+  resizeObs?.disconnect()
   stage?.dispose()
 })
 </script>
@@ -146,7 +167,7 @@ onBeforeUnmount(() => {
 .mv-side { position: absolute; width: 280px; display: flex; flex-direction: column; gap: var(--spacing-2); }
 .mv-side--l { left: 0; top: 16%; }
 .mv-side--r { right: 0; top: 64%; gap: 2px; }
-.mv-side .mv-fact-big { margin: 0; font-size: 2.5rem; line-height: 1.2; }
+.mv-side .mv-fact-big { margin: 0; font-size: var(--text-display); line-height: 1.2; }
 .mv-side .mv-fact-text { margin: 0; font-size: var(--text-base); line-height: 1.5; }
 .mv-side--r .mv-fact-text { color: var(--text-secondary); }
 .mv-pips { display: flex; justify-content: flex-end; }

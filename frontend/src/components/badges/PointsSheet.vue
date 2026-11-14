@@ -115,9 +115,9 @@ onBeforeUnmount(() => {
 @media (min-width: 768px) {
   .pts-sheet { max-width: 840px; padding: var(--spacing-4) var(--spacing-8) var(--spacing-8); }
   .pts-title { font-size: var(--text-xl); }
-  .pts-body { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 56px; padding-top: var(--spacing-4); }
+  .pts-body { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: var(--spacing-12); padding-top: var(--spacing-4); }
   .pts-hero { flex-direction: column; align-items: flex-start; justify-content: center; gap: var(--spacing-2); padding: 0 0 var(--spacing-6); }
-  .pts-hero-num { font-size: 6.5rem; white-space: nowrap; }
+  .pts-hero-num { white-space: nowrap; }
   .pts-hero-label { padding: 0; font-size: var(--text-xl); }
   .pts-hero-label br { display: none; }
   .pts-row { min-height: 64px; }

@@ -10,7 +10,7 @@
           :class="{ 'bs-item--locked': b.tier > tier }"
           :aria-label="labelOf(b)"
           :aria-pressed="b.tier === sel"
-          :aria-describedby="tip?.b.tier === b.tier ? 'bs-tip' : undefined"
+          :aria-describedby="`bs-mean-${b.tier}`"
           @click="onClick(b)"
           @pointerenter="(e) => e.pointerType === 'mouse' && showTip(b, e.currentTarget as HTMLElement)"
           @pointerleave="(e) => e.pointerType === 'mouse' && hideTip()"
@@ -34,6 +34,7 @@
               <circle cx="50" cy="50" r="34" class="bs-ring-fill" :stroke-dasharray="`${213.6 * nextFrac} 213.6`" />
             </svg>
           </span>
+          <span :id="`bs-mean-${b.tier}`" class="bs-sr">{{ BADGE_MEANING[b.tier] }}</span>
         </button>
       </div>
       <div class="bs-ledge"></div>
@@ -48,7 +49,7 @@
     </div>
     <!-- What a badge means: hover on desktop, press and hold on a phone. -->
     <Teleport to="body">
-      <div v-if="tip" id="bs-tip" role="tooltip" class="bs-tip" :class="tip.below ? 'bs-tip--below' : 'bs-tip--above'" :style="{ left: `${tip.left}px`, top: `${tip.y}px`, width: `${tip.width}px` }">
+      <div v-if="tip" class="bs-tip" aria-hidden="true" :class="tip.below ? 'bs-tip--below' : 'bs-tip--above'" :style="{ left: `${tip.left}px`, top: `${tip.y}px`, width: `${tip.width}px` }">
         <div class="bs-tip-head">
           <span class="bs-tip-name">{{ tip.b.title }}</span>
           <span class="bs-tip-tag">{{ tagOf(tip.b) }}</span>
@@ -153,7 +154,7 @@ function onClick(b: Badge) {
 .bs-medals { display: flex; height: calc(var(--bs-medal) + 16px); align-items: flex-end; background: radial-gradient(ellipse at 50% 100%, rgba(255, 230, 200, 0.08) 0%, transparent 70%); }
 .bs-item { flex: 1; display: flex; justify-content: center; padding: 0 0 var(--spacing-2); background: none; border: 0; cursor: pointer; -webkit-touch-callout: none; user-select: none; }
 .bs-float { position: relative; display: block; width: var(--bs-medal); height: var(--bs-medal); }
-.bs-img { width: 100%; height: 100%; object-fit: contain; display: block; transition: filter 150ms ease-out; }
+.bs-img { width: 100%; height: 100%; object-fit: contain; display: block; transition: filter var(--duration-snap) ease-out; }
 .bs-item--locked .bs-img { filter: brightness(0.55) saturate(0.85); }
 @media (hover: hover) {
   .bs-item:hover .bs-img { filter: brightness(1.12); }
@@ -174,7 +175,7 @@ function onClick(b: Badge) {
 .bs--wall .bs-plaques { padding-top: var(--spacing-3); }
 .bs--wall .bs-name { font-size: var(--text-base); }
 .bs--wall .bs-line { font-size: var(--text-sm); }
-.bs-tip { position: fixed; z-index: var(--z-toast); display: flex; flex-direction: column; gap: 6px; padding: 14px var(--spacing-4); border-radius: var(--radius-md); background: #1a1c1f; border: 1px solid #2e3237; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6); pointer-events: none; }
+.bs-tip { position: fixed; z-index: var(--z-toast); display: flex; flex-direction: column; gap: var(--spacing-1); padding: var(--spacing-3) var(--spacing-4); border-radius: var(--radius-md); background: #1a1c1f; border: 1px solid #2e3237; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6); pointer-events: none; }
 .bs-tip--above { transform: translateY(-100%); }
 .bs-tip-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--spacing-3); }
 .bs-tip-name { font-size: var(--text-base); font-weight: 700; color: #fff; }
@@ -184,9 +185,10 @@ function onClick(b: Badge) {
 .bs-tip--above .bs-tip-arrow { bottom: -7px; border-right: 1px solid #2e3237; border-bottom: 1px solid #2e3237; }
 .bs-tip--below .bs-tip-arrow { top: -7px; border-left: 1px solid #2e3237; border-top: 1px solid #2e3237; }
 @media (prefers-reduced-motion: no-preference) {
-  .bs-tip { animation: bs-tip-in 150ms ease-out both; }
+  .bs-tip { animation: bs-tip-in var(--duration-snap) ease-out both; }
 }
 @keyframes bs-tip-in { from { opacity: 0; } }
+.bs-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .bs-yours { font-size: var(--text-xs); font-weight: 700; letter-spacing: 0.12em; color: var(--color-hazard); }
 @media (prefers-reduced-motion: no-preference) {
   .bs-float { animation: bs-float 3.2s ease-in-out infinite; }
