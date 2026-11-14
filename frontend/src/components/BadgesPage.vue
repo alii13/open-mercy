@@ -6,23 +6,81 @@
         BACK
       </button>
       <h1 class="bp-title">BADGES</h1>
-      <span class="bp-spacer" aria-hidden="true"></span>
+      <span class="bp-count">{{ sel }}/20</span>
     </header>
 
-    <div class="bp-body">
-      <!-- Your standing, if you've played -->
-      <section v-if="showOwn" class="bp-you">
-        <Badge :badge="badge" size="full" :progress="badgeProgress" />
-        <p class="bp-you-line">
-          You're a <strong :style="{ color: badge.color }">{{ badge.title }}</strong>
-          with {{ badgePoints.toLocaleString() }} points.
-          <template v-if="badgeProgress.next">
-            {{ badgeProgress.needed.toLocaleString() }} more to {{ badgeProgress.next.title }}.
-          </template>
-          <template v-else>You've hit the top. Respect.</template>
-        </p>
-      </section>
+    <!-- The ladder as a carousel: one live medal, the neighbours peeking, a rail of all twenty. -->
+    <section class="bp-carousel" aria-label="Your badges">
+      <div class="bp-stage">
+        <span class="bp-glow" :class="`bp-glow--${stateOf(sel)}`" aria-hidden="true"></span>
+        <span v-if="sel > 1" class="bp-peek bp-peek--left" :class="{ 'bp-peek--locked': stateOf(sel - 1) === 'locked' }" :style="{ backgroundImage: artUrl(sel - 1) }" aria-hidden="true"></span>
+        <span v-if="sel < 20" class="bp-peek bp-peek--right" :class="{ 'bp-peek--locked': stateOf(sel + 1) === 'locked' }" :style="{ backgroundImage: artUrl(sel + 1) }" aria-hidden="true"></span>
+        <MedalView v-if="!detailTier" class="bp-medal" :tier="sel" :locked="stateOf(sel) === 'locked'" mode="hero" :label="`Open ${tierOf(sel).title}`" @tap="openDetail" />
+        <button v-if="sel > 1" type="button" class="bp-edge bp-edge--left" aria-label="Previous badge" @click="select(sel - 1)">
+          <ChevronLeft :size="20" :stroke-width="2" aria-hidden="true" />
+        </button>
+        <button v-if="sel < 20" type="button" class="bp-edge bp-edge--right" aria-label="Next badge" @click="select(sel + 1)">
+          <ChevronRight :size="20" :stroke-width="2" aria-hidden="true" />
+        </button>
+      </div>
+      <div class="bp-info" @pointerdown="swipeStart" @pointerup="swipeEnd">
+        <h2 class="bp-name">{{ tierOf(sel).title }}</h2>
+        <p class="bp-meta">{{ metaLine(sel) }}</p>
+        <div v-if="stateOf(sel) === 'current' && badgeProgress.next" class="bp-climb">
+          <div class="bp-climb-row">
+            <span class="bp-climb-pts">{{ badgePoints.toLocaleString() }} <span>/ {{ badgeProgress.next.threshold.toLocaleString() }}</span></span>
+            <span class="bp-hz">{{ badgeProgress.needed.toLocaleString() }} TO {{ badgeProgress.next.title.toUpperCase() }}</span>
+          </div>
+          <div class="bp-bar"><i :style="{ width: `${Math.round((badgePoints / badgeProgress.next.threshold) * 100)}%` }"></i></div>
+        </div>
+        <p v-else-if="stateOf(sel) === 'locked'" class="bp-line">{{ lockedLine(sel) }}</p>
+        <p v-else class="bp-line">Tap the medal to see its story.</p>
+      </div>
+      <div ref="rail" class="bp-rail">
+        <button
+          v-for="t in BADGES"
+          :key="t.tier"
+          type="button"
+          class="bp-rv"
+          :class="{ 'bp-rv--sel': t.tier === sel, 'bp-rv--you': t.tier === badge.tier }"
+          :aria-label="t.title"
+          :aria-pressed="t.tier === sel"
+          @click="select(t.tier)"
+        >
+          <span class="bp-rv-art" :class="{ 'bp-rv-art--locked': t.tier > badge.tier }" :style="{ '--art': artUrl(t.tier) }"></span>
+        </button>
+      </div>
+    </section>
 
+    <!-- One medal up close: its story when earned, what it takes when locked. -->
+    <div v-if="detailTier" class="bp-detail" role="dialog" aria-modal="true" :aria-label="tierOf(detailTier).title" @keydown.esc="closeDetail">
+      <header class="bp-topbar">
+        <button ref="detailBack" class="back-link" @click="closeDetail">
+          <ChevronLeft :size="14" :stroke-width="2" aria-hidden="true" />
+          BADGES
+        </button>
+        <h1 class="bp-title">{{ tierOf(detailTier).title }}</h1>
+        <span class="bp-count">{{ detailTier }}/20</span>
+      </header>
+      <p class="bp-meta bp-detail-meta">{{ metaLine(detailTier) }}</p>
+      <div class="bp-detail-stage">
+        <MedalView :tier="detailTier" :locked="stateOf(detailTier) === 'locked'" mode="showcase" :fact="stateOf(detailTier) === 'locked' ? null : BADGE_FACTS[detailTier]" />
+      </div>
+      <div v-if="stateOf(detailTier) === 'locked'" class="bp-detail-locked">
+        <p class="bp-line">{{ lockedLine(detailTier) }}</p>
+        <div class="bp-climb-row">
+          <span class="bp-climb-pts">{{ badgePoints.toLocaleString() }} <span>/ {{ tierOf(detailTier).threshold.toLocaleString() }}</span></span>
+          <span class="bp-hz">{{ (tierOf(detailTier).threshold - badgePoints).toLocaleString() }} TO GO</span>
+        </div>
+        <div class="bp-bar"><i :style="{ width: `${Math.max(1, Math.round((badgePoints / tierOf(detailTier).threshold) * 100))}%` }"></i></div>
+        <button type="button" class="bp-play" @click="play">
+          <Play :size="16" :stroke-width="2" aria-hidden="true" />
+          PLAY A GAME
+        </button>
+      </div>
+    </div>
+
+    <div class="bp-body">
       <!-- Plain-language intro -->
       <section class="bp-intro">
         <h2 class="bp-h2">How it works</h2>
@@ -36,18 +94,6 @@
           stop showing up, your progress toward the <em>next</em> badge slips a
           little each day. Play again and it starts building right back.
         </p>
-      </section>
-
-      <!-- The ladder -->
-      <section class="bp-ladder">
-        <h2 class="bp-h2">The twenty badges</h2>
-        <ul class="bp-tiers">
-          <li v-for="t in BADGES" :key="t.tier" class="bp-tier" :class="{ here: showOwn && t.tier === badge.tier }">
-            <Badge :badge="t" size="chip" class="bp-tier-badge" />
-            <span class="bp-tier-pts">{{ t.threshold === 0 ? 'Start' : t.threshold.toLocaleString() + ' pts' }}</span>
-            <span class="bp-tier-feel">{{ FEEL[t.tier - 1] }}</span>
-          </li>
-        </ul>
       </section>
 
       <!-- Earning table -->
@@ -99,13 +145,17 @@
 </template>
 
 <script setup lang="ts">
-import { ChevronLeft } from 'lucide-vue-next'
-import { computed, watch } from 'vue'
+import { ChevronLeft, ChevronRight, Play } from 'lucide-vue-next'
+import { computed, nextTick, ref, watch } from 'vue'
 import { BADGES, POINT_WEIGHTS, applyDecay, badgeFor, pointsFromRetention, progressToNext } from '../utils/badges'
 import { useBadges } from '../composables/useBadges'
 import { useAuthStore } from '../stores/authStore'
 import { useRetentionStore } from '../stores/retentionStore'
-import Badge from './Badge.vue'
+import MedalView from './badges/MedalView.vue'
+import { artUrl } from '../utils/badgeArt'
+import { BADGE_FACTS } from '../utils/badgeFacts'
+import { heldByLine, useBadgeHolders } from '../composables/useBadgeHolders'
+import { router } from '../utils/routes'
 import SiteFooter from './SiteFooter.vue'
 
 defineEmits<{ (e: 'back'): void }>()
@@ -138,30 +188,53 @@ const badgePoints = computed(() => {
 })
 const badge = computed(() => badgeFor(badgePoints.value))
 const badgeProgress = computed(() => progressToNext(badgePoints.value))
-const showOwn = computed(() => badgePoints.value > 0)
 
-const FEEL = [
-  'Everyone starts here',
-  'First few games in',
-  'Getting the hang of it',
-  'A regular at the table',
-  'Committed to the deck',
-  'A serious player',
-  'Rare at any table',
-  'Very rare',
-  'Notable across the board',
-  'Months of play',
-  'Past the King',
-  'Rarer than a King',
-  'Only the obsessed',
-  'Feared at every table',
-  'Over half a million points',
-  'Barely ever seen',
-  'A million points',
-  'Few will ever get here',
-  'One step from the top',
-  'The top. Nothing above it',
-]
+// ---- the carousel
+type TierState = 'earned' | 'current' | 'locked'
+const sel = ref(1)
+watch(() => badge.value.tier, (t) => { sel.value = t }, { immediate: true })
+const tierOf = (n: number) => BADGES[Math.min(19, Math.max(0, n - 1))]!
+const stateOf = (n: number): TierState => (n < badge.value.tier ? 'earned' : n === badge.value.tier ? 'current' : 'locked')
+
+const { holders, fetchHolders } = useBadgeHolders()
+void fetchHolders()
+
+function metaLine(n: number): string {
+  const s = stateOf(n)
+  if (s === 'current') return `YOUR TIER · ${n} OF 20`
+  if (s === 'earned') return `EARNED · TIER ${n} OF 20`
+  return `LOCKED · ${tierOf(n).threshold.toLocaleString()} POINTS`
+}
+function lockedLine(n: number): string {
+  const held = heldByLine(n, holders.value)
+  const need = `You need ${(tierOf(n).threshold - badgePoints.value).toLocaleString()} more points.`
+  return held ? `${held}. ${need}` : need
+}
+
+const rail = ref<HTMLElement | null>(null)
+function select(n: number) {
+  sel.value = Math.min(20, Math.max(1, n))
+  void nextTick(() => rail.value?.children[sel.value - 1]?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' }))
+}
+// The medal spins under a drag, so moving through the ladder is a swipe on the name area, the edges or the rail.
+let swipeX: number | null = null
+const swipeStart = (e: PointerEvent) => { swipeX = e.clientX }
+function swipeEnd(e: PointerEvent) {
+  if (swipeX === null) return
+  const dx = e.clientX - swipeX
+  swipeX = null
+  if (Math.abs(dx) > 40) select(sel.value + (dx < 0 ? 1 : -1))
+}
+
+// ---- the detail view
+const detailTier = ref<number | null>(null)
+const detailBack = ref<HTMLButtonElement | null>(null)
+function openDetail() {
+  detailTier.value = sel.value
+  void nextTick(() => detailBack.value?.focus())
+}
+function closeDetail() { detailTier.value = null }
+function play() { void router.push('/public') }
 
 const EARN = [
   { label: 'Win a game', points: POINT_WEIGHTS.win },
@@ -210,7 +283,6 @@ const EARN = [
   letter-spacing: 0.18em;
   margin: 0;
 }
-.bp-spacer { width: 48px; }
 
 .bp-body {
   width: 100%;
@@ -222,19 +294,6 @@ const EARN = [
   gap: var(--spacing-8);
   flex: 1;
 }
-
-.bp-you {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--spacing-4);
-  padding: var(--spacing-6);
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  text-align: center;
-}
-.bp-you-line { margin: 0; color: #cfcfd4; font-size: 0.95rem; line-height: 1.5; }
 
 .bp-h2 {
   font-family: var(--font-display), sans-serif;
@@ -250,39 +309,6 @@ const EARN = [
   line-height: 1.6;
 }
 .bp-intro em { color: #e6e6e6; font-style: italic; }
-
-.bp-tiers {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-1);
-}
-.bp-tier {
-  display: grid;
-  grid-template-columns: minmax(120px, 1.2fr) auto 1.6fr;
-  align-items: center;
-  gap: var(--spacing-3);
-  padding: var(--spacing-3);
-  border-radius: 10px;
-  border: 1px solid transparent;
-}
-.bp-tier.here {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.14);
-}
-.bp-tier-pts {
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  color: #a1a1aa;
-  white-space: nowrap;
-  text-align: right;
-}
-.bp-tier-feel {
-  font-size: 0.8rem;
-  color: #8a8f98;
-}
 
 .bp-earn-list {
   list-style: none;
@@ -331,14 +357,47 @@ const EARN = [
 .bp-table th:last-child,
 .bp-table td:last-child { text-align: right; color: #e6e6e6; }
 
-@media (max-width: 480px) {
-  .bp-tier {
-    grid-template-columns: 1fr auto;
-    grid-template-areas: 'badge pts' 'feel feel';
-    row-gap: var(--spacing-1);
-  }
-  .bp-tier-badge { grid-area: badge; }
-  .bp-tier-pts { grid-area: pts; }
-  .bp-tier-feel { grid-area: feel; }
-}
+/* ---- carousel: one live medal fills the first screen; the explainer is below it */
+.bp-count { width: 48px; text-align: right; font-size: var(--text-xs); font-weight: 600; letter-spacing: 0.12em; color: var(--text-secondary); }
+.bp-carousel { display: flex; flex-direction: column; height: calc(100dvh - 72px); min-height: 600px; }
+.bp-stage { position: relative; flex: 1; min-height: 340px; overflow: hidden; }
+.bp-medal { position: absolute; inset: 0 56px; width: auto; }
+.bp-glow { position: absolute; left: 50%; top: 50%; width: 340px; height: 340px; margin: -185px 0 0 -170px; border-radius: var(--radius-pill); pointer-events: none; }
+.bp-glow--earned { background: radial-gradient(circle, rgba(255, 80, 40, 0.28) 0%, transparent 65%); }
+.bp-glow--current { background: radial-gradient(circle, rgba(255, 150, 60, 0.34) 0%, transparent 65%); }
+.bp-glow--locked { background: radial-gradient(circle, rgba(160, 160, 170, 0.1) 0%, transparent 65%); }
+.bp-peek { position: absolute; top: 50%; width: 120px; height: 120px; margin-top: -76px; background: center / contain no-repeat; opacity: 0.35; filter: saturate(0.6); pointer-events: none; }
+.bp-peek--left { left: -60px; }
+.bp-peek--right { right: -60px; }
+.bp-peek--locked { filter: grayscale(1) brightness(0.35); }
+.bp-edge { position: absolute; top: 0; bottom: 0; width: 56px; display: flex; align-items: flex-end; justify-content: center; padding-bottom: var(--spacing-4); background: none; border: none; color: var(--text-secondary); cursor: pointer; touch-action: pan-y; }
+.bp-edge--left { left: 0; }
+.bp-edge--right { right: 0; }
+@media (pointer: coarse) { .bp-edge svg { visibility: hidden; } }
+.bp-info { display: flex; flex-direction: column; align-items: center; gap: var(--spacing-1); min-height: 168px; padding: 0 var(--spacing-6) var(--spacing-6); text-align: center; touch-action: pan-y; }
+.bp-name { margin: 0; font-family: var(--font-display); font-size: var(--text-3xl); line-height: 1.15; font-weight: 400; color: #fff; }
+.bp-meta { margin: 0; font-size: var(--text-xs); font-weight: 700; letter-spacing: 0.12em; color: #ffcf99; }
+.bp-line { margin: var(--spacing-3) 0 0; font-size: var(--text-sm); line-height: 1.5; color: var(--text-secondary); }
+.bp-climb { width: 100%; margin-top: var(--spacing-4); display: flex; flex-direction: column; gap: var(--spacing-2); }
+.bp-climb-row { display: flex; justify-content: space-between; align-items: baseline; gap: var(--spacing-3); }
+.bp-climb-pts { font-size: var(--text-base); font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; }
+.bp-climb-pts span { font-weight: 400; color: var(--text-secondary); }
+.bp-hz { font-size: var(--text-xs); font-weight: 700; letter-spacing: 0.12em; color: var(--color-hazard); white-space: nowrap; }
+.bp-bar { height: 8px; border-radius: 2px; background: var(--surface-metal); overflow: hidden; }
+.bp-bar i { display: block; height: 100%; background: repeating-linear-gradient(135deg, var(--color-hazard) 0 8px, var(--color-hazard-dim) 8px 14px); }
+.bp-rail { display: flex; gap: var(--spacing-1); padding: var(--spacing-3) var(--spacing-3) calc(var(--spacing-4) + env(safe-area-inset-bottom)); overflow-x: auto; scrollbar-width: none; border-top: 1px solid var(--surface-metal); }
+.bp-rv { position: relative; flex-shrink: 0; width: 44px; height: 56px; display: flex; align-items: center; justify-content: center; background: none; border: none; cursor: pointer; }
+.bp-rv-art { width: 36px; height: 36px; background: var(--art) center / contain no-repeat; }
+.bp-rv-art--locked { background: var(--surface-metal); -webkit-mask: var(--art) center / contain no-repeat; mask: var(--art) center / contain no-repeat; }
+.bp-rv::after { content: ''; position: absolute; left: 12px; right: 12px; bottom: 0; height: 2px; border-radius: 1px; }
+.bp-rv--sel::after { background: #ffcf99; }
+.bp-rv--you::before { content: 'YOU'; position: absolute; top: 0; font-size: 8px; font-weight: 700; letter-spacing: 0.16em; color: #ffcf99; }
+
+/* ---- detail */
+.bp-detail { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; background: var(--bg-concrete); }
+.bp-detail-meta { text-align: center; padding-top: var(--spacing-2); }
+.bp-detail-stage { position: relative; flex: 1; min-height: 360px; margin: var(--spacing-2) var(--spacing-4) var(--spacing-4); }
+.bp-detail-locked { display: flex; flex-direction: column; gap: var(--spacing-2); padding: 0 var(--spacing-4) calc(var(--spacing-6) + env(safe-area-inset-bottom)); }
+.bp-detail-locked .bp-line { margin: 0 0 var(--spacing-2); text-align: center; }
+.bp-play { margin-top: var(--spacing-3); min-height: 52px; display: flex; align-items: center; justify-content: center; gap: var(--spacing-2); border: none; border-radius: var(--radius-md); background: var(--color-alert); color: #fff; font-family: var(--font-display); font-size: var(--text-lg); letter-spacing: 0.06em; cursor: pointer; }
 </style>

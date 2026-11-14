@@ -69,6 +69,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: '2026-11-14T18:00Z',
+        level: 'loud',
+        tag: 'NEW',
+        title: 'See every badge as a 3D medal',
+        body: 'Open Badges to spin your medal, swipe through all 20 tiers, and tap one to read its story. Locked medals show how far you are from them.',
+        cta: { label: 'SEE YOUR BADGES', route: { name: 'badges' } },
+    },
+    {
         id: '2026-11-14T12:00Z',
         level: 'quiet',
         tag: 'NEW',
