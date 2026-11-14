@@ -1,16 +1,17 @@
 <template>
-  <Teleport to="body">
+  <Teleport to="body" :disabled="embedded">
     <div
       ref="overlayEl"
       class="ps-overlay"
-      role="dialog"
-      aria-modal="true"
+      :class="{ 'ps-embedded': embedded }"
+      :role="embedded ? undefined : 'dialog'"
+      :aria-modal="embedded ? undefined : 'true'"
       aria-labelledby="ps-title"
       tabindex="-1"
-      @click.self="close"
+      @click.self="!embedded && close()"
     >
       <div class="ps-sheet">
-        <span class="ps-grabber" aria-hidden="true"></span>
+        <span v-if="!embedded" class="ps-grabber" aria-hidden="true"></span>
 
         <!-- A guest's upload is refused by the bucket policy (supabase/avatars.sql),
              so the sheet explains it and hands them to the claim flow. The
@@ -30,7 +31,7 @@
         <template v-else>
           <header class="ps-head">
             <h2 id="ps-title" class="ps-title">Profile photo</h2>
-            <button type="button" class="ps-close" aria-label="Close" @click="close">
+            <button v-if="!embedded" type="button" class="ps-close" aria-label="Close" @click="close">
               <X :size="20" :stroke-width="2" aria-hidden="true" />
             </button>
           </header>
@@ -103,7 +104,11 @@ import { closePhotoSheet } from '../composables/usePhotoSheet'
 import { cropRect } from '../utils/avatar'
 import { track } from '../utils/analytics'
 
-defineEmits<{ claim: [] }>()
+const props = defineProps<{
+  /** Inside the account modal: no overlay, and closing returns to the account. */
+  embedded?: boolean
+}>()
+const emit = defineEmits<{ claim: []; done: [] }>()
 
 /** Crop circle diameter, and the strip of photo shown around it. */
 const VIEW = 248
@@ -134,20 +139,24 @@ function onKeydown(e: KeyboardEvent) {
 }
 
 onMounted(() => {
-  document.addEventListener('keydown', onKeydown)
-  overlayEl.value?.focus()
+  if (!props.embedded) {
+    document.addEventListener('keydown', onKeydown)
+    overlayEl.value?.focus()
+  }
   if (uid.value) void fetchBadges([uid.value])
 })
 
 onBeforeUnmount(() => {
   unmounted = true
-  document.removeEventListener('keydown', onKeydown)
+  if (!props.embedded) document.removeEventListener('keydown', onKeydown)
   if (photo.value) URL.revokeObjectURL(photo.value.url)
-  opener?.focus?.()
+  if (!props.embedded) opener?.focus?.()
 })
 
 function close() {
-  if (!busy.value) closePhotoSheet()
+  if (busy.value) return
+  if (props.embedded) emit('done')
+  else closePhotoSheet()
 }
 
 // ---- choosing a photo -----------------------------------------------------
@@ -296,7 +305,7 @@ async function save() {
     return
   }
   track('avatar_saved')
-  closePhotoSheet()
+  close()
 }
 
 async function remove() {
@@ -605,5 +614,24 @@ async function remove() {
 
 .ps-file {
   display: none;
+}
+/* Inside the account modal: the modal is the frame, so no overlay or surface. */
+.ps-overlay.ps-embedded {
+  position: static;
+  inset: auto;
+  z-index: auto;
+  display: block;
+  padding: 0;
+  background: none;
+}
+
+.ps-embedded .ps-sheet {
+  max-width: none;
+  max-height: none;
+  overflow: visible;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 0;
 }
 </style>

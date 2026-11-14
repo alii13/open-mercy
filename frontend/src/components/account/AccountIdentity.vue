@@ -7,7 +7,7 @@
         type="button"
         class="ai-photo"
         aria-label="Change profile photo"
-        @click="openPhotoSheet"
+        @click="$emit('photo')"
       >
         <Camera :size="16" :stroke-width="2" aria-hidden="true" />
       </button>
@@ -74,11 +74,10 @@ import Avatar from '../Avatar.vue'
 import { useAuthStore } from '../../stores/authStore'
 import { useMultiplayerStore } from '../../stores/multiplayerStore'
 import { avatarsAvailable } from '../../composables/useAvatars'
-import { openPhotoSheet } from '../../composables/usePhotoSheet'
 import { track } from '../../utils/analytics'
 
 defineProps<{ wide?: boolean; hideClaim?: boolean }>()
-defineEmits<{ claim: []; viewProfile: [] }>()
+defineEmits<{ claim: []; viewProfile: []; photo: [] }>()
 
 const authStore = useAuthStore()
 const mpStore = useMultiplayerStore()

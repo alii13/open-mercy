@@ -6,7 +6,7 @@
 
 import { ref } from 'vue'
 
-export type AccountStep = 'home' | 'claim' | 'delete'
+export type AccountStep = 'home' | 'claim' | 'delete' | 'photo' | 'email'
 
 /** null while closed. */
 export const accountStep = ref<AccountStep | null>(null)

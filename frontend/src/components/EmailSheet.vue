@@ -1,20 +1,21 @@
 <template>
-  <Teleport to="body">
+  <Teleport to="body" :disabled="embedded">
     <div
       ref="overlayEl"
       class="es-overlay"
-      role="dialog"
-      aria-modal="true"
+      :class="{ 'es-embedded': embedded }"
+      :role="embedded ? undefined : 'dialog'"
+      :aria-modal="embedded ? undefined : 'true'"
       aria-labelledby="es-title"
       tabindex="-1"
-      @click.self="close"
+      @click.self="!embedded && close()"
     >
       <div class="es-sheet">
-        <span class="es-grabber" aria-hidden="true"></span>
+        <span v-if="!embedded" class="es-grabber" aria-hidden="true"></span>
 
         <header class="es-head">
           <h2 id="es-title" class="es-title">{{ waiting ? 'Check both inboxes' : 'Change email' }}</h2>
-          <button type="button" class="es-close" aria-label="Close" @click="close">
+          <button v-if="!embedded" type="button" class="es-close" aria-label="Close" @click="close">
             <X :size="20" :stroke-width="2" aria-hidden="true" />
           </button>
         </header>
@@ -65,6 +66,12 @@ const newEmail = ref('')
 const busy = ref(false)
 const error = ref('')
 
+const props = defineProps<{
+  /** Inside the account modal: no overlay, and closing returns to the account. */
+  embedded?: boolean
+}>()
+const emit = defineEmits<{ done: [] }>()
+
 // A pending change is on the user (new_email), so after a reload the sheet
 // opens on it. "Use another email" goes back to the form.
 const editing = ref(false)
@@ -85,17 +92,21 @@ function onKeydown(e: KeyboardEvent) {
 }
 
 onMounted(() => {
-  document.addEventListener('keydown', onKeydown)
-  overlayEl.value?.focus()
+  if (!props.embedded) {
+    document.addEventListener('keydown', onKeydown)
+    overlayEl.value?.focus()
+  }
 })
 
 onBeforeUnmount(() => {
-  document.removeEventListener('keydown', onKeydown)
-  opener?.focus?.()
+  if (!props.embedded) document.removeEventListener('keydown', onKeydown)
+  if (!props.embedded) opener?.focus?.()
 })
 
 function close() {
-  if (!busy.value) closeEmailSheet()
+  if (busy.value) return
+  if (props.embedded) emit('done')
+  else closeEmailSheet()
 }
 
 async function useAnother() {
@@ -305,5 +316,24 @@ async function submit() {
   line-height: 1.45;
   color: var(--text-muted);
   text-align: center;
+}
+/* Inside the account modal: the modal is the frame, so no overlay or surface. */
+.es-overlay.es-embedded {
+  position: static;
+  inset: auto;
+  z-index: auto;
+  display: block;
+  padding: 0;
+  background: none;
+}
+
+.es-embedded .es-sheet {
+  max-width: none;
+  max-height: none;
+  overflow: visible;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 0;
 }
 </style>

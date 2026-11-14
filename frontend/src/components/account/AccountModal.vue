@@ -9,7 +9,7 @@
         aria-labelledby="acct-label"
       >
         <aside v-if="wide" class="acct-side">
-          <AccountIdentity wide :hide-claim="step === 'claim'" @claim="go('claim')" @view-profile="viewProfile" />
+          <AccountIdentity wide :hide-claim="step === 'claim'" @claim="go('claim')" @photo="go('photo')" @view-profile="viewProfile" />
         </aside>
 
         <section class="acct-main">
@@ -26,7 +26,7 @@
 
           <div class="acct-body">
             <template v-if="step === 'home'">
-              <AccountIdentity v-if="!wide" class="acct-identity" @claim="go('claim')" />
+              <AccountIdentity v-if="!wide" class="acct-identity" @claim="go('claim')" @photo="go('photo')" />
 
               <!-- Friends: requests answered in place on desktop, one row on phones -->
               <template v-if="!social.unavailable">
@@ -66,10 +66,10 @@
                   <div class="acct-email">
                     <Mail class="acct-row-icon" :size="20" :stroke-width="2" aria-hidden="true" />
                     <span class="acct-email-text">{{ authStore.user?.email }}</span>
-                    <button type="button" class="acct-change" @click="openEmailSheet">Change</button>
+                    <button type="button" class="acct-change" @click="go('email')">Change</button>
                   </div>
                 </section>
-                <button v-else type="button" class="acct-row" @click="openEmailSheet">
+                <button v-else type="button" class="acct-row" @click="go('email')">
                   <Mail class="acct-row-icon" :size="20" :stroke-width="2" aria-hidden="true" />
                   <span class="acct-row-label">Email</span>
                   <span class="acct-row-meta">{{ maskedEmail }}</span>
@@ -98,6 +98,10 @@
 
             <DeleteAccountStep v-else-if="step === 'delete'" :wide="wide" @keep="go('home')" />
 
+            <!-- Photo and email are steps in this frame, never a second modal on top. -->
+            <PhotoSheet v-else-if="step === 'photo'" embedded @done="go('home')" @claim="claimForPhoto" />
+            <EmailSheet v-else-if="step === 'email'" embedded @done="go('home')" />
+
             <div v-else class="acct-claim">
               <h2 class="acct-claim-title">Claim your account</h2>
               <AuthView embedded initial-mode="claim" @back="go('home')" />
@@ -116,10 +120,12 @@ import Avatar from '../Avatar.vue'
 import AuthView from '../AuthView.vue'
 import AccountIdentity from './AccountIdentity.vue'
 import DeleteAccountStep from './DeleteAccountStep.vue'
+import PhotoSheet from '../PhotoSheet.vue'
+import EmailSheet from '../EmailSheet.vue'
 import { useAuthStore } from '../../stores/authStore'
 import { useSocialStore } from '../../stores/socialStore'
 import { accountStep, closeAccountModal, openAccountModal, type AccountStep } from '../../composables/useAccountModal'
-import { openEmailSheet } from '../../composables/useEmailSheet'
+import { rememberPhotoAfterClaim } from '../../composables/usePhotoSheet'
 import { navigate } from '../../utils/routes'
 
 const authStore = useAuthStore()
@@ -177,6 +183,13 @@ async function respond(userId: string, accept: boolean) {
   } finally {
     responding.value = null
   }
+}
+
+// A guest can't upload until claimed: claim here, and the photo step comes
+// back by itself once they are (App.vue reads the remembered wish).
+function claimForPhoto() {
+  rememberPhotoAfterClaim()
+  go('claim')
 }
 
 function openFriends() {

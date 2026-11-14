@@ -441,7 +441,10 @@ function claimForPhoto() {
 watch(
   () => authStore.isAuthenticated && !authStore.isAnonymous,
   (claimed) => {
-    if (claimed && takePhotoAfterClaim()) openPhotoSheet()
+    if (!claimed || !takePhotoAfterClaim()) return
+    // Claimed inside the account modal: the photo step opens in the same frame.
+    if (accountStep.value) openAccountModal('photo')
+    else openPhotoSheet()
   },
   { immediate: true },
 )
