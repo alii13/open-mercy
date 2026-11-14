@@ -1110,6 +1110,10 @@ function viewProfile() {
 
 function accountFromMenu() {
     closeAccount()
+    // The menu item unmounts with the menu: park focus on the visible menu
+    // button (chip on desktop, burger on phones) so closing the modal returns there.
+    const triggers = accountRef.value?.querySelectorAll<HTMLElement>('.username-chip, .menu-burger') ?? []
+    ;[...triggers].find(el => el.offsetParent !== null)?.focus()
     openAccountModal()
 }
 

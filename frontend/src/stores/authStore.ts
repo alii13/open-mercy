@@ -423,7 +423,7 @@ export const useAuthStore = defineStore('auth', () => {
         // visitors keep the screen, where they can sign in or ask again.
         if (found.code === 'otp_expired' && user.value && !isAnonymous.value) {
             authNotice.value = canChangeEmail.value
-                ? 'That link has expired or was already used. Send a new one from Change email in the menu at the top right.'
+                ? 'That link has expired or was already used. Send a new one from Account in the menu at the top right.'
                 : 'That link has expired or was already used.'
             void router.replace(urlWithoutOAuthError(window.location))
             return

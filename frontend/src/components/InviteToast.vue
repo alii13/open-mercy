@@ -1,4 +1,7 @@
 <template>
+  <!-- On body, not inside #app: the account modal makes #app inert, and an
+       invite that arrives while it is open must still be answerable. -->
+  <Teleport to="body">
   <Transition name="invite-toast">
     <div v-if="showing" class="invite" role="status">
       <Users class="invite-glyph" :size="16" :stroke-width="2" aria-hidden="true" />
@@ -34,6 +37,7 @@
       </button>
     </div>
   </Transition>
+  </Teleport>
 </template>
 
 <script setup lang="ts">

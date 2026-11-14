@@ -254,7 +254,7 @@ async function save() {
 }
 
 .ai-suggestion {
-  min-height: 40px;
+  min-height: 44px;
   padding: 0 var(--spacing-3);
   border-radius: var(--radius-pill);
   border: 1px solid var(--surface-metal);
