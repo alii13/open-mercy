@@ -44,6 +44,8 @@ onMounted(async () => {
     await stage.show(props.tier, { locked: props.locked })
     if (disposed) return
   } catch {
+    stage?.dispose()
+    stage = null
     flat.value = true
     return
   }

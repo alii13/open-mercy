@@ -192,7 +192,9 @@ const badgeProgress = computed(() => progressToNext(badgePoints.value))
 // ---- the carousel
 type TierState = 'earned' | 'current' | 'locked'
 const sel = ref(1)
-watch(() => badge.value.tier, (t) => { sel.value = t }, { immediate: true })
+// Follow the player's own tier (it changes when their points load) until they pick one themselves.
+let picked = false
+watch(() => badge.value.tier, (t) => { if (!picked) sel.value = t }, { immediate: true })
 const tierOf = (n: number) => BADGES[Math.min(19, Math.max(0, n - 1))]!
 const STATE_LABEL: Record<TierState, string> = { earned: 'earned', current: 'your badge', locked: 'locked' }
 const stateOf = (n: number): TierState => (n < badge.value.tier ? 'earned' : n === badge.value.tier ? 'current' : 'locked')
@@ -214,6 +216,7 @@ function lockedLine(n: number): string {
 
 const rail = ref<HTMLElement | null>(null)
 function select(n: number) {
+  picked = true
   sel.value = Math.min(20, Math.max(1, n))
   void nextTick(() => rail.value?.children[sel.value - 1]?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' }))
 }
@@ -387,15 +390,15 @@ const EARN = [
 .bp-climb-pts { font-size: var(--text-base); font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; }
 .bp-climb-pts span { font-weight: 400; color: var(--text-secondary); }
 .bp-hz { font-size: var(--text-xs); font-weight: 700; letter-spacing: 0.12em; color: var(--color-hazard); white-space: nowrap; }
-.bp-bar { height: 8px; border-radius: 2px; background: var(--surface-metal); overflow: hidden; }
+.bp-bar { height: 8px; border-radius: var(--radius-sm); background: var(--surface-metal); overflow: hidden; }
 .bp-bar i { display: block; height: 100%; background: repeating-linear-gradient(135deg, var(--color-hazard) 0 8px, var(--color-hazard-dim) 8px 14px); }
-.bp-rail { display: flex; gap: var(--spacing-1); padding: var(--spacing-3) var(--spacing-3) calc(var(--spacing-4) + env(safe-area-inset-bottom)); overflow-x: auto; scrollbar-width: none; border-top: 1px solid var(--surface-metal); }
-.bp-rv { position: relative; flex-shrink: 0; width: 44px; height: 56px; display: flex; align-items: center; justify-content: center; background: none; border: none; cursor: pointer; }
+.bp-rail { display: flex; gap: var(--spacing-2); padding: var(--spacing-3) var(--spacing-3) calc(var(--spacing-4) + env(safe-area-inset-bottom)); overflow-x: auto; scrollbar-width: none; border-top: 1px solid var(--surface-metal); }
+.bp-rv { position: relative; flex-shrink: 0; width: 44px; height: 64px; display: flex; align-items: flex-end; justify-content: center; padding-bottom: var(--spacing-2); background: none; border: none; cursor: pointer; }
 .bp-rv-art { width: 36px; height: 36px; background: var(--art) center / contain no-repeat; }
 .bp-rv-art--locked { background: var(--surface-metal); -webkit-mask: var(--art) center / contain no-repeat; mask: var(--art) center / contain no-repeat; }
-.bp-rv::after { content: ''; position: absolute; left: 12px; right: 12px; bottom: 0; height: 2px; border-radius: 1px; }
+.bp-rv::after { content: ''; position: absolute; left: var(--spacing-3); right: var(--spacing-3); bottom: 0; height: 2px; border-radius: var(--radius-pill); }
 .bp-rv--sel::after { background: #ffcf99; }
-.bp-rv--you::before { content: 'YOU'; position: absolute; top: 0; font-size: 8px; font-weight: 700; letter-spacing: 0.16em; color: #ffcf99; }
+.bp-rv--you::before { content: 'YOU'; position: absolute; top: 0; font-size: var(--text-xs); font-weight: 700; letter-spacing: 0.12em; color: #ffcf99; }
 
 /* ---- detail */
 .bp-detail { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; background: var(--bg-concrete); }
