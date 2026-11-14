@@ -6,6 +6,7 @@ export interface MedalStage {
     project(point: [number, number]): { x: number; y: number; facing: number } | null
     /** Called on a tap (not a drag) on the medal. */
     onTap(fn: () => void): void
+    onFrame(fn: () => void): void
     dispose(): void
 }
 

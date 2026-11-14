@@ -230,7 +230,7 @@ function buildBadge(svgText) {
   for (const path of data.paths) {
     const style = path.userData.style;
     const fill = resolveColor(style.fill, grads);
-    const shapes = SVGLoader.createShapes(path);
+    const shapes = path.toShapes(true);
     const fp = footprint(shapes.length ? shapes.map((sh) => sh.getPoints(4)) : path.subPaths.map((sp) => sp.getPoints(4)));
     const base = first && fill ? 0 : restOn(fp);
     let layerTop = base;
@@ -428,11 +428,13 @@ function anchorOnSurface(wrap, [x, y]) {
 
 // A locked medal keeps its own metals and enamels with the light turned down: no glow, no charm.
 function dimBadge(wrap) {
-  wrap.traverse((m) => {
-    if (!m.isMesh) return
-    m.material.color.multiplyScalar(0.42)
-    if (m.material.emissive) m.material.emissiveIntensity *= 0.15
-  })
+  // A path's material is shared by all its meshes, so dim each material once, not once per mesh.
+  const mats = new Set()
+  wrap.traverse((m) => { if (m.isMesh) mats.add(m.material) })
+  for (const mat of mats) {
+    mat.color.multiplyScalar(0.42)
+    if (mat.emissive) mat.emissiveIntensity *= 0.15
+  }
 }
 const SHARED_MAPS = new Set([BRUSHED, DOT])
 
@@ -565,6 +567,7 @@ export function createMedalStage({ canvas, mode = 'hero', reducedMotion = false 
 
   // A tap (not a drag) on the medal.
   let tapHandler = null
+  let frameHandler = null
   let down = null
   const onDown = (e) => { down = { x: e.clientX, y: e.clientY, t: performance.now() } }
   const onUp = (e) => {
@@ -614,6 +617,7 @@ export function createMedalStage({ canvas, mode = 'hero', reducedMotion = false 
     }
     controls.update()
     renderer.render(scene, camera)
+    frameHandler?.()
   }
   // Render only while the medal is on screen.
   const io = new IntersectionObserver(([e]) => renderer.setAnimationLoop(e.isIntersecting ? frame : null))
@@ -623,6 +627,8 @@ export function createMedalStage({ canvas, mode = 'hero', reducedMotion = false 
     show,
     project,
     onTap(fn) { tapHandler = fn },
+    /** Runs after every rendered frame, so it pauses with the stage when the medal is off screen. */
+    onFrame(fn) { frameHandler = fn },
     dispose() {
       renderer.setAnimationLoop(null)
       clearTimeout(resume)

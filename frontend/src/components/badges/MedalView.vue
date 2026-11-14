@@ -54,7 +54,6 @@ const lines = ref<Line[]>([])
 const sideEls: (HTMLElement | null)[] = []
 let lastKey = ''
 let stage: MedalStage | null = null
-let raf = 0
 let disposed = false
 
 // A tap turns to the next fact; the page decides anything else.
@@ -81,7 +80,6 @@ onMounted(async () => {
   }
   // Each fact gets a line from its part of the medal to its text, redrawn as the medal turns.
   const tick = () => {
-    raf = requestAnimationFrame(tick)
     const next: Line[] = []
     if (stage && root.value && canvas.value) {
       const r = root.value.getBoundingClientRect()
@@ -111,17 +109,21 @@ onMounted(async () => {
     const key = next.map(l => l.points).join('|')
     if (key !== lastKey) { lastKey = key; lines.value = next }
   }
-  tick()
+  stage?.onFrame(tick)
 })
 
 watch(() => [props.tier, props.locked] as const, ([tier, locked], [prevTier]) => {
   idx.value = 0
-  void stage?.show(tier, { locked, dir: Math.sign(tier - prevTier) })
+  stage?.show(tier, { locked, dir: Math.sign(tier - prevTier) }).catch(() => {
+    // Most likely a stale chunk after a deploy: fall back to the flat art rather than a stale medal.
+    stage?.dispose()
+    stage = null
+    flat.value = true
+  })
 })
 
 onBeforeUnmount(() => {
   disposed = true
-  cancelAnimationFrame(raf)
   stage?.dispose()
 })
 </script>
@@ -148,7 +150,7 @@ onBeforeUnmount(() => {
 .mv-side .mv-fact-text { margin: 0; font-size: var(--text-base); line-height: 1.5; }
 .mv-side--r .mv-fact-text { color: var(--text-secondary); }
 .mv-pips { display: flex; justify-content: flex-end; }
-.mv-pip { width: 32px; height: 24px; display: flex; align-items: center; justify-content: center; background: none; border: 0; cursor: pointer; }
+.mv-pip { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: none; border: 0; cursor: pointer; }
 .mv-pip i { width: 18px; height: 3px; border-radius: var(--radius-pill); background: var(--surface-metal); }
 .mv-pip--on i { background: #ffcf99; }
 .mv-fact { padding: var(--spacing-3) var(--spacing-4); background: var(--surface-metal-dark); border: 1px solid var(--surface-metal); border-radius: var(--radius-md); }

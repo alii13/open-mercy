@@ -96,9 +96,8 @@ const retention = useRetentionStore()
 const { badges, fetchBadges } = useBadges()
 const { dates, fetchDates } = useBadgeDates()
 watch(() => auth.user?.id, (id) => {
-  if (!id) return
-  void fetchBadges([id], { fresh: true })
-  void fetchDates(id)
+  void fetchDates(id ?? null)
+  if (id) void fetchBadges([id], { fresh: true })
 }, { immediate: true })
 
 function daysIdleFromDate(dateStr: string | null): number {

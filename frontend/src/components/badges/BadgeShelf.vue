@@ -61,8 +61,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { BADGES, type Badge } from '../../utils/badges'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { BADGES, progressToNext, type Badge } from '../../utils/badges'
 import { BADGE_MEANING, type Holders } from '../../utils/badgeFacts'
 import { BADGE_RENDERS as RENDERS } from '../../utils/badgeRenders'
 
@@ -70,10 +70,7 @@ const props = withDefaults(defineProps<{ tier: number; sel: number; points: numb
 const emit = defineEmits<{ select: [tier: number] }>()
 
 const rows = computed(() => Array.from({ length: Math.ceil(BADGES.length / props.cols) }, (_, i) => BADGES.slice(i * props.cols, (i + 1) * props.cols)))
-const nextFrac = computed(() => {
-  const next = BADGES[props.tier]
-  return next ? Math.min(1, props.points / next.threshold) : 1
-})
+const nextFrac = computed(() => Math.min(1, Math.max(0, progressToNext(props.points).pct)))
 
 function lineOf(b: Badge): string {
   if (b.tier <= props.tier) return props.dates[b.tier] ? `Earned ${props.dates[b.tier]}` : 'Earned'
@@ -87,9 +84,17 @@ const labelOf = (b: Badge) => [b.title, b.tier <= props.tier ? 'earned' : 'locke
 
 // Open on the player's own shelf (the phone cabinet scrolls; the desktop wall shows them all).
 const box = ref<HTMLElement | null>(null)
-onMounted(() => {
+// The player's points usually land after mount, so follow the tier until they scroll the cabinet themselves.
+let scrolledByHand = false
+function toOwnShelf() {
   const shelf = box.value?.children[Math.floor((props.tier - 1) / props.cols)] as HTMLElement | undefined
-  if (box.value && shelf) box.value.scrollTop = shelf.offsetTop - 8
+  if (box.value && shelf && !scrolledByHand) box.value.scrollTop = shelf.offsetTop - 8
+}
+watch(() => props.tier, () => nextTick(toOwnShelf))
+onMounted(() => {
+  toOwnShelf()
+  box.value?.addEventListener('wheel', () => { scrolledByHand = true }, { once: true, passive: true })
+  box.value?.addEventListener('touchmove', () => { scrolledByHand = true }, { once: true, passive: true })
   addEventListener('scroll', hideTip, { capture: true, passive: true })
 })
 onBeforeUnmount(() => {
