@@ -132,8 +132,6 @@
     <!-- Profile photo: opened from the profile page and the account menu. -->
     <PhotoSheet v-if="authStore.isAuthenticated && photoSheetOpen" @claim="claimForPhoto" />
 
-    <!-- Change email: opened from the account menu, email accounts only. -->
-    <EmailSheet v-if="authStore.canChangeEmail && emailSheetOpen" />
 
     <!-- Guest sign-in failure toast. Top-center: the landing page owns the
          bottom edge with its sticky mobile CTA. -->
@@ -217,7 +215,6 @@ const BadgesPage = defineAsyncComponent(() => import('./components/BadgesPage.vu
 const ProfilePage = defineAsyncComponent(() => import('./components/ProfilePage.vue'))
 const ChangelogPage = defineAsyncComponent(() => import('./components/ChangelogPage.vue'))
 const PhotoSheet = defineAsyncComponent(() => import('./components/PhotoSheet.vue'))
-const EmailSheet = defineAsyncComponent(() => import('./components/EmailSheet.vue'))
 const AccountModal = defineAsyncComponent(() => import('./components/account/AccountModal.vue'))
 // A game screen that fails to download must never leave a blank page: in a
 // multiplayer room the turns keep running and time the player out. The
@@ -253,7 +250,6 @@ import {
   rememberPhotoAfterClaim,
   takePhotoAfterClaim,
 } from './composables/usePhotoSheet'
-import { emailSheetOpen } from './composables/useEmailSheet'
 import { accountStep, closeAccountModal, openAccountModal } from './composables/useAccountModal'
 
 const authStore = useAuthStore()

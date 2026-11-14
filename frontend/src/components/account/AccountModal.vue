@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div class="acct-overlay" @click.self="closeAccountModal">
+    <div class="acct-overlay" @click.self="close">
       <div
         class="acct"
         :class="wide ? 'acct--wide' : 'acct--sheet'"
@@ -15,15 +15,14 @@
         <section class="acct-main">
           <header class="acct-head" :class="{ 'acct-head--tabs': wide && step === 'home' }">
             <!-- Desktop home: Friends and Sign-in are separate screens, one tab each. -->
-            <div v-if="wide && step === 'home'" class="acct-tabs" role="tablist" aria-label="Account sections">
+            <div v-if="wide && step === 'home'" class="acct-tabs">
               <button
                 v-for="t in homeTabs"
                 :key="t.id"
                 type="button"
-                role="tab"
                 class="acct-tab"
-                :class="{ 'is-active': homeTab === t.id }"
-                :aria-selected="homeTab === t.id"
+                :class="{ 'is-active': activeTab === t.id }"
+                :aria-pressed="activeTab === t.id"
                 @click="homeTab = t.id"
               >
                 {{ t.label }}
@@ -35,7 +34,7 @@
               <span>ACCOUNT</span>
             </button>
             <h2 v-else class="acct-label">ACCOUNT</h2>
-            <button ref="closeEl" type="button" class="acct-close" aria-label="Close" @click="closeAccountModal">
+            <button ref="closeEl" type="button" class="acct-close" aria-label="Close" @click="close">
               <X :size="20" :stroke-width="2" aria-hidden="true" />
             </button>
           </header>
@@ -43,7 +42,7 @@
           <div class="acct-body">
             <!-- Desktop home -->
             <template v-if="step === 'home' && wide">
-              <FriendsSection v-if="homeTab === 'friends'" @opened-room="closeAccountModal" />
+              <FriendsSection v-if="activeTab === 'friends'" @opened-room="closeAccountModal" />
 
               <template v-else>
                 <section class="acct-section">
@@ -103,8 +102,8 @@
             <DeleteAccountStep v-else-if="step === 'delete'" :wide="wide" @keep="go('home')" />
 
             <!-- Photo and email are steps in this frame, never a second modal on top. -->
-            <PhotoSheet v-else-if="step === 'photo'" embedded @done="go('home')" @claim="claimForPhoto" />
-            <EmailSheet v-else-if="step === 'email'" embedded @done="go('home')" />
+            <PhotoSheet v-else-if="step === 'photo'" embedded @done="go('home')" @claim="claimForPhoto" @busy="stepBusy = $event" />
+            <EmailSheet v-else-if="step === 'email'" @done="go('home')" @busy="stepBusy = $event" />
 
             <div v-else class="acct-claim">
               <h2 v-if="authStore.isAnonymous" class="acct-claim-title">Claim your account</h2>
@@ -129,21 +128,30 @@ import EmailSheet from '../EmailSheet.vue'
 import { useAuthStore } from '../../stores/authStore'
 import { useSocialStore } from '../../stores/socialStore'
 import { accountStep, closeAccountModal, openAccountModal, type AccountStep } from '../../composables/useAccountModal'
-import { photoSheetOpen, rememberPhotoAfterClaim } from '../../composables/usePhotoSheet'
-import { emailSheetOpen } from '../../composables/useEmailSheet'
+import { rememberPhotoAfterClaim } from '../../composables/usePhotoSheet'
 import { navigate, router } from '../../utils/routes'
 
 const authStore = useAuthStore()
 const social = useSocialStore()
 
 const step = computed<AccountStep>(() => accountStep.value ?? 'home')
+
+// A photo saving or email links sending holds the modal where it is, or the
+// step would unmount before its error could show.
+const stepBusy = ref(false)
 function go(next: AccountStep) {
+  if (stepBusy.value) return
   openAccountModal(next)
+}
+function close() {
+  if (!stepBusy.value) closeAccountModal()
 }
 
 // Desktop home: Friends and Sign-in are separate screens, one tab each.
 type HomeTab = 'friends' | 'signin'
-const homeTab = ref<HomeTab>(social.unavailable ? 'signin' : 'friends')
+const homeTab = ref<HomeTab>('friends')
+// Friends can turn out to be unavailable after the modal opened.
+const activeTab = computed<HomeTab>(() => (social.unavailable ? 'signin' : homeTab.value))
 const homeTabs = computed(() => [
   ...(social.unavailable ? [] : [{ id: 'friends' as const, label: 'Friends', count: social.incoming.length }]),
   { id: 'signin' as const, label: 'Sign-in', count: 0 },
@@ -165,10 +173,9 @@ const backEl = ref<HTMLButtonElement | null>(null)
 
 function onKeydown(e: KeyboardEvent) {
   if (e.key !== 'Escape') return
-  // The name field cancels its own edit; a standalone sheet on top closes first.
+  // The name field cancels its own edit.
   if ((e.target as HTMLElement | null)?.classList?.contains('ai-name-input')) return
-  if (photoSheetOpen.value || emailSheetOpen.value) return
-  closeAccountModal()
+  close()
 }
 
 // Focus: start on Close, move to Back (or Close) as steps swap so it never
@@ -200,7 +207,9 @@ onUnmounted(() => {
   window.removeEventListener('keydown', onKeydown)
   appEl?.removeAttribute('inert')
   stopRouteWatch()
-  opener?.focus?.()
+  // The menu item that opened it is gone by now; the lobby moves focus to the
+  // menu button before opening, so that is what comes back.
+  if (opener?.isConnected) opener.focus()
 })
 
 const requestLabel = computed(() => {
@@ -536,7 +545,7 @@ function viewProfile() {
 
 .acct-danger-note {
   font-size: var(--text-sm);
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 
 .acct-danger-btn,

@@ -1,76 +1,55 @@
 <template>
-  <Teleport to="body" :disabled="embedded">
-    <div
-      ref="overlayEl"
-      class="es-overlay"
-      :class="{ 'es-embedded': embedded }"
-      :role="embedded ? undefined : 'dialog'"
-      :aria-modal="embedded ? undefined : 'true'"
-      aria-labelledby="es-title"
-      tabindex="-1"
-      @click.self="!embedded && close()"
-    >
-      <div class="es-sheet">
-        <span v-if="!embedded" class="es-grabber" aria-hidden="true"></span>
+  <!-- The email change, shown as a step inside the account modal. -->
+  <div class="es">
+    <header class="es-head">
+      <h2 id="es-title" class="es-title">{{ waiting ? 'Check both inboxes' : 'Change email' }}</h2>
+    </header>
 
-        <header class="es-head">
-          <h2 id="es-title" class="es-title">{{ waiting ? 'Check both inboxes' : 'Change email' }}</h2>
-          <button v-if="!embedded" type="button" class="es-close" aria-label="Close" @click="close">
-            <X :size="20" :stroke-width="2" aria-hidden="true" />
-          </button>
-        </header>
+    <template v-if="waiting">
+      <p class="es-copy">
+        We sent a link to <strong>{{ auth.user?.email }}</strong> and to <strong>{{ auth.user?.new_email }}</strong>.
+        Click both and you're moved.
+      </p>
+      <p class="es-fine">Not there? Check spam. Your name, rank and games stay the same.</p>
+      <button type="button" class="es-btn es-btn--primary" @click="close">DONE</button>
+      <button type="button" class="es-link" @click="useAnother">Use another email</button>
+    </template>
 
-        <template v-if="waiting">
-          <p class="es-copy">
-            We sent a link to <strong>{{ auth.user?.email }}</strong> and to <strong>{{ auth.user?.new_email }}</strong>.
-            Click both and you're moved.
-          </p>
-          <p class="es-fine">Not there? Check spam. Your name, rank and games stay the same.</p>
-          <button type="button" class="es-btn es-btn--primary" @click="close">DONE</button>
-          <button type="button" class="es-link" @click="useAnother">Use another email</button>
-        </template>
-
-        <form v-else class="es-form" @submit.prevent="submit">
-          <p class="es-copy">Signed in as <strong>{{ auth.user?.email }}</strong></p>
-          <input
-            ref="inputEl"
-            v-model="newEmail"
-            class="es-input"
-            type="email"
-            required
-            autocomplete="email"
-            placeholder="New email"
-            aria-label="New email"
-          />
-          <p v-if="error" class="es-error" role="alert">{{ error }}</p>
-          <button type="submit" class="es-btn es-btn--primary" :disabled="busy">
-            {{ busy ? 'SENDING…' : 'SEND LINKS' }}
-          </button>
-          <p class="es-fine">We email a link to both addresses. The change happens once you click both.</p>
-        </form>
-      </div>
-    </div>
-  </Teleport>
+    <form v-else class="es-form" @submit.prevent="submit">
+      <p class="es-copy">Signed in as <strong>{{ auth.user?.email }}</strong></p>
+      <input
+        ref="inputEl"
+        v-model="newEmail"
+        class="es-input"
+        type="email"
+        required
+        autocomplete="email"
+        placeholder="New email"
+        aria-label="New email"
+      />
+      <p v-if="error" class="es-error" role="alert">{{ error }}</p>
+      <button type="submit" class="es-btn es-btn--primary" :disabled="busy">
+        {{ busy ? 'SENDING…' : 'SEND LINKS' }}
+      </button>
+      <p class="es-fine">We email a link to both addresses. The change happens once you click both.</p>
+    </form>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { X } from 'lucide-vue-next'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useAuthStore } from '../stores/authStore'
-import { closeEmailSheet } from '../composables/useEmailSheet'
 
 const auth = useAuthStore()
-const overlayEl = ref<HTMLElement | null>(null)
 const inputEl = ref<HTMLInputElement | null>(null)
 const newEmail = ref('')
 const busy = ref(false)
 const error = ref('')
 
-const props = defineProps<{
-  /** Inside the account modal: no overlay, and closing returns to the account. */
-  embedded?: boolean
-}>()
-const emit = defineEmits<{ done: [] }>()
+// done: back to the account. busy: the account modal holds Back and Close
+// while links are sending, or a failure would never be seen.
+const emit = defineEmits<{ done: []; busy: [boolean] }>()
+watch(busy, (b) => emit('busy', b))
 
 // A pending change is on the user (new_email), so after a reload the sheet
 // opens on it. "Use another email" goes back to the form.
@@ -84,29 +63,8 @@ const ERRORS = {
   failed: 'Could not send the links. Try again in a moment.',
 } as const
 
-// Same contract as the photo sheet: Escape closes, focus goes back to the opener.
-const opener = document.activeElement as HTMLElement | null
-
-function onKeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape') close()
-}
-
-onMounted(() => {
-  if (!props.embedded) {
-    document.addEventListener('keydown', onKeydown)
-    overlayEl.value?.focus()
-  }
-})
-
-onBeforeUnmount(() => {
-  if (!props.embedded) document.removeEventListener('keydown', onKeydown)
-  if (!props.embedded) opener?.focus?.()
-})
-
 function close() {
-  if (busy.value) return
-  if (props.embedded) emit('done')
-  else closeEmailSheet()
+  if (!busy.value) emit('done')
 }
 
 async function useAnother() {
@@ -131,61 +89,16 @@ async function submit() {
 </script>
 
 <style scoped>
-/* Shell copied from PhotoSheet so the two account sheets look the same. */
-.es-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: var(--z-modal);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--spacing-4);
-  background: rgba(0, 0, 0, 0.82);
-  outline: none;
-}
-
-.es-sheet {
+.es {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: var(--spacing-4);
-  width: 100%;
-  max-width: 400px;
-  max-height: 100%;
-  overflow-y: auto;
-  padding: var(--spacing-3) var(--spacing-6) var(--spacing-6);
-  background: #121416;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: var(--radius-lg);
   font-family: var(--font-body);
   color: var(--text-primary);
 }
 
-.es-grabber {
-  display: none;
-  width: 40px;
-  height: 4px;
-  border-radius: 2px;
-  background: rgba(255, 255, 255, 0.18);
-}
-
 /* Phones get a bottom sheet. */
-@media (max-width: 480px) {
-  .es-overlay {
-    align-items: flex-end;
-    padding: 0;
-  }
-  .es-sheet {
-    max-width: none;
-    border-radius: 20px 20px 0 0;
-    border-bottom: none;
-    padding-bottom: calc(var(--spacing-8) + env(safe-area-inset-bottom));
-  }
-  .es-grabber {
-    display: block;
-  }
-}
-
 .es-head {
   display: flex;
   align-items: center;
@@ -199,24 +112,6 @@ async function submit() {
   font-size: var(--text-xl);
   font-weight: 400;
   color: var(--text-primary);
-}
-
-.es-close {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  border: none;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text-secondary);
-  cursor: pointer;
-}
-.es-close:hover,
-.es-close:focus-visible {
-  color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.12);
 }
 
 .es-form {
@@ -314,26 +209,7 @@ async function submit() {
   margin: 0;
   font-size: var(--text-sm);
   line-height: 1.45;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   text-align: center;
-}
-/* Inside the account modal: the modal is the frame, so no overlay or surface. */
-.es-overlay.es-embedded {
-  position: static;
-  inset: auto;
-  z-index: auto;
-  display: block;
-  padding: 0;
-  background: none;
-}
-
-.es-embedded .es-sheet {
-  max-width: none;
-  max-height: none;
-  overflow: visible;
-  padding: 0;
-  background: none;
-  border: none;
-  border-radius: 0;
 }
 </style>

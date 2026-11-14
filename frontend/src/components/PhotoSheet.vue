@@ -108,7 +108,8 @@ const props = defineProps<{
   /** Inside the account modal: no overlay, and closing returns to the account. */
   embedded?: boolean
 }>()
-const emit = defineEmits<{ claim: []; done: [] }>()
+// busy: the account modal holds Back and Close while a photo saves.
+const emit = defineEmits<{ claim: []; done: []; busy: [boolean] }>()
 
 /** Crop circle diameter, and the strip of photo shown around it. */
 const VIEW = 248
@@ -127,6 +128,7 @@ const mine = computed(() => (uid.value ? badges.value[uid.value] : undefined))
 const overlayEl = ref<HTMLElement | null>(null)
 const fileEl = ref<HTMLInputElement | null>(null)
 const busy = ref(false)
+watch(busy, (b) => emit('busy', b))
 const error = ref('')
 
 // Same contract as ui/Modal.vue: Escape works wherever focus is, and focus
@@ -623,6 +625,10 @@ async function remove() {
   display: block;
   padding: 0;
   background: none;
+}
+
+.ps-embedded .ps-fine {
+  color: var(--text-secondary);
 }
 
 .ps-embedded .ps-sheet {

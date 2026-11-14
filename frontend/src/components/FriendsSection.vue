@@ -675,8 +675,9 @@ onUnmounted(() => {
 }
 
 /* By the width it is given, not the window's: the same section sits on the
-   friends page and inside the account dialog. Both parents are containers. */
-@container (max-width: 900px) {
+   friends page and inside the account dialog. Both parents are containers.
+   868px is the old 900px window breakpoint less the friends page's padding. */
+@container (max-width: 868px) {
   .fs {
     flex-direction: column;
     gap: var(--spacing-6);
