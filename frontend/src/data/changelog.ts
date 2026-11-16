@@ -74,7 +74,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         level: 'quiet',
         tag: 'NEW',
         title: 'Sign in with email instead of Google',
-        body: "Signed up with Google or Apple? Open the menu, tap Account, then Switch to email, and add an email and password. Google or Apple stays linked, so it still signs you in too.",
+        body: "Signed up with Google or Apple? Open Account from the menu and pick Switch to email (on a computer, it's under Sign-in), then add an email and password. Google or Apple stays linked, so it still signs you in too.",
     },
     {
         id: '2026-11-14T18:00Z',

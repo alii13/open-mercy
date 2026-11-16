@@ -829,12 +829,44 @@ describe('switching a Google or Apple account to email sign-in', () => {
     it('refuses a short password and a guest without calling the API', async () => {
         const auth = useAuthStore()
         auth.user = { ...googleUser } as unknown as User
-        expect(await auth.switchToEmail('me@b.com', '12345')).toEqual({ success: false, error: 'weak_password' })
+        expect(await auth.switchToEmail('me@b.com', '12345')).toEqual({ success: false, error: 'too_short' })
 
         auth.user = { ...googleUser, is_anonymous: true, app_metadata: {} } as unknown as User
         expect(auth.canSwitchToEmail).toBe(false)
         expect((await auth.switchToEmail('me@b.com', 'secret1')).success).toBe(false)
         expect(h.state.updateUserCalls).toHaveLength(0)
+    })
+
+    it('names the error Supabase gives, so the player is not told to retry what cannot work', async () => {
+        const auth = useAuthStore()
+        const cases: [Record<string, unknown>, string][] = [
+            [{ code: 'reauthentication_needed', status: 400 }, 'reauth'],
+            [{ code: 'same_password', status: 422 }, 'same_password'],
+            [{ code: 'weak_password', status: 422 }, 'weak_password'],
+            [{ code: 'email_exists', status: 422 }, 'email_exists'],
+            [{ code: 'over_email_send_rate_limit', status: 429 }, 'rate_limited'],
+            [{ code: 'unexpected_failure', status: 500 }, 'failed'],
+        ]
+        for (const [error, expected] of cases) {
+            auth.user = { ...googleUser } as unknown as User
+            h.state.updateUserResult = { data: { user: null }, error: { message: 'x', ...error } }
+            expect(await auth.switchToEmail('me@b.com', 'secret1')).toEqual({ success: false, error: expected })
+        }
+    })
+
+    it('remembers a new address for the landing notice, and records nothing when the address stays', async () => {
+        const auth = useAuthStore()
+        auth.user = { ...googleUser } as unknown as User
+        h.state.updateUserResult = { data: { user: { ...googleUser, user_metadata: { email_sign_in: true } } }, error: null }
+        await auth.switchToEmail('g@gmail.com', 'secret1')
+        expect(local.has('om_email_change_to')).toBe(false)
+        expect(track).not.toHaveBeenCalledWith('email_change_sent', expect.anything())
+
+        auth.user = { ...googleUser } as unknown as User
+        h.state.updateUserResult = { data: { user: { ...googleUser, new_email: 'me@b.com', user_metadata: { email_sign_in: true } } }, error: null }
+        await auth.switchToEmail('me@b.com', 'secret1')
+        expect(local.has('om_email_change_to')).toBe(true)
+        expect(track).toHaveBeenCalledWith('email_change_sent', expect.anything())
     })
 
     it('treats a switched account as an email account, since Supabase still lists only Google', () => {

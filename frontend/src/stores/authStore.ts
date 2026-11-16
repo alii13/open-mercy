@@ -337,10 +337,10 @@ export const useAuthStore = defineStore('auth', () => {
     /** Give a Google or Apple account an email and password to sign in with. A new address needs
      *  both links clicked, like changeEmail; the Google address only needs the password. */
     async function switchToEmail(email: string, password: string):
-        Promise<{ success: true } | { success: false; error: 'weak_password' | 'email_exists' | 'rate_limited' | 'failed' }> {
+        Promise<{ success: true } | { success: false; error: 'too_short' | 'weak_password' | 'reauth' | 'same_password' | 'email_exists' | 'rate_limited' | 'failed' }> {
         const clean = email.trim().toLowerCase()
         if (!canSwitchToEmail.value) return { success: false, error: 'failed' }
-        if (password.length < 6) return { success: false, error: 'weak_password' }
+        if (password.length < 6) return { success: false, error: 'too_short' }
         const sameAddress = clean === user.value?.email?.toLowerCase()
         const data = { email_sign_in: true }
         try {
@@ -350,12 +350,16 @@ export const useAuthStore = defineStore('auth', () => {
             )
             if (updateError) throw updateError
             if (res.user) user.value = res.user
+            // Keeping the address sends nothing, so there is no change to announce or count.
             if (!sameAddress) {
                 try { localStorage.setItem(EMAIL_CHANGE_KEY, clean) } catch { /* private mode */ }
+                track('email_change_sent', {})
             }
-            track('email_change_sent', {})
             return { success: true }
         } catch (err: any) {
+            // With "Secure password change" on, an old session must sign in again first; retrying never helps.
+            if (err?.code === 'reauthentication_needed') return { success: false, error: 'reauth' }
+            if (err?.code === 'same_password') return { success: false, error: 'same_password' }
             if (err?.code === 'weak_password') return { success: false, error: 'weak_password' }
             if (err?.code === 'email_exists' || /already.*registered/i.test(err?.message ?? '')) return { success: false, error: 'email_exists' }
             if (err?.code === 'over_email_send_rate_limit' || err?.status === 429) return { success: false, error: 'rate_limited' }
