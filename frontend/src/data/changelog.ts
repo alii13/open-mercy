@@ -70,6 +70,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: '2026-11-17',
+        level: 'quiet',
+        tag: 'NEW',
+        title: 'Sign in with email instead of Google',
+        body: "Signed up with Google or Apple? Open the menu, tap Account, then Switch to email, and add an email and password. Google or Apple stays linked, so it still signs you in too.",
+    },
+    {
         id: '2026-11-14T18:00Z',
         level: 'loud',
         tag: 'NEW',

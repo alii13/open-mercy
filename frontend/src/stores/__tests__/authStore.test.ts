@@ -797,6 +797,54 @@ describe('changing the email on an account', () => {
     })
 })
 
+describe('switching a Google or Apple account to email sign-in', () => {
+    const googleUser = { id: 'g-1', is_anonymous: false, email: 'g@gmail.com', app_metadata: { providers: ['google'] }, user_metadata: {} }
+
+    it('sets the password and sends the links for the new address, and marks the account as email sign-in', async () => {
+        const auth = useAuthStore()
+        auth.user = { ...googleUser } as unknown as User
+        expect(auth.canSwitchToEmail).toBe(true)
+        h.state.updateUserResult = { data: { user: { ...googleUser, new_email: 'me@b.com', user_metadata: { email_sign_in: true } } }, error: null }
+
+        const res = await auth.switchToEmail(' Me@B.com ', 'secret1')
+
+        expect(res).toEqual({ success: true })
+        expect(h.state.updateUserCalls[0]!.attrs).toEqual({ email: 'me@b.com', password: 'secret1', data: { email_sign_in: true } })
+        expect(h.state.updateUserCalls[0]!.opts).toMatchObject({ emailRedirectTo: 'https://uno-no-mercy.com' })
+        expect(auth.emailChangePending).toBe(true)
+    })
+
+    it('keeps the Google address when the player types it, and only sets the password', async () => {
+        const auth = useAuthStore()
+        auth.user = { ...googleUser } as unknown as User
+        h.state.updateUserResult = { data: { user: { ...googleUser, user_metadata: { email_sign_in: true } } }, error: null }
+
+        expect(await auth.switchToEmail('G@gmail.com', 'secret1')).toEqual({ success: true })
+
+        expect(h.state.updateUserCalls[0]!.attrs).toEqual({ password: 'secret1', data: { email_sign_in: true } })
+        expect(auth.canChangeEmail).toBe(true)
+        expect(auth.canSwitchToEmail).toBe(false)
+    })
+
+    it('refuses a short password and a guest without calling the API', async () => {
+        const auth = useAuthStore()
+        auth.user = { ...googleUser } as unknown as User
+        expect(await auth.switchToEmail('me@b.com', '12345')).toEqual({ success: false, error: 'weak_password' })
+
+        auth.user = { ...googleUser, is_anonymous: true, app_metadata: {} } as unknown as User
+        expect(auth.canSwitchToEmail).toBe(false)
+        expect((await auth.switchToEmail('me@b.com', 'secret1')).success).toBe(false)
+        expect(h.state.updateUserCalls).toHaveLength(0)
+    })
+
+    it('treats a switched account as an email account, since Supabase still lists only Google', () => {
+        const auth = useAuthStore()
+        auth.user = { ...googleUser, email: 'me@b.com', user_metadata: { email_sign_in: true } } as unknown as User
+        expect(auth.canChangeEmail).toBe(true)
+        expect(auth.canSwitchToEmail).toBe(false)
+    })
+})
+
 describe('an expired email link', () => {
     it('reads as an expired link for a signed-in player, not as a failed guest claim', async () => {
         const user = { id: 'reg-1', is_anonymous: false, email: 'old@b.com', app_metadata: { providers: ['email'] } }

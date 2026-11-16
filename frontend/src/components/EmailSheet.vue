@@ -2,7 +2,7 @@
   <!-- The email change, shown as a step inside the account modal. -->
   <div class="es">
     <header class="es-head">
-      <h2 id="es-title" class="es-title">{{ waiting ? 'Check both inboxes' : 'Change email' }}</h2>
+      <h2 id="es-title" class="es-title">{{ title }}</h2>
     </header>
 
     <template v-if="waiting">
@@ -14,6 +14,42 @@
       <button type="button" class="es-btn es-btn--primary" @click="close">DONE</button>
       <button type="button" class="es-link" @click="useAnother">Use another email</button>
     </template>
+
+    <!-- A Google or Apple player who kept the same address is done at once: there is nothing to confirm. -->
+    <template v-else-if="switchedTo">
+      <p class="es-copy">You can now sign in with <strong>{{ switchedTo }}</strong> and your password.</p>
+      <p class="es-fine">{{ provider }} stays linked to this profile, so it still signs you in too.</p>
+      <button type="button" class="es-btn es-btn--primary" @click="close">DONE</button>
+    </template>
+
+    <form v-else-if="switching" class="es-form" @submit.prevent="submitSwitch">
+      <p class="es-copy">You sign in with <strong>{{ provider }}</strong>. Add an email and password to sign in with instead.</p>
+      <input
+        ref="inputEl"
+        v-model="newEmail"
+        class="es-input"
+        type="email"
+        required
+        autocomplete="email"
+        placeholder="Email"
+        aria-label="Email"
+      />
+      <input
+        v-model="password"
+        class="es-input"
+        type="password"
+        required
+        minlength="6"
+        autocomplete="new-password"
+        placeholder="Password, at least 6 characters"
+        aria-label="Password"
+      />
+      <p v-if="error" class="es-error" role="alert">{{ error }}</p>
+      <button type="submit" class="es-btn es-btn--primary" :disabled="busy">
+        {{ busy ? 'SAVING…' : 'SWITCH TO EMAIL' }}
+      </button>
+      <p class="es-fine">Your {{ provider }} account stays linked to this profile, so {{ provider }} sign-in keeps working too. A new address gets a link at both addresses first.</p>
+    </form>
 
     <form v-else class="es-form" @submit.prevent="submit">
       <p class="es-copy">Signed in as <strong>{{ auth.user?.email }}</strong></p>
@@ -56,7 +92,20 @@ watch(busy, (b) => emit('busy', b))
 const editing = ref(false)
 const waiting = computed(() => auth.emailChangePending && !editing.value)
 
+// Google and Apple accounts switch to email sign-in here; email accounts change their address.
+const PROVIDERS: Record<string, string> = { google: 'Google', apple: 'Apple' }
+const provider = computed(() => PROVIDERS[String(auth.user?.app_metadata?.provider ?? '')] ?? 'your provider')
+const switching = computed(() => auth.canSwitchToEmail)
+const password = ref('')
+const switchedTo = ref('')
+const title = computed(() => {
+  if (waiting.value) return 'Check both inboxes'
+  if (switchedTo.value) return 'Email sign-in is on'
+  return switching.value ? 'Switch to email' : 'Change email'
+})
+
 const ERRORS = {
+  weak_password: 'Use at least 6 characters for the password.',
   same_email: 'That is already your email.',
   email_exists: 'Another account already uses that email.',
   rate_limited: 'Too many emails went out just now. Try again in an hour.',
@@ -72,6 +121,22 @@ async function useAnother() {
   error.value = ''
   await nextTick()
   inputEl.value?.focus()
+}
+
+async function submitSwitch() {
+  busy.value = true
+  error.value = ''
+  const keepsAddress = newEmail.value.trim().toLowerCase() === auth.user?.email?.toLowerCase()
+  const res = await auth.switchToEmail(newEmail.value, password.value)
+  busy.value = false
+  if (!res.success) {
+    error.value = ERRORS[res.error]
+    return
+  }
+  password.value = ''
+  if (keepsAddress) switchedTo.value = newEmail.value.trim().toLowerCase()
+  newEmail.value = ''
+  editing.value = false
 }
 
 async function submit() {
