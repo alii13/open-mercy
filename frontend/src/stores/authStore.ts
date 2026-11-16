@@ -290,8 +290,15 @@ export const useAuthStore = defineStore('auth', () => {
     // A claim is pending while the guest's confirmation email is unclicked.
     // Derived from the user object (survives refreshes), never latched.
     const claimPending = computed(() => isAnonymous.value && !!user.value?.new_email)
-    /** Email + password accounts can move to another address; Google ones use Google's. */
-    const canChangeEmail = computed(() => !isAnonymous.value && (user.value?.app_metadata?.providers ?? []).includes('email'))
+    /** Email + password accounts can move to another address. A Google or Apple account that
+     *  switched to email sign-in counts too: Supabase still lists only Google for it, because
+     *  setting a password doesn't add an email identity on hosted projects (supabase/auth#2085),
+     *  so the switch is marked in user_metadata. */
+    const canChangeEmail = computed(() => !isAnonymous.value && (
+        (user.value?.app_metadata?.providers ?? []).includes('email') || user.value?.user_metadata?.email_sign_in === true))
+    /** Google and Apple accounts can add an email and password. Google stays linked: Supabase won't
+     *  unlink an account's only identity, and the password above doesn't create a second one. */
+    const canSwitchToEmail = computed(() => !!user.value && !isAnonymous.value && !canChangeEmail.value)
     const emailChangePending = computed(() => !isAnonymous.value && !!user.value?.new_email)
 
     /** One line for the player about their account, shown as a toast. */
@@ -321,6 +328,39 @@ export const useAuthStore = defineStore('auth', () => {
             track('email_change_sent', {})
             return { success: true }
         } catch (err: any) {
+            if (err?.code === 'email_exists' || /already.*registered/i.test(err?.message ?? '')) return { success: false, error: 'email_exists' }
+            if (err?.code === 'over_email_send_rate_limit' || err?.status === 429) return { success: false, error: 'rate_limited' }
+            return { success: false, error: 'failed' }
+        }
+    }
+
+    /** Give a Google or Apple account an email and password to sign in with. A new address needs
+     *  both links clicked, like changeEmail; the Google address only needs the password. */
+    async function switchToEmail(email: string, password: string):
+        Promise<{ success: true } | { success: false; error: 'too_short' | 'weak_password' | 'reauth' | 'same_password' | 'email_exists' | 'rate_limited' | 'failed' }> {
+        const clean = email.trim().toLowerCase()
+        if (!canSwitchToEmail.value) return { success: false, error: 'failed' }
+        if (password.length < 6) return { success: false, error: 'too_short' }
+        const sameAddress = clean === user.value?.email?.toLowerCase()
+        const data = { email_sign_in: true }
+        try {
+            const { data: res, error: updateError } = await supabase.auth.updateUser(
+                sameAddress ? { password, data } : { email: clean, password, data },
+                { emailRedirectTo: siteOrigin() },
+            )
+            if (updateError) throw updateError
+            if (res.user) user.value = res.user
+            // Keeping the address sends nothing, so there is no change to announce or count.
+            if (!sameAddress) {
+                try { localStorage.setItem(EMAIL_CHANGE_KEY, clean) } catch { /* private mode */ }
+                track('email_change_sent', {})
+            }
+            return { success: true }
+        } catch (err: any) {
+            // With "Secure password change" on, an old session must sign in again first; retrying never helps.
+            if (err?.code === 'reauthentication_needed') return { success: false, error: 'reauth' }
+            if (err?.code === 'same_password') return { success: false, error: 'same_password' }
+            if (err?.code === 'weak_password') return { success: false, error: 'weak_password' }
             if (err?.code === 'email_exists' || /already.*registered/i.test(err?.message ?? '')) return { success: false, error: 'email_exists' }
             if (err?.code === 'over_email_send_rate_limit' || err?.status === 429) return { success: false, error: 'rate_limited' }
             return { success: false, error: 'failed' }
@@ -702,10 +742,12 @@ export const useAuthStore = defineStore('auth', () => {
         isAnonymous,
         claimPending,
         canChangeEmail,
+        canSwitchToEmail,
         emailChangePending,
         authNotice,
         clearAuthNotice,
         changeEmail,
+        switchToEmail,
         username,
         oauthError,
         initialize,

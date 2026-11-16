@@ -54,7 +54,11 @@
                   <p v-else-if="authStore.isAnonymous" class="acct-copy">
                     You're playing as a guest, saved on this device only. Claim your account to sign in anywhere.
                   </p>
-                  <p v-else class="acct-copy">You sign in with {{ providerName }}, which looks after your password and email.</p>
+                  <div v-else class="acct-email">
+                    <Mail class="acct-row-icon" :size="20" :stroke-width="2" aria-hidden="true" />
+                    <span class="acct-email-text">Signed in with {{ providerName }}</span>
+                    <button type="button" class="acct-change" @click="go('email')">Switch to email</button>
+                  </div>
                 </section>
 
                 <!-- Deleting sits alone at the bottom, apart from everything else -->
@@ -85,6 +89,12 @@
                 <Mail class="acct-row-icon" :size="20" :stroke-width="2" aria-hidden="true" />
                 <span class="acct-row-label">Email</span>
                 <span class="acct-row-meta">{{ maskedEmail }}</span>
+                <ChevronRight class="acct-row-chevron" :size="16" :stroke-width="2" aria-hidden="true" />
+              </button>
+              <button v-else-if="authStore.canSwitchToEmail" type="button" class="acct-row" @click="go('email')">
+                <Mail class="acct-row-icon" :size="20" :stroke-width="2" aria-hidden="true" />
+                <span class="acct-row-label">Switch to email</span>
+                <span class="acct-row-meta">{{ providerName }}</span>
                 <ChevronRight class="acct-row-chevron" :size="16" :stroke-width="2" aria-hidden="true" />
               </button>
 
