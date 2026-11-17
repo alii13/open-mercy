@@ -70,7 +70,7 @@
         <p v-if="inviteCode" class="invite-banner">
           You've been invited to room <strong>{{ inviteCode }}</strong> — jump in.
         </p>
-        <div class="hero-actions">
+        <div class="hero-actions" :class="{ 'has-badge': showAppBadge && !inviteCode }">
           <Button variant="primary" size="lg" :disabled="loading" @click="reportAndEmit('playGuest')">
             {{ loading ? 'ENTERING…' : (inviteCode ? 'JOIN THE GAME' : 'PLAY NOW') }}
           </Button>
@@ -85,16 +85,19 @@
             <img :src="appStoreBadge" alt="Download on the App Store" width="120" height="40" />
           </a>
         </div>
-        <button type="button" class="rules-peek" @click="showRules = true">
-          New to Open Mercy? See how it works
-        </button>
-        <button type="button" class="rules-peek" @click="navigate({ name: 'leaderboard' })">
-          Today's leaderboard <ArrowRight :size="14" :stroke-width="2" aria-hidden="true" />
-        </button>
         <!-- Hidden below a floor and until the SQL exists; see useSitePulse. -->
         <p v-if="pulse.show.value" class="hero-pulse">
           <span class="live-dot" aria-hidden="true" />{{ pulse.players.value.toLocaleString() }} PLAYERS · {{ pulse.games.value.toLocaleString() }} GAMES THIS WEEK
         </p>
+        <!-- A pair: each link's own padding is the only space between them. -->
+        <div class="hero-links">
+          <button type="button" class="rules-peek" @click="showRules = true">
+            New to Open Mercy? See how it works
+          </button>
+          <button type="button" class="rules-peek" @click="navigate({ name: 'leaderboard' })">
+            Today's leaderboard <ArrowRight :size="14" :stroke-width="2" aria-hidden="true" />
+          </button>
+        </div>
       </div>
 
       <LandingStatsBadge class="hero-stats" />
@@ -731,34 +734,57 @@ function runHeroChoreography() {
   z-index: var(--z-base);
 }
 
+/* One rhythm down the stack: 12px from the button to its players line, then
+   16px between lines of text (8px gap plus each link's 8px padding). */
 .hero-cta {
   position: relative;
   z-index: var(--z-base);
   margin-top: var(--spacing-2);
+  /* Full width, so the action row can size itself against the hero, not against the links. */
+  width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--spacing-3);
+  gap: var(--spacing-2);
+}
+
+.hero-links {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .hero-actions {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
   justify-content: center;
+}
+
+/* Two actions of one size. The row is two equal columns; the badge's own 3:1
+   shape sets the row's height and the button stretches to it, so they match at
+   every width. 368px is two buttons at their natural width plus the gap. */
+.hero-actions.has-badge {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--spacing-3);
+  width: 100%;
+  max-width: 368px;
+}
+
+/* The button gives up its own height so the row's height is the badge's. */
+.hero-actions.has-badge > .btn {
+  min-height: 0;
+  padding: 0 var(--spacing-4);
 }
 
 .app-badge {
-  display: inline-flex;
+  display: block;
   border-radius: var(--radius-md);
 }
 
-/* 48px keeps both actions on one row at 390px; Apple's minimum is 40px. */
 .app-badge img {
   display: block;
-  width: auto;
-  height: 48px;
+  width: 100%;
+  height: auto;
 }
 
 .rules-peek {
@@ -797,7 +823,7 @@ function runHeroChoreography() {
 .hero-pulse {
   display: inline-flex;
   align-items: center;
-  margin: 0;
+  margin: var(--spacing-1) 0 0;
   font-family: var(--font-mono);
   font-size: 0.62rem;
   letter-spacing: 0.12em;
@@ -924,17 +950,6 @@ function runHeroChoreography() {
   .top-bar-cta {
     justify-content: center;
     flex-wrap: wrap;
-  }
-}
-
-/* Room for the badge to match the button's height. */
-@media (min-width: 600px) {
-  .hero-actions {
-    gap: var(--spacing-4);
-  }
-
-  .app-badge img {
-    height: 56px;
   }
 }
 
