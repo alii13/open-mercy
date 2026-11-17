@@ -81,6 +81,7 @@
             href="https://apps.apple.com/app/open-mercy-online-card-game/id6834576193"
             target="_blank"
             rel="noopener noreferrer"
+            @click="track('app_store_click', { from: 'landing_hero' })"
           >
             <img :src="appStoreBadge" alt="Download on the App Store" width="120" height="40" />
           </a>
@@ -154,6 +155,7 @@ import { useScreenSize } from '../composables/useScreenSize'
 import { currentRoute, navigate } from '../utils/routes'
 import { onFirstScroll } from '../composables/onFirstScroll'
 import appStoreBadge from '../assets/app-store-badge.svg'
+import { track } from '../utils/analytics'
 
 const isNative = Capacitor.isNativePlatform()
 // Not inside the app itself, and not on Android, where the App Store is a dead end.
