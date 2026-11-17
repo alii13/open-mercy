@@ -70,6 +70,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        // Same day as the email switch: a full timestamp sorts after the plain date.
+        id: '2026-11-17T12:00Z',
+        level: 'loud',
+        tag: 'NEW',
+        title: 'Get Open Mercy on your iPhone',
+        body: "Open Mercy is now on the App Store, free. Get it on your iPhone, and if you like it, leave a quick rating. Each one helps more players find the game.",
+        cta: { label: 'GET THE IPHONE APP', href: 'https://apps.apple.com/app/open-mercy-online-card-game/id6834576193' },
+    },
+    {
         id: '2026-11-17',
         level: 'quiet',
         tag: 'NEW',
