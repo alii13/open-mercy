@@ -935,6 +935,13 @@ function runHeroChoreography() {
     left: calc(50% + 90px);
     font-size: 2.8rem;
   }
+
+  /* Phones stack the two actions. Equal rows keep the button at the badge's height. */
+  .hero-actions.has-badge {
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-rows: 1fr;
+    max-width: 178px;
+  }
 }
 
 @media (max-width: 420px) {
