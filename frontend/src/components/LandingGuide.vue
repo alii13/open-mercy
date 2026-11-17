@@ -3,7 +3,7 @@
        always get the text that explains the game and links into the guides.
        The text lives in content/landingGuide.html because the build also writes
        it into index.html (vite.config.ts) for crawlers that do not run JavaScript. -->
-  <section class="guide-section" :class="{ 'is-native': isNative }" aria-labelledby="guide-heading" v-html="guideHtml"></section>
+  <section class="guide-section" :class="{ 'is-native': isNative }" aria-labelledby="guide-heading" v-html="html"></section>
 </template>
 
 <script setup lang="ts">
@@ -11,6 +11,11 @@ import { Capacitor } from '@capacitor/core'
 import guideHtml from '../content/landingGuide.html?raw'
 
 const isNative = Capacitor.isNativePlatform()
+
+// App review is strict about another company's game name, so the store apps get a plain heading.
+const html = isNative
+  ? guideHtml.replace(/<h2 id="guide-heading"[^]*?<\/h2>/, '<h2 id="guide-heading" class="guide-heading">WHAT IS <span class="accent-yellow">OPEN MERCY?</span></h2>')
+  : guideHtml
 </script>
 
 <style scoped>
@@ -49,10 +54,6 @@ const isNative = Capacitor.isNativePlatform()
   text-align: center;
 }
 
-.guide-section :deep(.guide-heading-next) {
-  margin-top: var(--spacing-16);
-}
-
 /* The store apps leave out the parts written for search visitors: they name
    another company's game and the other phone platform, which app review rejects. */
 .guide-section.is-native :deep(.guide-web) {
@@ -65,7 +66,7 @@ const isNative = Capacitor.isNativePlatform()
   grid-template-columns: repeat(2, minmax(0, 1fr));
   column-gap: var(--spacing-12);
   row-gap: var(--spacing-12);
-  margin-top: var(--spacing-8);
+  margin-top: var(--spacing-12);
 }
 
 .guide-section :deep(.guide-topic-title) {
@@ -150,9 +151,6 @@ const isNative = Capacitor.isNativePlatform()
   .guide-section :deep(.guide-topics) {
     grid-template-columns: minmax(0, 1fr);
     row-gap: var(--spacing-8);
-  }
-  .guide-section :deep(.guide-heading-next) {
-    margin-top: var(--spacing-12);
   }
 }
 

@@ -15,6 +15,13 @@ describe('landing guide links', () => {
     })
 })
 
+describe('landing guide heading', () => {
+    it('is the one element the store apps swap out', () => {
+        expect(guideHtml.match(/<h2 id="guide-heading"[^]*?<\/h2>/g)).toHaveLength(1)
+        expect(guideHtml.match(/<h2/g)).toHaveLength(1)
+    })
+})
+
 describe('sitemap', () => {
     it('lists every static page', () => {
         for (const page of pages) expect(sitemap, page).toContain(`<loc>https://open-mercy.com${page}</loc>`)
