@@ -25,9 +25,9 @@
         </details>
       </div>
 
-      <!-- Answers stay plain text so they match the FAQPage JSON-LD in
-           index.html exactly; the deep link into the rules guide lives here
-           instead of inside an answer. -->
+      <!-- Answers stay plain text so they match the FAQPage JSON-LD the build
+           writes from the same list; the deep link into the rules guide lives
+           here instead of inside an answer. -->
       <p class="faq-more">
         Still deciding a rule mid-game?
         <a href="/rules/" class="faq-more-link">Read the full rules guide</a>
@@ -42,59 +42,10 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import gsap from 'gsap'
 import type { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { onFirstScroll } from '../composables/onFirstScroll'
+import { Capacitor } from '@capacitor/core'
+import { LANDING_FAQS } from '../data/landingFaqs'
 
-// Keep this list in sync with the FAQPage JSON-LD in index.html — the
-// structured data must match the visible questions and answers exactly.
-const faqs = [
-  {
-    q: 'Can I play Open Mercy online?',
-    a: 'Yes. Open Mercy runs directly in your web browser at open-mercy.com. There is nothing to install - open the page and play.',
-  },
-  {
-    q: 'Is the game free?',
-    a: 'Yes, it is completely free to play. No purchase is required to play a full game.',
-  },
-  {
-    q: 'Do I need to download anything?',
-    a: 'No. It is a browser game that works on any modern desktop or mobile browser. No app or download is needed.',
-  },
-  {
-    q: 'Do I need an account?',
-    a: 'No account is required to play. You can jump in as a guest. Creating a free account is optional and only used to save your stats.',
-  },
-  {
-    q: 'Can I play with friends?',
-    a: 'Yes. Create a multiplayer room, share the room code or invite link, and your friends join the same game in real time.',
-  },
-  {
-    q: 'Can I play against AI?',
-    a: "Yes. Choose Play vs bot to face one computer opponent whenever you don't have other players. There are eight bots on a ladder, and beating one unlocks the next.",
-  },
-  {
-    q: 'How many players are supported?',
-    a: 'Each game supports 2 to 20 players.',
-  },
-  {
-    q: 'Does the game work on mobile?',
-    a: 'Yes. It works on iPhone, Android, and desktop browsers, with a layout built for touch screens.',
-  },
-  {
-    q: 'Does the game include Draw 6 and Draw 10?',
-    a: 'Yes. Both Draw 6 and Draw 10 cards are included, along with the other brutal action cards.',
-  },
-  {
-    q: 'Is stacking supported?',
-    a: 'Yes. Draw cards stack onto each other, so a Draw 2 can build into a much larger penalty before someone finally picks up.',
-  },
-  {
-    q: 'What is the 25-card Mercy Rule?',
-    a: 'If a player\'s hand ever reaches 25 or more cards, that player is eliminated from the game. It is the "no mercy" twist that ends runaway hands.',
-  },
-  {
-    q: 'Is Open Mercy an official UNO or Mattel game?',
-    a: "No. Open Mercy is an independent game. Its ruleset was popularized by Mattel's UNO Show 'Em No Mercy® card game, but this project is not affiliated with, endorsed by, or associated with Mattel or the official UNO brand.",
-  },
-]
+const faqs = Capacitor.isNativePlatform() ? LANDING_FAQS.filter((f) => !f.webOnly) : LANDING_FAQS
 
 const faqSection = ref<HTMLElement>()
 const faqHeading = ref<HTMLElement>()

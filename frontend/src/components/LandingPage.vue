@@ -63,7 +63,8 @@
         </span>
       </h1>
 
-      <p class="hero-tagline" ref="taglineRef">THE RUTHLESS CARD BATTLE</p>
+      <!-- The store apps do not name another company's game on their first screen. -->
+      <p class="hero-tagline" ref="taglineRef">{{ isNative ? 'Free online card game' : 'Free online card game with UNO No Mercy rules' }}</p>
 
       <div class="hero-cta" ref="heroCtaRef">
         <p v-if="inviteCode" class="invite-banner">
@@ -126,6 +127,7 @@
 import { ArrowRight } from 'lucide-vue-next'
 import { ref, shallowRef, onMounted, onUnmounted, computed, defineAsyncComponent, type Component } from 'vue'
 import gsap from 'gsap'
+import { Capacitor } from '@capacitor/core'
 import LandingGuide from './LandingGuide.vue'
 import LandingFAQ from './LandingFAQ.vue'
 import SiteFooter from './SiteFooter.vue'
@@ -136,6 +138,8 @@ import Button from './ui/Button.vue'
 import { useScreenSize } from '../composables/useScreenSize'
 import { currentRoute, navigate } from '../utils/routes'
 import { onFirstScroll } from '../composables/onFirstScroll'
+
+const isNative = Capacitor.isNativePlatform()
 
 const FeedbackModal = defineAsyncComponent(() => import('./FeedbackModal.vue'))
 const RulesModal = defineAsyncComponent(() => import('./RulesModal.vue'))
@@ -705,10 +709,9 @@ function runHeroChoreography() {
 
 .hero-tagline {
   font-family: var(--font-body);
-  font-size: var(--text-sm);
+  font-size: var(--text-base);
   color: var(--text-secondary);
-  letter-spacing: 0.3em;
-  text-transform: uppercase;
+  text-align: center;
   margin: 0;
   z-index: var(--z-base);
 }

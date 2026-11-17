@@ -1,71 +1,17 @@
 <template>
   <!-- Static on purpose: no scroll-in animation, so crawlers and slow phones
-       always get the text that explains the game and links into the guides. -->
-  <section class="guide-section" aria-labelledby="guide-heading">
-    <div class="guide-inner">
-      <h2 id="guide-heading" class="guide-heading">
-        WHAT IS <span class="accent-yellow">OPEN MERCY?</span>
-      </h2>
-      <p class="guide-intro">
-        Open Mercy is a free card game you play in your browser, built on the No Mercy rules:
-        bigger draw cards, stacking, and a hard limit on how many cards you can hold.
-        The ruleset was popularized by Mattel's UNO Show 'Em No Mercy&reg; card game;
-        Open Mercy is independent and not affiliated with Mattel.
-      </p>
-      <p class="guide-intro">
-        It is made for friend groups who want a quick game over a call, but you can also
-        practice alone against a ladder of eight bots, or play the daily deal that everyone
-        gets the same shuffle for.
-      </p>
-
-      <div class="guide-grid">
-        <div class="guide-block">
-          <h3 class="guide-sub">Ways to play</h3>
-          <ul>
-            <li><strong>Play vs bot</strong> - one computer opponent, a new one each time you win.</li>
-            <li><strong>CREATE GAME</strong> - a private room for up to 20 friends.</li>
-            <li><strong>Quick match</strong> - join an open public room with strangers.</li>
-            <li><strong>TODAY'S DEAL</strong> - you against the toughest bot, same cards for everyone.</li>
-          </ul>
-        </div>
-
-        <div class="guide-block">
-          <h3 class="guide-sub">What makes it mean</h3>
-          <ul>
-            <li>Draw cards stack, all the way up to +10.</li>
-            <li>Hold 25 cards and you are out.</li>
-            <li>A 7 swaps hands, a 0 passes every hand along.</li>
-            <li>Color Roulette makes the next player pick a color, then draw until they hit it.</li>
-            <li>Forget to call MERCY! and it can cost you 10 cards.</li>
-          </ul>
-        </div>
-
-        <div class="guide-block">
-          <h3 class="guide-sub">How to start</h3>
-          <ol>
-            <li>Press PLAY NOW. You get a guest account, no email needed.</li>
-            <li>Pick a bot, a private room, or Quick match in the lobby.</li>
-            <li>Match the top card by color, number or symbol. Tap the deck if you can't.</li>
-          </ol>
-        </div>
-      </div>
-
-      <nav class="guide-links" aria-label="Guides">
-        <a href="/how-to-play/">How to play</a>
-        <a href="/rules/">Full rules</a>
-        <a href="/rules/how-to-play/">Rules step by step</a>
-        <a href="/rules/cards/">Every card</a>
-        <a href="/rules/stacking/">Stacking rules</a>
-        <a href="/rules/draw-10/">Draw 10 card</a>
-        <a href="/rules/mercy-rule/">The mercy rule</a>
-        <a href="/rules/7-0-rule/">7 and 0 rule</a>
-        <a href="/strategy/">Strategy</a>
-        <a href="/faq/">FAQ</a>
-        <a href="/about/">About</a>
-      </nav>
-    </div>
-  </section>
+       always get the text that explains the game and links into the guides.
+       The text lives in content/landingGuide.html because the build also writes
+       it into index.html (vite.config.ts) for crawlers that do not run JavaScript. -->
+  <section class="guide-section" :class="{ 'is-native': isNative }" aria-labelledby="guide-heading" v-html="guideHtml"></section>
 </template>
+
+<script setup lang="ts">
+import { Capacitor } from '@capacitor/core'
+import guideHtml from '../content/landingGuide.html?raw'
+
+const isNative = Capacitor.isNativePlatform()
+</script>
 
 <style scoped>
 .guide-section {
@@ -74,25 +20,27 @@
   padding: 6rem 2rem;
 }
 
-.guide-inner {
+.guide-section :deep(.guide-inner) {
   max-width: 960px;
   margin: 0 auto;
 }
 
-.guide-heading {
+.guide-section :deep(.guide-heading) {
   font-family: var(--font-display);
   font-size: 3.2rem;
   margin: 0 0 1.5rem;
   color: var(--text-primary);
   line-height: 1;
   text-align: center;
+  /* Keeps a two-line heading from leaving one word alone on the second line. */
+  text-wrap: balance;
 }
 
-.accent-yellow {
+.guide-section :deep(.accent-yellow) {
   color: var(--color-hazard);
 }
 
-.guide-intro {
+.guide-section :deep(.guide-intro) {
   color: var(--text-secondary);
   font-size: 1.1rem;
   line-height: 1.7;
@@ -101,47 +49,70 @@
   text-align: center;
 }
 
-.guide-grid {
+.guide-section :deep(.guide-heading-next) {
+  margin-top: var(--spacing-16);
+}
+
+/* The store apps leave out the parts written for search visitors: they name
+   another company's game and the other phone platform, which app review rejects. */
+.guide-section.is-native :deep(.guide-web) {
+  display: none;
+}
+
+/* Topics are grouped by space alone: more room between them than inside one. */
+.guide-section :deep(.guide-topics) {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1rem;
-  margin-top: 2.5rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: var(--spacing-12);
+  row-gap: var(--spacing-12);
+  margin-top: var(--spacing-8);
 }
 
-.guide-block {
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 10px;
-  background: rgba(0, 0, 0, 0.35);
-  padding: 1.25rem 1.3rem;
-}
-
-.guide-sub {
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  letter-spacing: 3px;
-  text-transform: uppercase;
-  color: var(--color-neon-blue);
-  margin: 0 0 0.9rem;
-}
-
-.guide-block ul,
-.guide-block ol {
-  margin: 0;
-  padding-left: 1.1rem;
-  color: var(--text-secondary);
-  font-size: 0.95rem;
-  line-height: 1.6;
-}
-
-.guide-block li + li {
-  margin-top: 0.5rem;
-}
-
-.guide-block strong {
+.guide-section :deep(.guide-topic-title) {
+  margin: 0 0 var(--spacing-2);
+  font-family: var(--font-body);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  line-height: 1.3;
   color: var(--text-primary);
 }
 
-.guide-links {
+.guide-section :deep(.guide-topic p) {
+  margin: 0 0 var(--spacing-2);
+  font-size: var(--text-base);
+  line-height: 1.7;
+  color: var(--text-secondary);
+}
+
+/* Mixed toward white: saturated cyan under 24px vibrates on the dark floor. */
+.guide-section :deep(.guide-topic a) {
+  color: color-mix(in srgb, var(--color-neon-blue) 85%, white);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* The link that closes a topic is its own line, so it gets a full tap target. */
+.guide-section :deep(.guide-topic > a) {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: 600;
+}
+
+.guide-section :deep(.guide-topic a:hover) {
+  color: var(--text-primary);
+}
+
+.guide-section :deep(.guide-legal) {
+  max-width: 640px;
+  margin: var(--spacing-8) auto 0;
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.guide-section :deep(.guide-links) {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
@@ -149,7 +120,7 @@
   margin-top: 2rem;
 }
 
-.guide-links a {
+.guide-section :deep(.guide-links a) {
   font-family: var(--font-mono);
   font-size: 0.8rem;
   letter-spacing: 1px;
@@ -164,7 +135,7 @@
   transition: border-color 0.2s, color 0.2s;
 }
 
-.guide-links a:hover {
+.guide-section :deep(.guide-links a:hover) {
   border-color: var(--color-neon-blue);
   color: var(--color-neon-blue);
 }
@@ -173,11 +144,15 @@
   .guide-section {
     padding: 4rem 1.5rem;
   }
-  .guide-heading {
+  .guide-section :deep(.guide-heading) {
     font-size: 2.4rem;
   }
-  .guide-grid {
-    grid-template-columns: 1fr;
+  .guide-section :deep(.guide-topics) {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: var(--spacing-8);
+  }
+  .guide-section :deep(.guide-heading-next) {
+    margin-top: var(--spacing-12);
   }
 }
 
@@ -185,10 +160,10 @@
   .guide-section {
     padding: 3rem 1rem;
   }
-  .guide-heading {
+  .guide-section :deep(.guide-heading) {
     font-size: 1.9rem;
   }
-  .guide-intro {
+  .guide-section :deep(.guide-intro) {
     font-size: 1rem;
   }
 }
