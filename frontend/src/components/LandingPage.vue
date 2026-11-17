@@ -70,9 +70,21 @@
         <p v-if="inviteCode" class="invite-banner">
           You've been invited to room <strong>{{ inviteCode }}</strong> — jump in.
         </p>
-        <Button variant="primary" size="lg" :disabled="loading" @click="reportAndEmit('playGuest')">
-          {{ loading ? 'ENTERING…' : (inviteCode ? 'JOIN THE GAME' : 'PLAY NOW') }}
-        </Button>
+        <div class="hero-actions">
+          <Button variant="primary" size="lg" :disabled="loading" @click="reportAndEmit('playGuest')">
+            {{ loading ? 'ENTERING…' : (inviteCode ? 'JOIN THE GAME' : 'PLAY NOW') }}
+          </Button>
+          <!-- Apple's own artwork, unaltered, as its badge rules require. An invite keeps one action. -->
+          <a
+            v-if="showAppBadge && !inviteCode"
+            class="app-badge"
+            href="https://apps.apple.com/app/open-mercy-online-card-game/id6834576193"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <img :src="appStoreBadge" alt="Download on the App Store" width="120" height="40" />
+          </a>
+        </div>
         <button type="button" class="rules-peek" @click="showRules = true">
           New to Open Mercy? See how it works
         </button>
@@ -138,8 +150,11 @@ import Button from './ui/Button.vue'
 import { useScreenSize } from '../composables/useScreenSize'
 import { currentRoute, navigate } from '../utils/routes'
 import { onFirstScroll } from '../composables/onFirstScroll'
+import appStoreBadge from '../assets/app-store-badge.svg'
 
 const isNative = Capacitor.isNativePlatform()
+// Not inside the app itself, and not on Android, where the App Store is a dead end.
+const showAppBadge = !isNative && !/Android/i.test(navigator.userAgent)
 
 const FeedbackModal = defineAsyncComponent(() => import('./FeedbackModal.vue'))
 const RulesModal = defineAsyncComponent(() => import('./RulesModal.vue'))
@@ -726,6 +741,26 @@ function runHeroChoreography() {
   gap: var(--spacing-3);
 }
 
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-3);
+}
+
+.app-badge {
+  display: inline-flex;
+  border-radius: var(--radius-md);
+}
+
+/* 48px keeps both actions on one row at 390px; Apple's minimum is 40px. */
+.app-badge img {
+  display: block;
+  width: auto;
+  height: 48px;
+}
+
 .rules-peek {
   display: inline-flex;
   align-items: center;
@@ -889,6 +924,17 @@ function runHeroChoreography() {
   .top-bar-cta {
     justify-content: center;
     flex-wrap: wrap;
+  }
+}
+
+/* Room for the badge to match the button's height. */
+@media (min-width: 600px) {
+  .hero-actions {
+    gap: var(--spacing-4);
+  }
+
+  .app-badge img {
+    height: 56px;
   }
 }
 
