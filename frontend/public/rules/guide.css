@@ -87,8 +87,10 @@ header {
 .breadcrumb a:hover { color: var(--blue); }
 .breadcrumb .sep { margin: 0 0.5rem; color: var(--text-muted); }
 
-/* Hero */
-.hero { padding: 2rem 0 3rem; text-align: center; }
+/* Hero. One headline, the answer in a sentence or two, one action, then the
+   small print. Left-aligned like the text below it. docs/guide-pages.md has the
+   whole page structure. */
+.hero { padding: 2rem 0 3rem; }
 h1 {
   font-family: var(--display-font);
   font-size: 3rem;
@@ -102,9 +104,7 @@ h1 .accent { color: var(--red); display: block; font-size: 1.5rem; margin-top: 0
   font-size: 0.72rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--text-muted);
-  text-align: center;
-  margin-bottom: 1rem;
+  color: var(--text-dim);
 }
 .byline a { color: var(--text); text-decoration: none; }
 figure.shot { margin: 1.5rem 0; }
@@ -114,15 +114,24 @@ figure.shot figcaption { font-size: 0.85rem; color: var(--text-muted); text-alig
 .lead {
   color: var(--text-dim);
   font-size: 1.1rem;
-  max-width: 600px;
-  margin: 1.5rem auto 0;
+  max-width: 640px;
+  margin: 1.5rem 0 0;
+}
+/* The trademark notice sits under the action as small print, not as a box above it. */
+.hero .callout:not(.success):not(.danger) {
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0 0 0.5rem;
+  max-width: 640px;
+  font-size: 0.85rem;
 }
 
 /* CTA */
 .cta-row {
   display: flex;
-  gap: 1rem;
-  justify-content: center;
+  align-items: center;
+  gap: 0.5rem 1.5rem;
   margin: 2rem 0;
   flex-wrap: wrap;
 }
@@ -141,8 +150,20 @@ figure.shot figcaption { font-size: 0.85rem; color: var(--text-muted); text-alig
 }
 .btn-primary { background: linear-gradient(145deg, var(--red), var(--red-dim)); color: white; border-color: var(--red); }
 .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 0 30px rgba(255, 42, 42, 0.4); }
-.btn-ghost { color: var(--blue); border-color: var(--blue); background: transparent; }
-.btn-ghost:hover { background: var(--blue); color: black; }
+/* One filled button per row. Every other action is a text link with a full tap target. */
+.btn-ghost {
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  color: var(--text);
+  font-family: var(--body-font);
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.btn-ghost:hover { color: var(--blue); }
 
 /* TOC */
 .toc {
@@ -225,6 +246,7 @@ li { margin-bottom: 0.5rem; }
    body copy fell back to the UA's default blue. */
 .callout a,
 section p a,
+section li a,
 .faq-item p a {
   color: var(--blue);
   text-decoration: underline;
@@ -232,6 +254,7 @@ section p a,
 }
 .callout a:hover,
 section p a:hover,
+section li a:hover,
 .faq-item p a:hover { color: var(--text); }
 .callout.danger { background: rgba(255, 42, 42, 0.05); border-left-color: var(--red); }
 .callout.danger strong { color: var(--red); }
@@ -253,16 +276,15 @@ section p a:hover,
   letter-spacing: 1px;
 }
 
-/* Final CTA */
+/* Final CTA. Set apart by space and a hairline, not a box. */
 .final-cta {
-  background: rgba(0,0,0,0.5);
-  border: 2px solid var(--red);
-  padding: 3rem 2rem;
-  text-align: center;
+  border-top: 1px solid var(--border);
+  padding-top: 2.5rem;
   margin: 4rem 0 2rem;
 }
 .final-cta h2 { border: none; padding: 0; margin-bottom: 0.75rem; }
-.final-cta p { margin-bottom: 1.5rem; }
+.final-cta p { margin-bottom: 0; }
+.final-cta .cta-row { margin: 1.5rem 0 0; }
 
 /* Footer — the same footer as the app's SiteFooter.vue; keep the two in step. */
 .site-footer {

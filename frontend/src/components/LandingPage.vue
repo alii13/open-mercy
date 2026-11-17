@@ -63,25 +63,42 @@
         </span>
       </h1>
 
-      <p class="hero-tagline" ref="taglineRef">THE RUTHLESS CARD BATTLE</p>
+      <!-- The store apps do not name another company's game on their first screen. -->
+      <p class="hero-tagline" ref="taglineRef">{{ isNative ? 'Free online card game' : 'Free online card game with UNO No Mercy rules' }}</p>
 
       <div class="hero-cta" ref="heroCtaRef">
         <p v-if="inviteCode" class="invite-banner">
           You've been invited to room <strong>{{ inviteCode }}</strong> — jump in.
         </p>
-        <Button variant="primary" size="lg" :disabled="loading" @click="reportAndEmit('playGuest')">
-          {{ loading ? 'ENTERING…' : (inviteCode ? 'JOIN THE GAME' : 'PLAY NOW') }}
-        </Button>
-        <button type="button" class="rules-peek" @click="showRules = true">
-          New to Open Mercy? See how it works
-        </button>
-        <button type="button" class="rules-peek" @click="navigate({ name: 'leaderboard' })">
-          Today's leaderboard <ArrowRight :size="14" :stroke-width="2" aria-hidden="true" />
-        </button>
+        <div class="hero-actions" :class="{ 'has-badge': showAppBadge && !inviteCode }">
+          <Button variant="primary" size="lg" :disabled="loading" @click="reportAndEmit('playGuest')">
+            {{ loading ? 'ENTERING…' : (inviteCode ? 'JOIN THE GAME' : 'PLAY NOW') }}
+          </Button>
+          <!-- Apple's own artwork, unaltered, as its badge rules require. An invite keeps one action. -->
+          <a
+            v-if="showAppBadge && !inviteCode"
+            class="app-badge"
+            href="https://apps.apple.com/app/open-mercy-online-card-game/id6834576193"
+            target="_blank"
+            rel="noopener noreferrer"
+            @click="track('app_store_click', { from: 'landing_hero' })"
+          >
+            <img :src="appStoreBadge" alt="Download on the App Store" width="120" height="40" />
+          </a>
+        </div>
         <!-- Hidden below a floor and until the SQL exists; see useSitePulse. -->
         <p v-if="pulse.show.value" class="hero-pulse">
           <span class="live-dot" aria-hidden="true" />{{ pulse.players.value.toLocaleString() }} PLAYERS · {{ pulse.games.value.toLocaleString() }} GAMES THIS WEEK
         </p>
+        <!-- A pair: each link's own padding is the only space between them. -->
+        <div class="hero-links">
+          <button type="button" class="rules-peek" @click="showRules = true">
+            New to Open Mercy? See how it works
+          </button>
+          <button type="button" class="rules-peek" @click="navigate({ name: 'leaderboard' })">
+            Today's leaderboard <ArrowRight :size="14" :stroke-width="2" aria-hidden="true" />
+          </button>
+        </div>
       </div>
 
       <LandingStatsBadge class="hero-stats" />
@@ -126,6 +143,7 @@
 import { ArrowRight } from 'lucide-vue-next'
 import { ref, shallowRef, onMounted, onUnmounted, computed, defineAsyncComponent, type Component } from 'vue'
 import gsap from 'gsap'
+import { Capacitor } from '@capacitor/core'
 import LandingGuide from './LandingGuide.vue'
 import LandingFAQ from './LandingFAQ.vue'
 import SiteFooter from './SiteFooter.vue'
@@ -136,6 +154,12 @@ import Button from './ui/Button.vue'
 import { useScreenSize } from '../composables/useScreenSize'
 import { currentRoute, navigate } from '../utils/routes'
 import { onFirstScroll } from '../composables/onFirstScroll'
+import appStoreBadge from '../assets/app-store-badge.svg'
+import { track } from '../utils/analytics'
+
+const isNative = Capacitor.isNativePlatform()
+// Not inside the app itself, and not on Android, where the App Store is a dead end.
+const showAppBadge = !isNative && !/Android/i.test(navigator.userAgent)
 
 const FeedbackModal = defineAsyncComponent(() => import('./FeedbackModal.vue'))
 const RulesModal = defineAsyncComponent(() => import('./RulesModal.vue'))
@@ -705,22 +729,64 @@ function runHeroChoreography() {
 
 .hero-tagline {
   font-family: var(--font-body);
-  font-size: var(--text-sm);
+  font-size: var(--text-base);
   color: var(--text-secondary);
-  letter-spacing: 0.3em;
-  text-transform: uppercase;
+  text-align: center;
   margin: 0;
   z-index: var(--z-base);
 }
 
+/* One rhythm down the stack: 12px from the button to its players line, then
+   16px between lines of text (8px gap plus each link's 8px padding). */
 .hero-cta {
   position: relative;
   z-index: var(--z-base);
   margin-top: var(--spacing-2);
+  /* Full width, so the action row can size itself against the hero, not against the links. */
+  width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: var(--spacing-2);
+}
+
+.hero-links {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.hero-actions {
+  display: flex;
+  justify-content: center;
+}
+
+/* Two actions of one size. The row is two equal columns; the badge's own 3:1
+   shape sets the row's height and the button stretches to it, so they match at
+   every width. 368px is two buttons at their natural width plus the gap. */
+.hero-actions.has-badge {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--spacing-3);
+  width: 100%;
+  max-width: 368px;
+}
+
+/* The button gives up its own height so the row's height is the badge's. */
+.hero-actions.has-badge > .btn {
+  min-height: 0;
+  padding: 0 var(--spacing-4);
+}
+
+.app-badge {
+  display: block;
+  border-radius: var(--radius-md);
+}
+
+.app-badge img {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
 .rules-peek {
@@ -759,7 +825,7 @@ function runHeroChoreography() {
 .hero-pulse {
   display: inline-flex;
   align-items: center;
-  margin: 0;
+  margin: var(--spacing-1) 0 0;
   font-family: var(--font-mono);
   font-size: 0.62rem;
   letter-spacing: 0.12em;
@@ -870,6 +936,13 @@ function runHeroChoreography() {
   .hero-counter {
     left: calc(50% + 90px);
     font-size: 2.8rem;
+  }
+
+  /* Phones stack the two actions. Equal rows keep the button at the badge's height. */
+  .hero-actions.has-badge {
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-rows: 1fr;
+    max-width: 178px;
   }
 }
 

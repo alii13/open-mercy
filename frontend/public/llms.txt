@@ -1,6 +1,6 @@
 # Open Mercy
 
-> Free browser card game with the No Mercy ruleset: draw stacking, Draw 6, Draw 10, Skip Everyone, Discard All, Color Roulette, 7 swap, 0 rotate and elimination at 25 cards. Real-time multiplayer for 2 to 20 players, or solo against AI. No download, no account required.
+> Free browser card game that plays by UNO No Mercy rules: draw stacking, Draw 6, Draw 10, Skip Everyone, Discard All, Color Roulette, 7 swap, 0 rotate and elimination at 25 cards. Real-time multiplayer for 2 to 20 players, or solo against AI. No download, no account required.
 
 Play now: [open-mercy.com](https://open-mercy.com/)
 
@@ -29,6 +29,9 @@ Open Mercy is an independent, open-source web game. Its ruleset was popularized 
 ## Pages
 
 - [Play Open Mercy](https://open-mercy.com/): the game, multiplayer rooms and solo vs AI
+- [Play with friends](https://open-mercy.com/play-with-friends/): private rooms, invite links, stacking modes and voice chat
+- [Play vs computer](https://open-mercy.com/play-vs-computer/): the ladder of eight bots and the daily deal
+- [iPhone app](https://apps.apple.com/app/open-mercy-online-card-game/id6834576193): the same game on the App Store
 - [Complete rules guide](https://open-mercy.com/rules/): every card, stacking variants and edge cases
 - [One-page cheat sheet](https://open-mercy.com/rules/cheat-sheet/): printable, with a [PDF](https://open-mercy.com/rules/cheat-sheet.pdf)
 - [Every card explained](https://open-mercy.com/rules/cards/): all 168 cards with deck counts
