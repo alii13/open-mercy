@@ -98,6 +98,8 @@ describe('saving results through a database restart', () => {
     const batch = queue.mock.calls[0]![0]
     expect(batch.attempt).toBe(0)
     expect((batch.rows as { user_id: string }[]).map(r => r.user_id)).toEqual(['u1', 'u2'])
+    // The end time travels with the rows, so a later retry keeps the game's day.
+    expect(batch.rows.every(r => typeof r.played_at === 'string')).toBe(true)
   })
 
   it('queues the rows instead of throwing when the request itself fails', async () => {
@@ -111,16 +113,38 @@ describe('saving results through a database restart', () => {
   it('counts a retry that finds the rows already saved as done', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response('{"code":"23505"}', { status: 409 })))
 
-    expect(await retryResults([{ rows: [{ user_id: 'u1' }], attempt: 0 }], env)).toEqual([])
+    expect(await retryResults([{ rows: [{ user_id: 'u1' }], attempt: 0, dueAt: 0 }], env)).toEqual([])
+  })
+
+  it('does not count any other 409 as saved', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{"code":"23503"}', { status: 409 })))
+    const queue = vi.fn(async (_batch: ResultBatch) => {})
+
+    expect(await persistResults(finished(), 'ABCDEF', env, queue)).toBe(false)
+    expect(queue).not.toHaveBeenCalled()
   })
 
   it('keeps a failing batch for the next delay, and gives up after the last one', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response('down', { status: 503 })))
     const rows = [{ user_id: 'u1' }]
     const last = RESULT_RETRY_DELAYS_MS.length - 1
+    const now = 1_000_000
 
-    expect(await retryResults([{ rows, attempt: 0 }], env)).toEqual([{ rows, attempt: 1 }])
-    expect(await retryResults([{ rows, attempt: last }], env)).toEqual([])
+    expect(await retryResults([{ rows, attempt: 0, dueAt: now }], env, now))
+      .toEqual([{ rows, attempt: 1, dueAt: now + RESULT_RETRY_DELAYS_MS[1]! }])
+    expect(await retryResults([{ rows, attempt: last, dueAt: now }], env, now)).toEqual([])
+  })
+
+  it('retries only the batches that are due, so a newer game does not use up an older one', async () => {
+    const fetchMock = vi.fn(async () => new Response('down', { status: 503 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const now = 1_000_000
+    const older = { rows: [{ user_id: 'u1' }], attempt: 4, dueAt: now + 60_000 }
+    const newer = { rows: [{ user_id: 'u2' }], attempt: 0, dueAt: now }
+
+    expect(await retryResults([older, newer], env, now))
+      .toEqual([older, { rows: newer.rows, attempt: 1, dueAt: now + RESULT_RETRY_DELAYS_MS[1]! }])
+    expect(fetchMock).toHaveBeenCalledOnce()
   })
 })
 

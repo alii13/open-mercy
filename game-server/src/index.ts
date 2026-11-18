@@ -2,7 +2,7 @@
 
 import { verifySupabaseToken, type AuthEnv } from './auth'
 import type { ClientMsg, GameEvent, PresencePlayer, ServerMsg } from './protocol'
-import { applyIntent, applyUnoCatch, clearTimeouts, forceEliminate, persistResults, personalView, playHouseTurn, retryResults, RESULT_RETRY_DELAYS_MS, startGame, timeOutTurn, updateStats, viewEventFor, type GameRecord, type ResultBatch } from './game'
+import { applyIntent, applyUnoCatch, clearTimeouts, forceEliminate, persistResults, personalView, playHouseTurn, retryResults, startGame, timeOutTurn, updateStats, viewEventFor, type GameRecord, type ResultBatch } from './game'
 import { dueTimeout, nextTurnClock } from './turnClock'
 import { dirCodes, dirRegister, liveTables, normalizeDir } from './directory'
 import { cleanName, cleanSkin, isStackingMode } from './validate'
@@ -361,7 +361,7 @@ export class GameRoomDO {
         const t = await this.getTimers()
         if (pending.length) {
             await this.ctx.storage.put('pendingResults', pending)
-            t.resultsAt = Date.now() + Math.min(...pending.map(b => RESULT_RETRY_DELAYS_MS[b.attempt]!))
+            t.resultsAt = Math.min(...pending.map(b => b.dueAt))
         } else {
             await this.ctx.storage.delete('pendingResults')
             delete t.resultsAt
@@ -1260,11 +1260,19 @@ export class GameRoomDO {
         // Last, so a slow database never holds up the game clocks above.
         if (resultsDue) {
             const pending = (await this.ctx.storage.get<ResultBatch[]>('pendingResults')) ?? []
-            await this.armResults(await retryResults(pending, this.env))
+            const left = await retryResults(pending, this.env)
+            // A game that ended while those requests were out appended its batch
+            // (queueResults); writing back only what was read would drop it.
+            const added = ((await this.ctx.storage.get<ResultBatch[]>('pendingResults')) ?? []).slice(pending.length)
+            await this.armResults([...left, ...added])
         }
 
+        // An alarm that threw after clearing resultsAt left these without a clock.
+        const unsaved = await this.ctx.storage.get<ResultBatch[]>('pendingResults')
+        if (unsaved && !(await this.getTimers()).resultsAt) await this.armResults(unsaved)
+
         // A room still holding unsaved results waits for them: deleteAll would drop the game.
-        if (gcDue && this.roomSockets().length === 0 && !(await this.ctx.storage.get('pendingResults'))) {
+        if (gcDue && this.roomSockets().length === 0 && !unsaved) {
             const roomRec = await this.ctx.storage.get<RoomRecord>('room')
             if (roomRec?.isPublic) {
                 await directoryStub(this.env).fetch('https://do/dir-unregister', {

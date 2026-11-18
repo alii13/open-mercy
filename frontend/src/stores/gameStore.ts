@@ -882,6 +882,10 @@ export const useGameStore = defineStore('game', () => {
             const { error } = await supabase.rpc('record_bot_result', args)
             if (!error || wait === null) return
             await new Promise(resolve => setTimeout(resolve, wait))
+            // record_bot_result files the game under whoever is signed in at
+            // the time; after a switch to another account it is not theirs.
+            const { data: { session: current } } = await supabase.auth.getSession()
+            if (current?.user?.id !== session.user.id) return
         }
     }
 
