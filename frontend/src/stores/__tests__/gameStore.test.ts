@@ -762,6 +762,21 @@ describe('saving a finished bot game', () => {
         expect(rpc).toHaveBeenCalledTimes(2)
     })
 
+    it('waits out a session read that fails while the auth server is down, instead of dropping the game', async () => {
+        vi.useFakeTimers()
+        getSession
+            .mockResolvedValueOnce({ data: { session: null }, error: { name: 'AuthRetryableFetchError' } } as never)
+            .mockResolvedValueOnce(signedIn('user-1'))
+        const store = oneCardFromWinning()
+
+        store.playCard('p-0', red7)
+        await vi.advanceTimersByTimeAsync(0)
+        expect(rpc).not.toHaveBeenCalled()
+
+        await vi.advanceTimersByTimeAsync(5_000)
+        expect(rpc).toHaveBeenCalledOnce()
+    })
+
     it('stops retrying once a different account is signed in', async () => {
         vi.useFakeTimers()
         getSession.mockResolvedValueOnce(signedIn('user-1')).mockResolvedValueOnce(signedIn('user-2'))

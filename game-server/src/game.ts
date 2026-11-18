@@ -560,8 +560,10 @@ async function postResults(rows: Record<string, unknown>[], env: ResultsEnv): Pr
         },
         body: JSON.stringify(body),
         // A database that hangs instead of refusing would otherwise stall the
-        // game-over handling; a timeout is just another retry.
-        signal: AbortSignal.timeout(10_000),
+        // game-over handling and the room alarm (turn and house clocks wait
+        // behind it); a timeout is just another retry. Short is safe: an insert
+        // that still lands after it makes the retry a duplicate, read as saved.
+        signal: AbortSignal.timeout(3_000),
     })
     try {
         let res = await insert(rows)
