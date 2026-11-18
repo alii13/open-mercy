@@ -14,13 +14,16 @@
 -- would cost nearly as much, and a slower one leaves ranks behind the badge
 -- points players see. The trigger costs two small upserts per saved game.
 --
--- game_results rows are never updated, and are only deleted when an account is
--- deleted (FK cascade), which removes these rows the same way. So the trigger
--- only handles inserts. The check at the bottom catches any drift.
+-- game_results rows are never updated. An account deletion removes them by FK
+-- cascade, which removes these rows the same way. The one other delete is the
+-- hand removal of a fake daily (daily-suspects.sql), which must be followed by
+-- a re-run of this file. So the trigger only handles inserts. The check at the
+-- bottom catches any drift.
 --
 -- Takes a lock on game_results for under a second while it rebuilds: saves
 -- wait, reads continue. It gives up (and changes nothing) if it cannot get the
--- lock within 2 s or a step runs past 5 s, well inside the 8 s request limit.
+-- lock within 2 s or the rebuild runs past 5 s in total, inside the 8 s request
+-- limit.
 
 begin;
 
@@ -45,6 +48,17 @@ alter table public.player_alltime_totals enable row level security;
 alter table public.player_play_days enable row level security;
 revoke all on table public.player_alltime_totals, public.player_play_days from anon, authenticated;
 
+commit;
+
+begin;
+
+set local lock_timeout = '2s';
+-- Bounds the whole rebuild, so saves queued behind the lock never wait past 5 s
+-- (Postgres 17+; a per-statement timeout would let five steps add up).
+set local transaction_timeout = '5s';
+
+-- Replaced in the same transaction as the rebuild, so a rebuild that gives up
+-- never leaves new weights adding onto totals built with the old ones.
 create or replace function public.add_game_to_alltime_totals()
 returns trigger
 language plpgsql
@@ -66,7 +80,7 @@ begin
         new.user_id,
         1,
         (new.result = 'won')::int,
-        case when new.is_bot_game or new.cards_played_total >= 5 then
+        case when (new.is_bot_game or new.cards_played_total >= 5) then
             case new.result when 'won' then 100 when 'lost' then 12 when 'eliminated' then 12 else 0 end
         else 0 end
         + new.draw_cards_played * 2
@@ -87,12 +101,8 @@ exception when others then
 end;
 $$;
 
-commit;
-
-begin;
-
-set local lock_timeout = '2s';
-set local statement_timeout = '5s';
+-- A trigger function; nobody should be able to call it over the API.
+revoke execute on function public.add_game_to_alltime_totals() from public, anon, authenticated;
 
 lock table public.game_results in share row exclusive mode;
 
@@ -114,9 +124,10 @@ from (
         count(*) as games,
         count(*) filter (where result = 'won') as wins,
         sum(
-            case when is_bot_game or cards_played_total >= 5 then
+            case when (is_bot_game or cards_played_total >= 5) then
                 case result when 'won' then 100 when 'lost' then 12 when 'eliminated' then 12 else 0 end
             else 0 end
+            -- The stat columns are NOT NULL, so no coalesce is needed here or in the trigger.
             + draw_cards_played * 2
             + biggest_stack_survived * 3
             + uno_calls * 4

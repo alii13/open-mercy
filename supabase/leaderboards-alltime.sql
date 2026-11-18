@@ -136,9 +136,9 @@ security definer
 set search_path = public
 stable
 as $$
-    select p.country, count(distinct gr.user_id) as players
-    from game_results gr
-    join profiles p on p.id = gr.user_id
+    select p.country, count(*) as players
+    from player_alltime_totals t
+    join profiles p on p.id = t.user_id
     where p.country is not null
     group by p.country
     order by players desc, p.country asc;

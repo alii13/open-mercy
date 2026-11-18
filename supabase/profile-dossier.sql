@@ -1,6 +1,7 @@
 -- Dossier sections for the public profile page (/p/<share_code>). Run in the
--- Supabase SQL Editor AFTER profile-pages.sql and leaderboards-alltime.sql
--- (this depends on profiles.share_code + country). Additive only: three
+-- Supabase SQL Editor AFTER profile-pages.sql, leaderboards-alltime.sql
+-- (this depends on profiles.share_code + country) and alltime-score-totals.sql
+-- (profile_rank reads player_alltime_totals). Additive only: three
 -- SECURITY DEFINER functions + grants. No table changes.
 --
 -- public_profile() returns one row of aggregates, which is enough for the

@@ -1,5 +1,5 @@
--- Undo for alltime-ranks-from-totals.sql: puts back the four all-time rank
--- functions that aggregate game_results on every call (the bodies on main
+-- Undo for alltime-ranks-from-totals.sql: puts back the all-time rank
+-- functions and country list that aggregate game_results on every call (the bodies on main
 -- before 2026-11-18). Same signatures and columns, grants kept.
 
 -- alltime_leaderboard (source: supabase/leaderboards-alltime.sql)
@@ -197,4 +197,21 @@ as $$
         (select count(*) from country_ranked);
 $$;
 grant execute on function public.profile_rank to anon, authenticated;
+
+-- alltime_countries (source: supabase/leaderboards-alltime.sql)
+create or replace function public.alltime_countries()
+returns table (country text, players bigint)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+    select p.country, count(distinct gr.user_id) as players
+    from game_results gr
+    join profiles p on p.id = gr.user_id
+    where p.country is not null
+    group by p.country
+    order by players desc, p.country asc;
+$$;
+grant execute on function public.alltime_countries to anon, authenticated;
 

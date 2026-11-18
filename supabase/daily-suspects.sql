@@ -34,3 +34,5 @@ order by game_id desc;
 
 -- To remove a confirmed fake (one row, by id from the result above):
 -- delete from game_results where id = '<id>';
+-- then re-run alltime-score-totals.sql, or the fake's points stay on the
+-- all-time board and ranks (its trigger only counts inserts).

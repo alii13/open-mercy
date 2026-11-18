@@ -1,7 +1,7 @@
--- The four all-time rank functions, reading player_alltime_totals instead of
--- re-scoring every game. Run once in the Supabase SQL Editor, AFTER
--- alltime-score-totals.sql. It only replaces function bodies (same signatures,
--- same columns, grants kept), so the app needs no release.
+-- The four all-time rank functions and the country list, reading
+-- player_alltime_totals instead of re-scoring every game. Run in the Supabase
+-- SQL Editor AFTER alltime-score-totals.sql. It only replaces function bodies
+-- (same signatures, same columns, grants kept), so the app needs no release.
 --
 -- Undo: run alltime-ranks-from-totals-undo.sql, which puts the bodies that
 -- aggregate game_results back. The totals tables and trigger can stay.
@@ -162,4 +162,21 @@ as $$
         (select count(*) from country_ranked);
 $$;
 grant execute on function public.profile_rank to anon, authenticated;
+
+-- alltime_countries (source: supabase/leaderboards-alltime.sql)
+create or replace function public.alltime_countries()
+returns table (country text, players bigint)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+    select p.country, count(*) as players
+    from player_alltime_totals t
+    join profiles p on p.id = t.user_id
+    where p.country is not null
+    group by p.country
+    order by players desc, p.country asc;
+$$;
+grant execute on function public.alltime_countries to anon, authenticated;
 
