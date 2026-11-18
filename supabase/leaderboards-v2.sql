@@ -7,8 +7,9 @@
 -- Re-run after adding badges: both board functions now also return user_id
 -- so the client can look up each row's badge via player_points (badges.sql).
 --
--- Run after alltime-score-totals.sql: daily_leaderboard reads lifetime wins
--- from player_alltime_totals.
+-- lifetime_wins is always null. No screen reads it, and counting it cost a
+-- lookup per row; the column stays so the return type, and so the callers,
+-- do not change.
 
 -- Shareable, rename-safe identity for /p/<code> profile URLs.
 alter table public.profiles
@@ -54,16 +55,13 @@ as $$
         p.share_code,
         p.country,
         p.equipped_card_back as skin,
-        -- One row lookup instead of counting each player's games, which
-        -- scattered ~50 reads per call (alltime-score-totals.sql keeps it).
-        coalesce(t.wins, 0) as lifetime_wins,
+        null::bigint as lifetime_wins,
         gr.result,
         (gr.cards_played_total + gr.draws_taken) as effort,
         gr.game_duration_secs as duration_secs,
         (auth.uid() is not null and gr.user_id = auth.uid()) as is_me
     from game_results gr
     left join profiles p on p.id = gr.user_id
-    left join player_alltime_totals t on t.user_id = gr.user_id
     where gr.game_id = 'daily-' || to_char(challenge_date, 'YYYY-MM-DD')
     order by 1
     limit max_rows;
@@ -101,8 +99,7 @@ as $$
         p.share_code,
         p.country,
         p.equipped_card_back as skin,
-        (select count(*) from game_results w
-          where w.user_id = gr.user_id and w.result = 'won') as lifetime_wins,
+        null::bigint as lifetime_wins,
         count(*) filter (where gr.result = 'won') as wins,
         count(*) as games,
         (auth.uid() is not null and gr.user_id = auth.uid()) as is_me
