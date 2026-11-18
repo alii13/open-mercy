@@ -2,7 +2,7 @@
 
 import { verifySupabaseToken, type AuthEnv } from './auth'
 import type { ClientMsg, GameEvent, PresencePlayer, ServerMsg } from './protocol'
-import { applyIntent, applyUnoCatch, clearTimeouts, forceEliminate, persistResults, personalView, playHouseTurn, startGame, timeOutTurn, updateStats, viewEventFor, type GameRecord } from './game'
+import { applyIntent, applyUnoCatch, clearTimeouts, forceEliminate, persistResults, personalView, playHouseTurn, retryResults, startGame, timeOutTurn, updateStats, viewEventFor, type GameRecord, type ResultBatch } from './game'
 import { dueTimeout, nextTurnClock } from './turnClock'
 import { dirCodes, dirRegister, liveTables, normalizeDir } from './directory'
 import { cleanName, cleanSkin, isStackingMode } from './validate'
@@ -293,6 +293,8 @@ interface RoomTimers {
     houseFor?: string
     // A finished public game goes back to the lounge.
     nextHandAt?: number
+    // The next retry of results a save could not write ('pendingResults').
+    resultsAt?: number
 }
 
 type SocketTag = { userId: string } | null
@@ -349,9 +351,27 @@ export class GameRoomDO {
         return (await this.ctx.storage.get<RoomTimers>('timers')) ?? { gcAt: 0 }
     }
 
+    private async queueResults(batch: ResultBatch): Promise<void> {
+        const pending = (await this.ctx.storage.get<ResultBatch[]>('pendingResults')) ?? []
+        await this.armResults([...pending, batch])
+    }
+
+    /** Stores what is left to save and sets the retry clock to the soonest batch. */
+    private async armResults(pending: ResultBatch[]): Promise<void> {
+        const t = await this.getTimers()
+        if (pending.length) {
+            await this.ctx.storage.put('pendingResults', pending)
+            t.resultsAt = Math.min(...pending.map(b => b.dueAt))
+        } else {
+            await this.ctx.storage.delete('pendingResults')
+            delete t.resultsAt
+        }
+        await this.putTimers(t)
+    }
+
     private async putTimers(t: RoomTimers): Promise<void> {
         await this.ctx.storage.put('timers', t)
-        const due = [t.gcAt, t.graceAt, t.catchAt, t.startAt, t.turnAt, t.houseAt, t.nextHandAt].filter((x): x is number => !!x)
+        const due = [t.gcAt, t.graceAt, t.catchAt, t.startAt, t.turnAt, t.houseAt, t.nextHandAt, t.resultsAt].filter((x): x is number => !!x)
         if (due.length) await this.ctx.storage.setAlarm(Math.min(...due))
     }
 
@@ -676,7 +696,7 @@ export class GameRoomDO {
                 const house = this.game.house ?? []
                 if (house.length && Math.random() < 0.4) this.houseChat(house[Math.floor(Math.random() * house.length)]!, ['gg', 'gg', 'close', 'wow'])
             }
-            await persistResults(this.game, roomRec.code, this.env)
+            await persistResults(this.game, roomRec.code, this.env, batch => this.queueResults(batch))
             // The room just left the joinable pool. Tell the directory now —
             // waiting for the next presence change would leave a window where
             // a finished room (inProgress: false) re-enters quick match.
@@ -1152,7 +1172,8 @@ export class GameRoomDO {
 
     // The single alarm dispatches whichever clocks are due: catch-window
     // expiry, turn grace for an absent player, the turn limit, lobby
-    // auto-start, house seats, the return to the lounge, and room GC.
+    // auto-start, house seats, the return to the lounge, result-save
+    // retries, and room GC.
     async alarm() {
         const now = Date.now()
         const t = await this.getTimers()
@@ -1177,6 +1198,9 @@ export class GameRoomDO {
 
         const nextHandDue = !!t.nextHandAt && t.nextHandAt <= now
         if (nextHandDue) delete t.nextHandAt
+
+        const resultsDue = !!t.resultsAt && t.resultsAt <= now
+        if (resultsDue) delete t.resultsAt
 
         const gcDue = !!t.gcAt && t.gcAt <= now
         if (gcDue) t.gcAt = now + gcWindowMs(await this.isRoomPublic())
@@ -1233,7 +1257,22 @@ export class GameRoomDO {
             if ((await this.isRoomPublic()) && this.roomStatus() === 'finished') await this.nextHand()
         }
 
-        if (gcDue && this.roomSockets().length === 0) {
+        // Last, so a slow database never holds up the game clocks above.
+        if (resultsDue) {
+            const pending = (await this.ctx.storage.get<ResultBatch[]>('pendingResults')) ?? []
+            const left = await retryResults(pending, this.env)
+            // A game that ended while those requests were out appended its batch
+            // (queueResults); writing back only what was read would drop it.
+            const added = ((await this.ctx.storage.get<ResultBatch[]>('pendingResults')) ?? []).slice(pending.length)
+            await this.armResults([...left, ...added])
+        }
+
+        // An alarm that threw after clearing resultsAt left these without a clock.
+        const unsaved = await this.ctx.storage.get<ResultBatch[]>('pendingResults')
+        if (unsaved && !(await this.getTimers()).resultsAt) await this.armResults(unsaved)
+
+        // A room still holding unsaved results waits for them: deleteAll would drop the game.
+        if (gcDue && this.roomSockets().length === 0 && !unsaved) {
             const roomRec = await this.ctx.storage.get<RoomRecord>('room')
             if (roomRec?.isPublic) {
                 await directoryStub(this.env).fetch('https://do/dir-unregister', {

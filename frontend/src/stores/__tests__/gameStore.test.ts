@@ -706,13 +706,12 @@ describe('daily resume after a reload', () => {
 })
 
 describe('saving a finished bot game', () => {
-    it('saves the win even when the player leaves the victory screen before the session read returns', async () => {
-        let release!: () => void
-        getSession.mockImplementationOnce(() => new Promise(resolve => {
-            release = () => resolve({ data: { session: { user: { id: 'user-1' } } } })
-        }))
+    const red7: Card = { id: 'c-red-7', color: 'red', type: 'number', value: 7 }
+    const signedIn = (id: string) => ({ data: { session: { user: { id } } } })
+
+    /** A bot game the human wins with their next card (red7). */
+    function oneCardFromWinning() {
         const store = useGameStore()
-        const red7: Card = { id: 'c-red-7', color: 'red', type: 'number', value: 7 }
         const bot = makePlayer('p-1', 'Bot', [red5])
         bot.isBot = true
         store.players = [makePlayer('p-0', 'You', [red7]), bot]
@@ -725,6 +724,15 @@ describe('saving a finished bot game', () => {
         store.discardPile = [red5]
         store.currentColor = 'red'
         store.turnState = 'WAITING_FOR_ACTION'
+        return store
+    }
+
+    it('saves the win even when the player leaves the victory screen before the session read returns', async () => {
+        let release!: () => void
+        getSession.mockImplementationOnce(() => new Promise(resolve => {
+            release = () => resolve(signedIn('user-1'))
+        }))
+        const store = oneCardFromWinning()
 
         store.playCard('p-0', red7)
         await nextTick()
@@ -733,5 +741,50 @@ describe('saving a finished bot game', () => {
         await vi.waitFor(() => expect(rpc).toHaveBeenCalled())
 
         expect(rpc).toHaveBeenCalledWith('record_bot_result', expect.objectContaining({ p_result: 'won', p_cards_played_total: 7 }))
+    })
+
+    it('retries the save while the server is down, and stops once it lands', async () => {
+        vi.useFakeTimers()
+        getSession.mockResolvedValueOnce(signedIn('user-1')).mockResolvedValueOnce(signedIn('user-1'))
+        rpc.mockResolvedValueOnce({ data: null, error: { message: 'Service Unavailable' } } as never)
+        const store = oneCardFromWinning()
+
+        store.playCard('p-0', red7)
+        await vi.advanceTimersByTimeAsync(0)
+        expect(rpc).toHaveBeenCalledTimes(1)
+
+        await vi.advanceTimersByTimeAsync(5_000)
+        expect(rpc).toHaveBeenCalledTimes(2)
+        const gameIds = (rpc.mock.calls as unknown as [string, { p_game_id: string }][]).map(call => call[1].p_game_id)
+        expect(gameIds[1]).toBe(gameIds[0])
+
+        await vi.advanceTimersByTimeAsync(600_000)
+        expect(rpc).toHaveBeenCalledTimes(2)
+    })
+
+    it('waits out a session read that fails while the auth server is down, instead of dropping the game', async () => {
+        vi.useFakeTimers()
+        getSession
+            .mockResolvedValueOnce({ data: { session: null }, error: { name: 'AuthRetryableFetchError' } } as never)
+            .mockResolvedValueOnce(signedIn('user-1'))
+        const store = oneCardFromWinning()
+
+        store.playCard('p-0', red7)
+        await vi.advanceTimersByTimeAsync(0)
+        expect(rpc).not.toHaveBeenCalled()
+
+        await vi.advanceTimersByTimeAsync(5_000)
+        expect(rpc).toHaveBeenCalledOnce()
+    })
+
+    it('stops retrying once a different account is signed in', async () => {
+        vi.useFakeTimers()
+        getSession.mockResolvedValueOnce(signedIn('user-1')).mockResolvedValueOnce(signedIn('user-2'))
+        rpc.mockResolvedValueOnce({ data: null, error: { message: 'Service Unavailable' } } as never)
+        const store = oneCardFromWinning()
+
+        store.playCard('p-0', red7)
+        await vi.advanceTimersByTimeAsync(600_000)
+        expect(rpc).toHaveBeenCalledTimes(1)
     })
 })

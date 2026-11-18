@@ -463,15 +463,28 @@ export function timeOutTurn(game: GameRecord, userId: string, present: boolean):
     return [...out, ...autoResolveAbsentTurn(game, userId).filter(e => e.t !== 'TURN_AUTO_RESOLVED')]
 }
 
+/** Waits before each retry of a results save that hit a server or network
+ *  error: about 15 minutes in all, enough to ride out a database restart. */
+export const RESULT_RETRY_DELAYS_MS = [10_000, 30_000, 60_000, 120_000, 240_000, 480_000]
+
+/** A game's rows still to be saved; attempt counts the retries already made,
+ *  dueAt is when the next one runs. */
+export type ResultBatch = { rows: Record<string, unknown>[]; attempt: number; dueAt: number }
+
+type ResultsEnv = { SUPABASE_URL: string; SUPABASE_SERVICE_KEY?: string }
+
 /**
  * Persist one game_results row per player, server-to-server. Requires the
  * service-role key (wrangler secret SUPABASE_SERVICE_KEY); without it this is
- * a no-op so the game itself never depends on stats plumbing.
+ * a no-op so the game itself never depends on stats plumbing. A server or
+ * network error hands the rows to queueRetry (the room retries them on its
+ * alarm through retryResults) instead of losing the game.
  */
 export async function persistResults(
     game: GameRecord,
     roomCode: string,
-    env: { SUPABASE_URL: string; SUPABASE_SERVICE_KEY?: string },
+    env: ResultsEnv,
+    queueRetry?: (batch: ResultBatch) => Promise<void>,
 ): Promise<boolean> {
     if (!env.SUPABASE_SERVICE_KEY || game.resultsLogged || game.hadKick) return false
     const s = game.engine
@@ -480,6 +493,9 @@ export async function persistResults(
 
     const gameId = `do-${roomCode}-${game.startedAt}`
     const duration = Math.max(0, Math.round((Date.now() - game.startedAt) / 1000))
+    // Sent rather than left to the column default, so a retry minutes later
+    // keeps the game on the day it was played (the 25-point day, weekly boards).
+    const playedAt = new Date().toISOString()
     const house = new Set(game.house ?? [])
     const rows = s.players.filter(p => !house.has(p.id) && !(game.timeoutWalkover && p.id === s.winnerId)).map(p => {
         const st = statsFor(game, p.id)
@@ -502,11 +518,38 @@ export async function persistResults(
             uno_penalties: st.unoPenalties,
             game_duration_secs: duration,
             is_bot_game: false,
+            played_at: playedAt,
             ...(house.size ? { house_count: house.size } : {}),
         }
     })
     if (!rows.length) return false
 
+    const outcome = await postResults(rows, env)
+    if (outcome === 'retry') await queueRetry?.({ rows, attempt: 0, dueAt: Date.now() + RESULT_RETRY_DELAYS_MS[0]! })
+    return outcome === 'saved'
+}
+
+/** Tries the batches that are due, together; returns every batch still worth retrying. */
+export async function retryResults(batches: ResultBatch[], env: ResultsEnv, now = Date.now()): Promise<ResultBatch[]> {
+    const left = await Promise.all(batches.map(async (batch): Promise<ResultBatch | null> => {
+        if (batch.dueAt > now) return batch
+        if ((await postResults(batch.rows, env)) !== 'retry') return null
+        const attempt = batch.attempt + 1
+        if (attempt < RESULT_RETRY_DELAYS_MS.length) return { rows: batch.rows, attempt, dueAt: now + RESULT_RETRY_DELAYS_MS[attempt]! }
+        console.log('game_results insert gave up', batch.rows[0]?.game_id)
+        return null
+    }))
+    return left.filter((b): b is ResultBatch => b !== null)
+}
+
+/**
+ * One insert of a game's rows. 'retry' is a server or network error that can
+ * pass; 'failed' is a refusal a retry would only repeat. A unique violation
+ * (409, code 23505) counts as saved: a retry whose first reply was lost hits the
+ * one-row-per-player-per-game index (supabase/result-save-retries.sql). Any
+ * other 409, such as a player whose account was deleted since, is a refusal.
+ */
+async function postResults(rows: Record<string, unknown>[], env: ResultsEnv): Promise<'saved' | 'retry' | 'failed'> {
     const insert = (body: object[]) => fetch(`${env.SUPABASE_URL}/rest/v1/game_results`, {
         method: 'POST',
         headers: {
@@ -516,21 +559,35 @@ export async function persistResults(
             Prefer: 'return=minimal',
         },
         body: JSON.stringify(body),
+        // A database that hangs instead of refusing would otherwise stall the
+        // game-over handling and the room alarm (turn and house clocks wait
+        // behind it); a timeout is just another retry. Short is safe: an insert
+        // that still lands after it makes the retry a duplicate, read as saved.
+        signal: AbortSignal.timeout(3_000),
     })
-    let res = await insert(rows)
-    let failure = res.ok ? '' : (await res.text()).slice(0, 200)
-    // supabase/house-players.sql adds the column. Until it has run, a game with
-    // house seats still saves its rows, just without the count.
-    if (failure.includes('house_count')) {
-        res = await insert(rows.map(({ house_count: _drop, ...row }) => row))
-        failure = res.ok ? '' : (await res.text()).slice(0, 200)
-    }
-    if (!res.ok) {
+    try {
+        let res = await insert(rows)
+        let failure = res.ok ? '' : (await res.text()).slice(0, 200)
+        // supabase/house-players.sql adds the column. Until it has run, a game with
+        // house seats still saves its rows, just without the count.
+        if (failure.includes('house_count')) {
+            res = await insert(rows.map(({ house_count: _drop, ...row }) => row))
+            failure = res.ok ? '' : (await res.text()).slice(0, 200)
+        }
+        if (res.ok) {
+            console.log('game_results insert ok', rows.length, rows[0]?.game_id)
+            return 'saved'
+        }
+        if (res.status === 409 && failure.includes('23505')) {
+            console.log('game_results already saved', rows.length, rows[0]?.game_id)
+            return 'saved'
+        }
         console.log('game_results insert failed', res.status, failure)
-        return false
+        return res.status >= 500 || res.status === 429 ? 'retry' : 'failed'
+    } catch (err) {
+        console.log('game_results insert failed', String(err))
+        return 'retry'
     }
-    console.log('game_results insert ok', rows.length, gameId)
-    return true
 }
 
 /** Draw-10 penalty for a caught UNO miss. Window validation is the room's job. */
