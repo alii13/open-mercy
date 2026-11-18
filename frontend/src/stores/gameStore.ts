@@ -18,6 +18,10 @@ import { soundEffects } from '../composables/useSoundEffects'
 import { supabase } from '../lib/supabase'
 import { track } from '../utils/analytics'
 
+// Waits between retries of a bot-game result save: about 5 minutes in all,
+// enough to ride out a database restart while the tab stays open.
+const RESULT_RETRY_DELAYS_MS = [5_000, 15_000, 30_000, 60_000, 60_000, 60_000, 60_000]
+
 export const useGameStore = defineStore('game', () => {
     // Timings (single tunable block).
     //
@@ -853,7 +857,7 @@ export const useGameStore = defineStore('game', () => {
 
         // Through a definer function, not a table insert: it owns user_id,
         // played_at and is_bot_game and clamps the stats (supabase/results-hardening.sql).
-        await supabase.rpc('record_bot_result', {
+        const args = {
             p_game_id: gameId,
             p_result: result,
             p_opponent_count: opponentCount,
@@ -869,7 +873,16 @@ export const useGameStore = defineStore('game', () => {
             p_uno_calls: s.unoCalls,
             p_uno_penalties: s.unoPenalties,
             p_game_duration_secs: duration,
-        })
+        }
+        // A request error (server down, connection lost) is retried with the
+        // same game id; a save that did land the first time answers
+        // 'duplicate' (supabase/result-save-retries.sql), so nothing counts twice.
+        // Answers like 'too_soon' come back as data and are not retried.
+        for (const wait of [...RESULT_RETRY_DELAYS_MS, null]) {
+            const { error } = await supabase.rpc('record_bot_result', args)
+            if (!error || wait === null) return
+            await new Promise(resolve => setTimeout(resolve, wait))
+        }
     }
 
     // --- Daily resume ---

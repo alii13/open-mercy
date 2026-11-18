@@ -734,4 +734,36 @@ describe('saving a finished bot game', () => {
 
         expect(rpc).toHaveBeenCalledWith('record_bot_result', expect.objectContaining({ p_result: 'won', p_cards_played_total: 7 }))
     })
+
+    it('retries the save while the server is down, and stops once it lands', async () => {
+        vi.useFakeTimers()
+        getSession.mockResolvedValueOnce({ data: { session: { user: { id: 'user-1' } } } })
+        rpc.mockResolvedValueOnce({ data: null, error: { message: 'Service Unavailable' } } as never)
+        const store = useGameStore()
+        const red7: Card = { id: 'c-red-7', color: 'red', type: 'number', value: 7 }
+        const bot = makePlayer('p-1', 'Bot', [red5])
+        bot.isBot = true
+        store.players = [makePlayer('p-0', 'You', [red7]), bot]
+        store.playerStats = Object.fromEntries(['p-0', 'p-1'].map(id => [id, {
+            peakCards: 7, drawCardsPlayed: 0, wildCardsPlayed: 0, cardsPlayedTotal: 6, skipsDealt: 0,
+            swapsMade: 0, drawsTaken: 0, biggestStackSurvived: 0, unoCalls: 1, unoPenalties: 0,
+        }]))
+        store.gameState = 'PLAYING'
+        store.currentPlayerIndex = 0
+        store.discardPile = [red5]
+        store.currentColor = 'red'
+        store.turnState = 'WAITING_FOR_ACTION'
+
+        store.playCard('p-0', red7)
+        await vi.advanceTimersByTimeAsync(0)
+        expect(rpc).toHaveBeenCalledTimes(1)
+
+        await vi.advanceTimersByTimeAsync(5_000)
+        expect(rpc).toHaveBeenCalledTimes(2)
+        const gameIds = (rpc.mock.calls as unknown as [string, { p_game_id: string }][]).map(call => call[1].p_game_id)
+        expect(gameIds[1]).toBe(gameIds[0])
+
+        await vi.advanceTimersByTimeAsync(600_000)
+        expect(rpc).toHaveBeenCalledTimes(2)
+    })
 })
