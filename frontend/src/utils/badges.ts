@@ -12,8 +12,9 @@
  * returns the same `points` plus `days_idle`; the client applies the decay
  * (applyDecay) so the tier table lives in exactly one place — here.
  *
- * supabase/leaderboards-alltime.sql repeats the same sum a third time to rank
- * the whole field. A weight change here must be made in both SQL files too.
+ * supabase/alltime-score-totals.sql repeats the same sum a third time, one game
+ * at a time, to keep every player's all-time total for the rankings. A weight
+ * change here must be made in both SQL files too, then that file re-run.
  */
 
 import type { ResultRow } from './gameStats'

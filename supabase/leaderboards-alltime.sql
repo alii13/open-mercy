@@ -1,5 +1,6 @@
 -- All-time leaderboard. Run in the Supabase SQL Editor AFTER
--- leaderboards-v2.sql (it depends on profiles.share_code + country).
+-- leaderboards-v2.sql (it depends on profiles.share_code + country) and
+-- alltime-score-totals.sql (it reads player_alltime_totals).
 -- Additive only: three SECURITY DEFINER functions + grants. No table changes.
 --
 -- The board ranks on the same points that drive the badge, so the ladder a
@@ -9,7 +10,7 @@
 -- POINTS ARITHMETIC LIVES IN THREE PLACES AND MUST BE CHANGED IN ALL THREE:
 --   frontend/src/utils/badges.ts  (POINT_WEIGHTS + aggregateRows) — canonical
 --   supabase/badges.sql           (player_points, for explicit user ids)
---   supabase/leaderboards-alltime.sql (this file, for the whole field)
+--   supabase/alltime-score-totals.sql (the whole field, one game at a time)
 -- No test can catch a drift between them: the SQL needs a database. Grep for
 -- POINT_WEIGHTS before touching any weight, and keep the walkover guard
 -- (is_bot_game or cards_played_total >= 5) identical everywhere.
@@ -44,29 +45,22 @@ stable
 as $$
     with scored as (
         select
-            gr.user_id,
+            t.user_id,
             coalesce(p.username, 'PLAYER') as username,
             p.share_code,
             p.country,
             p.equipped_card_back as skin,
-            count(*) as games,
-            count(*) filter (where gr.result = 'won') as wins,
-            (
-                count(*) filter (where gr.result = 'won' and (gr.is_bot_game or gr.cards_played_total >= 5)) * 100
-              + count(*) filter (where gr.result in ('lost', 'eliminated') and (gr.is_bot_game or gr.cards_played_total >= 5)) * 12
-              + coalesce(sum(gr.draw_cards_played), 0) * 2
-              + coalesce(sum(gr.biggest_stack_survived), 0) * 3
-              + coalesce(sum(gr.uno_calls), 0) * 4
-              + count(distinct (gr.played_at at time zone 'UTC')::date) * 25
-            )::bigint as points
-        from game_results gr
-        left join profiles p on p.id = gr.user_id
+            t.games,
+            t.wins,
+            t.points
+        from player_alltime_totals t
+        left join profiles p on p.id = t.user_id
         where p_country is null or p.country = p_country
-        group by gr.user_id, p.username, p.share_code, p.country, p.equipped_card_back
     )
     select
-        -- Same points, fewer games played is the sharper player.
-        row_number() over (order by s.points desc, s.games asc) as rank,
+        -- Same points, fewer games played is the sharper player. Exact ties
+        -- fall back to user_id so every surface shows the same rank.
+        row_number() over (order by s.points desc, s.games asc, s.user_id asc) as rank,
         s.user_id,
         s.username,
         s.share_code,
@@ -104,26 +98,14 @@ set search_path = public
 stable
 as $$
     with scored as (
-        select
-            gr.user_id,
-            count(*) as games,
-            count(*) filter (where gr.result = 'won') as wins,
-            (
-                count(*) filter (where gr.result = 'won' and (gr.is_bot_game or gr.cards_played_total >= 5)) * 100
-              + count(*) filter (where gr.result in ('lost', 'eliminated') and (gr.is_bot_game or gr.cards_played_total >= 5)) * 12
-              + coalesce(sum(gr.draw_cards_played), 0) * 2
-              + coalesce(sum(gr.biggest_stack_survived), 0) * 3
-              + coalesce(sum(gr.uno_calls), 0) * 4
-              + count(distinct (gr.played_at at time zone 'UTC')::date) * 25
-            )::bigint as points
-        from game_results gr
-        left join profiles p on p.id = gr.user_id
+        select t.user_id, t.games, t.wins, t.points
+        from player_alltime_totals t
+        left join profiles p on p.id = t.user_id
         where p_country is null or p.country = p_country
-        group by gr.user_id
     ),
     ranked as (
         select user_id, games, wins, points,
-               row_number() over (order by points desc, games asc) as rnk
+               row_number() over (order by points desc, games asc, user_id asc) as rnk
         from scored
     ),
     me as (
