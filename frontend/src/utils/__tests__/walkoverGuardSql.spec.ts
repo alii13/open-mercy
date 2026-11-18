@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import alltime from '../../../../supabase/leaderboards-alltime.sql?raw'
-import alltimeRanks from '../../../../supabase/alltime-ranks.sql?raw'
+import alltimeTotals from '../../../../supabase/alltime-score-totals.sql?raw'
 import badges from '../../../../supabase/badges.sql?raw'
 import badgeHolders from '../../../../supabase/badge-holders.sql?raw'
 import badgeDates from '../../../../supabase/badge-dates.sql?raw'
@@ -12,8 +11,7 @@ import pages from '../../../../supabase/profile-pages.sql?raw'
 // near-zero card count. A bot never leaves, so every copy of the guard has to
 // let bot games through, or a quick win against a bot scores nothing.
 const files = {
-    'leaderboards-alltime.sql': alltime,
-    'alltime-ranks.sql': alltimeRanks,
+    'alltime-score-totals.sql': alltimeTotals,
     'badges.sql': badges,
     'badge-holders.sql': badgeHolders,
     'badge-dates.sql': badgeDates,

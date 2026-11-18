@@ -1,5 +1,6 @@
 -- All-time global rank for the players at a public table (the 3D lounge
--- cards). Run in the Supabase SQL Editor after leaderboards-alltime.sql.
+-- cards). Run in the Supabase SQL Editor after leaderboards-alltime.sql and
+-- alltime-score-totals.sql (it reads player_alltime_totals).
 -- Additive only: one SECURITY DEFINER function + grant.
 --
 -- Same scoring and ordering as alltime_my_rank(), so a card's rank matches
@@ -15,22 +16,10 @@ set search_path = public
 stable
 as $$
     with scored as (
-        select
-            gr.user_id,
-            count(*) as games,
-            (
-                count(*) filter (where gr.result = 'won' and (gr.is_bot_game or gr.cards_played_total >= 5)) * 100
-              + count(*) filter (where gr.result in ('lost', 'eliminated') and (gr.is_bot_game or gr.cards_played_total >= 5)) * 12
-              + coalesce(sum(gr.draw_cards_played), 0) * 2
-              + coalesce(sum(gr.biggest_stack_survived), 0) * 3
-              + coalesce(sum(gr.uno_calls), 0) * 4
-              + count(distinct (gr.played_at at time zone 'UTC')::date) * 25
-            )::bigint as points
-        from game_results gr
-        group by gr.user_id
+        select user_id, games, points from player_alltime_totals
     ),
     ranked as (
-        select user_id, row_number() over (order by points desc, games asc) as rnk
+        select user_id, row_number() over (order by points desc, games asc, user_id asc) as rnk
         from scored
     )
     select r.user_id, r.rnk

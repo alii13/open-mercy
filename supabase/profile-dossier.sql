@@ -1,6 +1,7 @@
 -- Dossier sections for the public profile page (/p/<share_code>). Run in the
--- Supabase SQL Editor AFTER profile-pages.sql and leaderboards-alltime.sql
--- (this depends on profiles.share_code + country). Additive only: three
+-- Supabase SQL Editor AFTER profile-pages.sql, leaderboards-alltime.sql
+-- (this depends on profiles.share_code + country) and alltime-score-totals.sql
+-- (profile_rank reads player_alltime_totals). Additive only: three
 -- SECURITY DEFINER functions + grants. No table changes.
 --
 -- public_profile() returns one row of aggregates, which is enough for the
@@ -12,7 +13,7 @@
 -- POINTS ARITHMETIC LIVES IN FOUR PLACES AND MUST BE CHANGED IN ALL FOUR:
 --   frontend/src/utils/badges.ts       (POINT_WEIGHTS + aggregateRows) — canonical
 --   supabase/badges.sql                (player_points, for explicit user ids)
---   supabase/leaderboards-alltime.sql  (the whole field)
+--   supabase/alltime-score-totals.sql  (the whole field, one game at a time)
 --   supabase/profile-dossier.sql       (this file)
 -- No test can catch a drift between them: the SQL needs a database. Grep for
 -- POINT_WEIGHTS before touching any weight, and keep the walkover guard
@@ -31,24 +32,10 @@
 -- alltime_my_rank answers this for the CALLER via auth.uid(); a profile page is
 -- about somebody else, so the target comes from the share code instead.
 --
--- KNOWN COST, accepted deliberately (2026-08-29): this aggregates the whole of
--- game_results on every call. Measured at 32,912 rows / 3,308 scored players:
---
---   GroupAggregate (actual rows=3308) <- Incremental Sort (actual rows=32912)
---   Execution Time: 449.344 ms
---
--- The ranking itself is free; the aggregate is the whole cost, and it grows
--- with total games played rather than with users. alltime_leaderboard and
--- alltime_my_rank pay the identical cost, so the site pays it three ways.
---
--- The fix, when it starts to hurt: one materialised view of the scored set
--- (user_id, country, games, points), refreshed on a schedule, with all three
--- functions reading from it — profile rank becomes a lookup plus a ranking over
--- ~3k rows. pg_cron 1.6.4 is available on the project but not installed. The
--- trade is staleness bounded by the refresh interval, which an all-time board
--- can absorb: it already ignores decay for the same "record of what happened"
--- reason. A trigger-maintained table is the other option and is rejected here,
--- because it would put the points arithmetic in a fifth place.
+-- Ranks over player_alltime_totals (supabase/alltime-score-totals.sql), the
+-- same per-player totals the all-time board reads, so a profile's rank matches
+-- the board. Aggregating game_results here instead cost 0.45 s at 33k games
+-- (2026-08-29) and 0.4-0.6 s, up to 6.5 s, at 117k games (2026-11-18).
 -- ---------------------------------------------------------------------------
 
 drop function if exists public.profile_rank(text);
@@ -69,28 +56,16 @@ as $$
         select id, country from profiles where share_code = p_share_code
     ),
     scored as (
-        select
-            gr.user_id,
-            p.country,
-            count(*) as games,
-            (
-                count(*) filter (where gr.result = 'won' and (gr.is_bot_game or gr.cards_played_total >= 5)) * 100
-              + count(*) filter (where gr.result in ('lost', 'eliminated') and (gr.is_bot_game or gr.cards_played_total >= 5)) * 12
-              + coalesce(sum(gr.draw_cards_played), 0) * 2
-              + coalesce(sum(gr.biggest_stack_survived), 0) * 3
-              + coalesce(sum(gr.uno_calls), 0) * 4
-              + count(distinct (gr.played_at at time zone 'UTC')::date) * 25
-            )::bigint as points
-        from game_results gr
-        left join profiles p on p.id = gr.user_id
-        group by gr.user_id, p.country
+        select t.user_id, p.country, t.games, t.points
+        from player_alltime_totals t
+        left join profiles p on p.id = t.user_id
     ),
     global_ranked as (
-        select user_id, row_number() over (order by points desc, games asc) as rnk
+        select user_id, row_number() over (order by points desc, games asc, user_id asc) as rnk
         from scored
     ),
     country_ranked as (
-        select s.user_id, row_number() over (order by s.points desc, s.games asc) as rnk
+        select s.user_id, row_number() over (order by s.points desc, s.games asc, s.user_id asc) as rnk
         from scored s
         join target t on t.country is not null and s.country = t.country
     )
