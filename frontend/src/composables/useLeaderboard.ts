@@ -6,7 +6,7 @@
  *
  * Feature-detects: until the SQL has been run on the project, the rpc
  * errors and `available` stays false — callers hide the board entirely.
- * The v2 columns (share_code, country, skin, lifetime_wins) and the
+ * The v2 columns (share_code, country, skin) and the
  * my-rank context are optional the same way: absent until v2 is run.
  * The all-time board detects separately via `alltimeAvailable`, so a project
  * without leaderboards-alltime.sql still shows the daily and weekly tabs.
@@ -25,7 +25,6 @@ export interface DailyRow {
     share_code?: string | null
     country?: string | null
     skin?: string | null
-    lifetime_wins?: number
     result: 'won' | 'lost' | 'eliminated'
     effort: number
     duration_secs: number
@@ -39,7 +38,6 @@ export interface WeeklyRow {
     share_code?: string | null
     country?: string | null
     skin?: string | null
-    lifetime_wins?: number
     wins: number
     games: number
     is_me: boolean

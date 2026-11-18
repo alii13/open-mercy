@@ -6,6 +6,10 @@
 --
 -- Re-run after adding badges: both board functions now also return user_id
 -- so the client can look up each row's badge via player_points (badges.sql).
+--
+-- lifetime_wins is always null. No screen reads it, and counting it cost a
+-- lookup per row; the column stays so the return type, and so the callers,
+-- do not change.
 
 -- Shareable, rename-safe identity for /p/<code> profile URLs.
 alter table public.profiles
@@ -51,8 +55,7 @@ as $$
         p.share_code,
         p.country,
         p.equipped_card_back as skin,
-        (select count(*) from game_results w
-          where w.user_id = gr.user_id and w.result = 'won') as lifetime_wins,
+        null::bigint as lifetime_wins,
         gr.result,
         (gr.cards_played_total + gr.draws_taken) as effort,
         gr.game_duration_secs as duration_secs,
@@ -96,8 +99,7 @@ as $$
         p.share_code,
         p.country,
         p.equipped_card_back as skin,
-        (select count(*) from game_results w
-          where w.user_id = gr.user_id and w.result = 'won') as lifetime_wins,
+        null::bigint as lifetime_wins,
         count(*) filter (where gr.result = 'won') as wins,
         count(*) as games,
         (auth.uid() is not null and gr.user_id = auth.uid()) as is_me
