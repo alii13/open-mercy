@@ -466,6 +466,9 @@ export async function createLounge({ canvas, overlay, artUrl, badgeUrl, reducedM
     t.classList.toggle('host', host)
     t.classList.toggle('action', action)
     p.tagEl.style.pointerEvents = action ? 'auto' : 'none'
+    // Keyboard users reach the same sheet: the tag's own text (name, rank, chips) names the button.
+    if (action) { p.tagEl.setAttribute('role', 'button'); p.tagEl.tabIndex = 0 }
+    else { p.tagEl.removeAttribute('role'); p.tagEl.removeAttribute('tabindex') }
   }
 
   function rename(id, name) {

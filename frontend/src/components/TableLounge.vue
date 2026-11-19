@@ -84,7 +84,8 @@ function shareFromTray(e: MouseEvent) {
 }
 
 function copyCode() {
-    navigator.clipboard.writeText(mp.roomCode).then(() => {
+    // No clipboard API on plain-http pages and some in-app browsers: fall through to the toast.
+    ;(navigator.clipboard?.writeText(mp.roomCode) ?? Promise.reject(new Error('no clipboard'))).then(() => {
         codeCopied.value = true
         setTimeout(() => { codeCopied.value = false }, 1500)
     }, () => toast(`Room code ${mp.roomCode}`))
@@ -507,8 +508,17 @@ onMounted(async () => {
         document.removeEventListener('pointerdown', closeShare)
         document.removeEventListener('keydown', closeShare)
     })
+    const onTagKey = (e: KeyboardEvent) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return
+        e.preventDefault()
+        onTagTap(e)
+    }
     overlayEl.value!.addEventListener('click', onTagTap)
-    offs.push(() => overlayEl.value?.removeEventListener('click', onTagTap))
+    overlayEl.value!.addEventListener('keydown', onTagKey)
+    offs.push(() => {
+        overlayEl.value?.removeEventListener('click', onTagTap)
+        overlayEl.value?.removeEventListener('keydown', onTagKey)
+    })
     offs.push(watch(() => [mp.isHost, voice.voiceUserIds, hostId.value], refreshTags))
     offs.push(mp.onLounge(apply))
     offs.push(watch(here, syncPlayers, { deep: true }))
@@ -661,8 +671,8 @@ onUnmounted(() => {
           START GAME ({{ here.length }})
         </button>
         <button v-else-if="alone" class="ptl-primary ptl-cta ptl-share-trigger" type="button" :aria-expanded="!!shareAt" @click="share">
-          <Check v-if="copied" :size="20" :stroke-width="2" aria-hidden="true" />
-          <UserPlus v-else :size="20" :stroke-width="2" aria-hidden="true" />
+          <Check v-if="copied" :size="16" :stroke-width="2" aria-hidden="true" />
+          <UserPlus v-else :size="16" :stroke-width="2" aria-hidden="true" />
           {{ copied ? 'LINK COPIED' : 'INVITE FRIENDS' }}
         </button>
         <p v-else-if="!isPublic && secs === null" class="ptl-primary ptl-status" role="status">
@@ -694,23 +704,22 @@ onUnmounted(() => {
     </div>
     <QuickChat />
 
-    <div v-if="shareAt" class="ptl-share" :style="shareAt" role="menu" aria-label="Share room link">
+    <div v-if="shareAt" class="ptl-share" :style="shareAt">
       <a
         v-for="l in shareLinks"
         :key="l.name"
         class="ptl-share-item"
-        role="menuitem"
         :href="l.href"
         target="_blank"
         rel="noopener noreferrer"
         @click="shareAt = null"
       >
-        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path :d="l.path" /></svg>
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path :d="l.path" /></svg>
         {{ l.name }}
       </a>
-      <button class="ptl-share-item" role="menuitem" type="button" @click="copyLink">
-        <Check v-if="copied" :size="20" :stroke-width="2" aria-hidden="true" />
-        <Copy v-else :size="20" :stroke-width="2" aria-hidden="true" />
+      <button class="ptl-share-item" type="button" @click="copyLink">
+        <Check v-if="copied" :size="16" :stroke-width="2" aria-hidden="true" />
+        <Copy v-else :size="16" :stroke-width="2" aria-hidden="true" />
         {{ copied ? 'Link copied' : 'Copy link' }}
       </button>
     </div>
@@ -739,12 +748,12 @@ onUnmounted(() => {
           </button>
         </header>
         <button v-if="personInVoice" class="ptl-person-row" type="button" :disabled="mp.isHost && personMuted" @click="mutePerson">
-          <Volume1 v-if="personMuted" :size="20" :stroke-width="2" aria-hidden="true" />
-          <VolumeX v-else :size="20" :stroke-width="2" aria-hidden="true" />
+          <Volume1 v-if="personMuted" :size="16" :stroke-width="2" aria-hidden="true" />
+          <VolumeX v-else :size="16" :stroke-width="2" aria-hidden="true" />
           {{ mp.isHost ? (personMuted ? 'Muted for everyone' : 'Mute for everyone') : (personMuted ? 'Unmute' : 'Mute for me') }}
         </button>
         <button v-if="mp.isHost" class="ptl-person-row ptl-person-row--danger" type="button" @click="removePerson">
-          <UserMinus :size="20" :stroke-width="2" aria-hidden="true" />
+          <UserMinus :size="16" :stroke-width="2" aria-hidden="true" />
           Remove from room
         </button>
       </div>

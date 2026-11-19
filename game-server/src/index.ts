@@ -901,6 +901,7 @@ export class GameRoomDO {
                     const roster = (await this.ctx.storage.get<Record<string, RosterEntry>>('roster')) ?? {}
                     delete roster[tag.userId]
                     await this.ctx.storage.put('roster', roster)
+                    await this.dropSpot(tag.userId)
                 }
                 ws.close(1000, 'left')
                 return
@@ -1021,7 +1022,8 @@ export class GameRoomDO {
                     if (s.userId !== tag.userId) this.send(s.ws, { t: 'lounge', userId: tag.userId, act })
                 }
                 // Where the card comes to rest, not every frame of a drag: one write per placement.
-                if (act.kind === 'move' && !act.drag) await this.ctx.storage.put(`spot:${tag.userId}`, [act.x, act.z])
+                // Private rooms only: a public table's strangers come and go, and it keeps spots in memory as before.
+                if (act.kind === 'move' && !act.drag && !(await this.isRoomPublic())) await this.ctx.storage.put(`spot:${tag.userId}`, [act.x, act.z])
                 return
             }
 
@@ -1034,10 +1036,10 @@ export class GameRoomDO {
                 const roster = (await this.ctx.storage.get<Record<string, RosterEntry>>('roster')) ?? {}
                 delete roster[msg.userId]
                 await this.ctx.storage.put('roster', roster)
+                await this.dropSpot(msg.userId)
                 const house = await this.houseSeats()
                 if (msg.userId in house) {
                     delete house[msg.userId]
-                    this.loungeSpots.delete(msg.userId)
                     await this.ctx.storage.put('house', house)
                 }
                 for (const s of this.roomSockets()) {
@@ -1307,6 +1309,8 @@ export class GameRoomDO {
             await this.ctx.storage.deleteAll()
             this.game = undefined
             this.roomIsPublic = undefined
+            this.loungeSpots.clear()
+            this.spotsLoaded = false
         }
     }
 
@@ -1336,7 +1340,9 @@ export class GameRoomDO {
             .map(([userId, entry]) => ({ userId, name: entry.name, connected: connectedIds.has(userId) || userId in house, skin: entry.skin }))
         // Presence changes are exactly when the auto-start clock moves, so the
         // frame carries it and the clients never need to poll.
-        const auto = await this.tickAutoStart(connectedIds.size)
+        // The host's countdown counts players still seated: a socket the host just kicked may not have closed yet.
+        const seated = [...connectedIds].filter(id => id in roster).length
+        const auto = await this.tickAutoStart(connectedIds.size, seated)
         await this.loadSpots()
         const spots = Object.fromEntries([...this.loungeSpots].filter(([id]) => id in roster || id in house))
         const frame: ServerMsg = { t: 'presence', players, ...auto, ...(Object.keys(spots).length ? { spots } : {}) }
@@ -1360,13 +1366,19 @@ export class GameRoomDO {
         }
     }
 
+    /** A player who left or was removed takes their card's spot with them. */
+    private async dropSpot(userId: string): Promise<void> {
+        this.loungeSpots.delete(userId)
+        await this.ctx.storage.delete(`spot:${userId}`)
+    }
+
     /** Advance the auto-start clock; returns the presence-frame fields. */
-    private async tickAutoStart(humans: number): Promise<{ autoStartInMs?: number }> {
+    private async tickAutoStart(humans: number, seated: number): Promise<{ autoStartInMs?: number }> {
         const isPublic = await this.isRoomPublic()
         await this.loadGame()
         const t = await this.getTimers()
         const now = Date.now()
-        const input = { phase: this.roomStatus(), humans, now }
+        const input = { phase: this.roomStatus(), humans: isPublic ? humans : seated, now }
         const next = isPublic ? autoStartTick({ at: t.startAt }, { ...input, isPublic }) : hostStartTick({ at: t.startAt }, input)
         if (next.at !== t.startAt) {
             if (next.at === undefined) delete t.startAt; else t.startAt = next.at

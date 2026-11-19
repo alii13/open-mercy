@@ -74,7 +74,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         level: 'quiet',
         tag: 'NEW',
         title: 'Wait for friends at the 3D table',
-        body: "Rooms you make with friends now wait at the 3D table. Stand your card on the felt, flick your friends, and when the host taps START everyone gets the same 3-2-1.",
+        body: "When you make a room for friends, you now wait at the 3D table, like in public games. Drag your card around and tap a friend's card to flick it. When the host taps START, everyone sees the same countdown.",
     },
     {
         // Same day as the email switch: a full timestamp sorts after the plain date.
