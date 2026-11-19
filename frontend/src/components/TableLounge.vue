@@ -601,19 +601,18 @@ onUnmounted(() => {
           <VolumeX v-else :size="20" :stroke-width="2" aria-hidden="true" />
         </button>
         <template v-if="!isPublic">
-          <!-- Voice sits beside the speaker: JOIN VOICE, then once joined MUTE
-               and LEAVE VOICE. -->
+          <!-- Voice sits beside the speaker: JOIN VOICE, then once joined the mic
+               (tap to mute) and LEAVE VOICE. -->
           <span class="ptl-voice-row">
-            <VoiceMicCluster class="ptl-voice" :can-moderate="mp.isHost" no-nudge mute-label />
+            <VoiceMicCluster class="ptl-voice" :can-moderate="mp.isHost" no-nudge />
             <button v-if="voice.state === 'live'" class="ptl-pill" type="button" @click="voice.leaveVoice()">
               <PhoneOff :size="16" :stroke-width="2" aria-hidden="true" />
               LEAVE VOICE
             </button>
           </span>
-          <!-- Share stays one tap away for everyone; alone, it is the big button below.
+          <!-- Share stays one tap away for everyone, alone too, where COPY CODE is the quick way to pass the room on.
                Wide screens drop SHARE TO… and COPY CODE down under this button. -->
           <button
-            v-if="!alone"
             class="ptl-icon ptl-share-toggle ptl-wide-only"
             type="button"
             :aria-label="shareTray ? 'Close sharing' : 'Share: room link or code'"
@@ -631,7 +630,6 @@ onUnmounted(() => {
                the link and the code; voice, sound and LEAVE wait in a second tray
                behind the more button. One tray is open at a time. -->
           <button
-            v-if="!alone"
             class="ptl-icon ptl-phone-only ptl-share-side ptl-share-toggle"
             type="button"
             :aria-label="shareTray ? 'Close sharing' : 'Share: room link or code'"
@@ -641,7 +639,7 @@ onUnmounted(() => {
             <X v-if="shareTray" :size="20" :stroke-width="2" aria-hidden="true" />
             <Share2 v-else :size="20" :stroke-width="2" aria-hidden="true" />
           </button>
-          <div v-if="!alone" class="ptl-share-tray" :class="{ open: shareTray }" :style="shareTrayAt ?? undefined">
+          <div class="ptl-share-tray" :class="{ open: shareTray }" :style="shareTrayAt ?? undefined">
             <button class="ptl-pill ptl-share-trigger" type="button" :aria-expanded="!!shareAt" @click="shareFromTray">
               <Check v-if="copied" :size="16" :stroke-width="2" aria-hidden="true" />
               <Share v-else :size="16" :stroke-width="2" aria-hidden="true" />
@@ -770,6 +768,8 @@ onUnmounted(() => {
   z-index: 40;
   background: #040405;
   overflow: hidden;
+  /* The buttons draw their own pressed state; the browser's tap square doubled it. */
+  -webkit-tap-highlight-color: transparent;
   /* Hazard yellow is the public table's colour; a private room is multiplayer cyan. */
   --ptl-accent: var(--color-hazard);
   --ptl-accent-glow: rgba(255, 204, 0, 0.35);
