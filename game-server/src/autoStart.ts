@@ -36,3 +36,22 @@ export function autoStartTick(prev: AutoStartState | undefined, input: {
 export function canDeal(humans: number, seats: number): boolean {
     return humans >= 1 && seats >= 2
 }
+
+/** From a private room's START to its deal: long enough for every screen to play the 3-2-1. */
+export const HOST_START_MS = 4_000
+
+/**
+ * A private room's clock. It never starts on its own: the host's START sets it,
+ * and a second START keeps the first deadline. Dropping below two people
+ * connected stops it, and the host starts again.
+ */
+export function hostStartTick(prev: AutoStartState | undefined, input: {
+    phase: 'lobby' | 'playing' | 'finished'
+    humans: number
+    now: number
+    start?: boolean
+}): AutoStartState {
+    if (input.phase !== 'lobby' || input.humans < 2) return {}
+    if (prev?.at !== undefined) return { at: prev.at }
+    return input.start ? { at: input.now + HOST_START_MS } : {}
+}

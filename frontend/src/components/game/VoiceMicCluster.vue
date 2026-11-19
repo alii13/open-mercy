@@ -63,7 +63,7 @@ import { VolumeX } from 'lucide-vue-next'
 import { computed, ref, watch } from 'vue'
 import { useVoiceStore } from '../../stores/voiceStore'
 
-defineProps<{
+const props = defineProps<{
   /** Room host: shows the mute-everyone control while mics are open. */
   canModerate?: boolean
   /** The discovery nudge takes the button's place instead of hanging under
@@ -71,6 +71,10 @@ defineProps<{
   nudgeInline?: boolean
   /** Short helper text after the button (hidden while the nudge shows). */
   hint?: string
+  /** No discovery nudge: the caller keeps the JOIN VOICE label in view instead. */
+  noNudge?: boolean
+  /** Once live, say MUTE / UNMUTE instead of the bare mic (the table, where the mic sits among labelled buttons). */
+  muteLabel?: boolean
 }>()
 
 const voice = useVoiceStore()
@@ -83,7 +87,7 @@ function markNudgeSeen() {
   nudgeSeen.value = true
   try { localStorage.setItem(NUDGE_KEY, '1') } catch { /* private mode */ }
 }
-const showNudge = computed(() => !nudgeSeen.value && voice.state === 'off')
+const showNudge = computed(() => !props.noNudge && !nudgeSeen.value && voice.state === 'off')
 function acceptNudge() {
   markNudgeSeen()
   void voice.joinVoice()
@@ -105,6 +109,7 @@ const anySpeaking = computed(() => voice.speakingUserIds.size > 0)
 // (RETRY). Live/muted state reads from the icon color + slash + equalizer.
 const label = computed(() => {
   if (voice.state === 'error') return 'RETRY'
+  if (voice.state === 'live' && props.muteLabel) return voice.muted ? 'UNMUTE' : 'MUTE'
   if (busy.value || voice.state === 'live') return ''
   return 'JOIN VOICE'
 })

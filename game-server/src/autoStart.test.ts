@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { AUTO_START_MS, NEXT_DEAL_MS, autoStartTick, canDeal } from './autoStart'
+import { AUTO_START_MS, HOST_START_MS, NEXT_DEAL_MS, autoStartTick, canDeal, hostStartTick } from './autoStart'
 
 const NOW = 1_700_000_000_000
 const lobby = { isPublic: true, phase: 'lobby' as const, now: NOW }
@@ -34,6 +34,35 @@ describe('autoStartTick', () => {
     it('never runs in a private room or outside the lobby', () => {
         expect(autoStartTick(undefined, { ...lobby, humans: 3, isPublic: false })).toEqual({})
         expect(autoStartTick({ at: NOW }, { ...lobby, humans: 3, phase: 'playing' })).toEqual({})
+    })
+})
+
+describe('hostStartTick', () => {
+    const room = { phase: 'lobby' as const, now: NOW }
+
+    it('never starts on its own', () => {
+        expect(hostStartTick(undefined, { ...room, humans: 5 })).toEqual({})
+    })
+
+    it('counts down from the host\'s START, long enough for every screen to play 3-2-1', () => {
+        expect(HOST_START_MS).toBe(4_000)
+        expect(hostStartTick(undefined, { ...room, humans: 2, start: true }).at).toBe(NOW + 4_000)
+    })
+
+    it('keeps the first deadline when the host taps START again', () => {
+        const s = hostStartTick(undefined, { ...room, humans: 2, start: true })
+        expect(hostStartTick(s, { ...room, humans: 2, now: NOW + 2_000, start: true }).at).toBe(NOW + 4_000)
+        expect(hostStartTick(s, { ...room, humans: 3, now: NOW + 2_500 }).at).toBe(NOW + 4_000)
+    })
+
+    it('does not start, or stops, with fewer than two people connected', () => {
+        expect(hostStartTick(undefined, { ...room, humans: 1, start: true })).toEqual({})
+        expect(hostStartTick({ at: NOW + 4_000 }, { ...room, humans: 1, now: NOW + 1_000 })).toEqual({})
+    })
+
+    it('runs only in the lobby', () => {
+        expect(hostStartTick(undefined, { ...room, humans: 3, phase: 'finished', start: true })).toEqual({})
+        expect(hostStartTick({ at: NOW + 4_000 }, { ...room, humans: 3, phase: 'playing' })).toEqual({})
     })
 })
 

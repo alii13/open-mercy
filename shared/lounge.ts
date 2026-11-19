@@ -1,5 +1,5 @@
 /**
- * The 3D public table's relayed actions: a player moving their card, flicking a
+ * The 3D table's relayed actions: a player moving their card, flicking a
  * card at someone, drawing from the deck. The room relays them to everyone else
  * at the table and stores nothing but each player's last spot. Emotes are not
  * here: they ride quick chat, which is already id-only and rate-limited.
@@ -22,6 +22,7 @@ export const LOUNGE_FACES = [
 export type LoungeFace = (typeof LOUNGE_FACES)[number]
 
 export type LoungeAct =
+    /** drag: true while the card follows a finger; false where it comes to rest. */
     | { kind: 'move'; x: number; z: number; drag: boolean }
     /**
      * The sender's own simulation of the skid: the points it passes through and,

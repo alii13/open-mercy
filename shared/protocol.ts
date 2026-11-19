@@ -47,8 +47,8 @@ export type ClientMsg =
     // the socket, so there is nothing to moderate.
     | { t: 'chat'; phraseId: string }
     | { t: 'intent'; id: string; action: IntentAction }
-    // The 3D public table: a move, flick or draw, relayed to the rest of the
-    // table while a public room is in its lobby. See shared/lounge.ts.
+    // The 3D table: a move, flick or draw, relayed to the rest of the table
+    // while the room is in its lobby. See shared/lounge.ts.
     | { t: 'lounge'; act: LoungeAct }
 
 // --- Game events: animation-grade facts, personalized per viewer ---
@@ -118,10 +118,11 @@ export interface PersonalView {
 
 export type ServerMsg =
     // isPublic: a quick-match room, which the client shows as the 3D table.
-    // Older servers omit it, and the client keeps the list view.
+    // Older servers omit isPublic, and the client treats the room as private.
     | { t: 'hello'; roomCode: string; userId: string; hostUserId: string | null; isPublic?: boolean }
-    // autoStartInMs: countdown remaining once a public table is full, sent as
-    // a duration so client clock skew cannot bend it; absent = no countdown.
+    // autoStartInMs: time to the deal (a public table's clock, or the 3-2-1
+    // after a private room's START), sent as a duration so client clock skew
+    // cannot bend it; absent = no countdown.
     // spots: each seated player's last spot on the 3D table, for a late joiner.
     | { t: 'presence'; players: PresencePlayer[]; autoStartInMs?: number; spots?: Record<string, [number, number]> }
     | { t: 'pong'; now: number }
