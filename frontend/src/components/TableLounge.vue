@@ -1797,8 +1797,13 @@ onUnmounted(() => {
     transition: opacity var(--duration-snap) var(--ease-snap), visibility 0s linear var(--duration-snap);
   }
 
-  /* Top to bottom: JOIN VOICE, then LEAVE next to the X. The speaker lives at the top right. */
-  .ptl--room .ptl-tools .ptl-voice-row { order: 1; }
+  /* Top to bottom: the mic (JOIN VOICE before you join), LEAVE VOICE, then LEAVE next to the X.
+     The speaker lives at the top right. */
+  .ptl--room .ptl-tools .ptl-voice-row {
+    order: 1;
+    flex-direction: column;
+    align-items: flex-end;
+  }
   .ptl--room .ptl-tools .ptl-leave { order: 2; }
 
   /* Phones have no hover, so LEAVE is red from the start. */
