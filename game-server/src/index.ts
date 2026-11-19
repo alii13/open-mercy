@@ -12,7 +12,7 @@ import { addParticipant, createMeeting, deactivateMeeting, voiceConfigured, type
 import { gcWindowMs } from './roomGc'
 import { ROOM_CODE_ALPHABET, isRoomCode, normalizeRoomCode } from '../../shared/roomCode'
 import { doorVerdict, PUBLIC_SEATS } from './seats'
-import { NEXT_DEAL_MS, autoStartTick, canDeal } from './autoStart'
+import { NEXT_DEAL_MS, autoStartTick, canDeal, hostStartTick } from './autoStart'
 import { houseClockFor, housePlanAtDeal, houseStep, leavesTable, newHouseSeat, thinkMs, walkDelayMs, type HouseSeat } from './house'
 import { chatAllowed, loungeAllowed } from './chatLimit'
 import { cleanLoungeAct, LOUNGE_FACES, LOUNGE_TABLE, type LoungeAct } from '../../shared/lounge'
@@ -285,7 +285,8 @@ interface RoomTimers {
     turnSeat?: string
     catchAt?: number
     catchFor?: string
-    // Auto-start for public lobbies (see autoStart.ts for the transitions).
+    // The deal clock (autoStart.ts): a public table's auto-start, or the
+    // 3-2-1 after a private room's START.
     startAt?: number
     // House seats (house.ts): the next walk in or out and idle act in the
     // lobby ('lobby'), or the next action of the house seat on turn (its id).
@@ -312,9 +313,11 @@ export class GameRoomDO {
     // is acceptable for a best-effort spam guard.
     private chatTimes = new Map<string, number[]>()
     private loungeTimes = new Map<string, number[]>()
-    /** Last spot on the 3D table per player, for late joiners. Memory only:
-     *  after hibernation clients fall back to the shared seat spots. */
+    /** Last spot on the 3D table per player, for late joiners. Where a person
+     *  drops their card is also stored ('spot:<id>'), so a room that slept
+     *  still knows where its people stand; house seats stay in memory. */
     private loungeSpots = new Map<string, [number, number]>()
+    private spotsLoaded = false
     /** When each player's last socket closed, for the seat grace at the door. In memory: hibernation forgets it, which counts as long gone. */
     private goneAt = new Map<string, number>()
     // Per-socket message buckets (see socketLimit.ts).
@@ -620,6 +623,24 @@ export class GameRoomDO {
         return true
     }
 
+    /** Deal a private room to everyone connected; false with fewer than two. */
+    private async dealPrivate(mode: StackingMode): Promise<boolean> {
+        const roster = await this.rosterList()
+        const connected = new Set(this.roomSockets().map(s => s.userId))
+        const seated = roster.filter(r => connected.has(r.userId))
+        if (seated.length < 2) return false
+        const { game, events } = startGame(seated, mode)
+        this.game = game
+        // Disarm a count still running so the alarm doesn't fire into a running game.
+        const t = await this.getTimers()
+        if (t.startAt !== undefined) {
+            delete t.startAt
+            await this.putTimers(t)
+        }
+        await this.broadcastGame(events)
+        return true
+    }
+
     /**
      * A finished public game goes back to the lounge: the result clears,
      * whoever is still connected keeps their seat, people who left give theirs
@@ -880,6 +901,7 @@ export class GameRoomDO {
                     const roster = (await this.ctx.storage.get<Record<string, RosterEntry>>('roster')) ?? {}
                     delete roster[tag.userId]
                     await this.ctx.storage.put('roster', roster)
+                    await this.dropSpot(tag.userId)
                 }
                 ws.close(1000, 'left')
                 return
@@ -982,9 +1004,8 @@ export class GameRoomDO {
             }
 
             case 'lounge': {
-                // The 3D public table: relay a rebuilt act to the rest of the
-                // table, only in a public room's lobby. Never the raw frame.
-                if (!(await this.isRoomPublic())) return
+                // The 3D table: relay a rebuilt act to the rest of the table,
+                // only in the lobby. Never the raw frame.
                 await this.loadGame()
                 if (this.roomStatus() !== 'lobby') return
                 const act = cleanLoungeAct(msg.act)
@@ -1000,6 +1021,9 @@ export class GameRoomDO {
                 for (const s of this.roomSockets()) {
                     if (s.userId !== tag.userId) this.send(s.ws, { t: 'lounge', userId: tag.userId, act })
                 }
+                // Where the card comes to rest, not every frame of a drag: one write per placement.
+                // Private rooms only: a public table's strangers come and go, and it keeps spots in memory as before.
+                if (act.kind === 'move' && !act.drag && !(await this.isRoomPublic())) await this.ctx.storage.put(`spot:${tag.userId}`, [act.x, act.z])
                 return
             }
 
@@ -1012,10 +1036,10 @@ export class GameRoomDO {
                 const roster = (await this.ctx.storage.get<Record<string, RosterEntry>>('roster')) ?? {}
                 delete roster[msg.userId]
                 await this.ctx.storage.put('roster', roster)
+                await this.dropSpot(msg.userId)
                 const house = await this.houseSeats()
                 if (msg.userId in house) {
                     delete house[msg.userId]
-                    this.loungeSpots.delete(msg.userId)
                     await this.ctx.storage.put('house', house)
                 }
                 for (const s of this.roomSockets()) {
@@ -1058,25 +1082,25 @@ export class GameRoomDO {
                     if (!(await this.dealPublic(mode))) this.send(ws, { t: 'error', code: 'need-players' })
                     return
                 }
-                const roster = await this.rosterList()
-                const connected = new Set(this.roomSockets().map(s => s.userId))
-                const seated = roster.filter(r => connected.has(r.userId))
-                if (seated.length < 2) {
-                    this.send(ws, { t: 'error', code: 'need-players' })
+                if (this.roomStatus() === 'lobby') {
+                    // From the table: a short count so every screen plays the
+                    // 3-2-1, then the alarm deals. A second START changes nothing.
+                    const t = await this.getTimers()
+                    const humans = new Set(this.roomSockets().map(s => s.userId)).size
+                    const next = hostStartTick({ at: t.startAt }, { phase: 'lobby', humans, now: Date.now(), start: true })
+                    if (next.at === undefined) {
+                        this.send(ws, { t: 'error', code: 'need-players' })
+                        return
+                    }
+                    if (next.at === t.startAt) return
+                    if (roomRec.stackingMode !== mode) await this.ctx.storage.put('room', { ...roomRec, stackingMode: mode })
+                    t.startAt = next.at
+                    await this.putTimers(t)
+                    await this.broadcastPresence()
                     return
                 }
-                const { game, events } = startGame(seated, mode)
-                this.game = game
-                {
-                    // A manual start beats the countdown to the punch —
-                    // disarm it so the alarm doesn't fire into a running game.
-                    const t = await this.getTimers()
-                    if (t.startAt !== undefined) {
-                        delete t.startAt
-                        await this.putTimers(t)
-                    }
-                }
-                await this.broadcastGame(events)
+                // A rematch from the result screen deals at once.
+                if (!(await this.dealPrivate(mode))) this.send(ws, { t: 'error', code: 'need-players' })
                 return
             }
 
@@ -1238,13 +1262,15 @@ export class GameRoomDO {
         }
 
         if (startDue) {
-            // The countdown hit zero: deal to whoever is connected plus the
-            // house seats. A table nobody is at cannot deal, so the room
-            // reopens and the presence frame clears every clock.
+            // The countdown hit zero: deal to whoever is connected, plus the
+            // house seats at a public table. A table that cannot deal reopens
+            // and the presence frame clears every clock.
             await this.loadGame()
             const roomRec = await this.ctx.storage.get<RoomRecord>('room')
-            if (roomRec?.isPublic && this.roomStatus() === 'lobby') {
-                if (!(await this.dealPublic(roomRec.stackingMode as StackingMode))) await this.broadcastPresence()
+            if (roomRec && this.roomStatus() === 'lobby') {
+                const mode = roomRec.stackingMode as StackingMode
+                const dealt = roomRec.isPublic ? await this.dealPublic(mode) : await this.dealPrivate(mode)
+                if (!dealt) await this.broadcastPresence()
             }
         }
 
@@ -1283,6 +1309,8 @@ export class GameRoomDO {
             await this.ctx.storage.deleteAll()
             this.game = undefined
             this.roomIsPublic = undefined
+            this.loungeSpots.clear()
+            this.spotsLoaded = false
         }
     }
 
@@ -1312,7 +1340,10 @@ export class GameRoomDO {
             .map(([userId, entry]) => ({ userId, name: entry.name, connected: connectedIds.has(userId) || userId in house, skin: entry.skin }))
         // Presence changes are exactly when the auto-start clock moves, so the
         // frame carries it and the clients never need to poll.
-        const auto = await this.tickAutoStart(connectedIds.size)
+        // The host's countdown counts players still seated: a socket the host just kicked may not have closed yet.
+        const seated = [...connectedIds].filter(id => id in roster).length
+        const auto = await this.tickAutoStart(connectedIds.size, seated)
+        await this.loadSpots()
         const spots = Object.fromEntries([...this.loungeSpots].filter(([id]) => id in roster || id in house))
         const frame: ServerMsg = { t: 'presence', players, ...auto, ...(Object.keys(spots).length ? { spots } : {}) }
         for (const { ws } of sockets) {
@@ -1324,13 +1355,31 @@ export class GameRoomDO {
         await this.armHouse()
     }
 
+    /** After hibernation, read the stored spots back once; a newer one in memory wins. */
+    private async loadSpots(): Promise<void> {
+        if (this.spotsLoaded) return
+        this.spotsLoaded = true
+        const saved = await this.ctx.storage.list<[number, number]>({ prefix: 'spot:' })
+        for (const [key, spot] of saved) {
+            const id = key.slice('spot:'.length)
+            if (!this.loungeSpots.has(id)) this.loungeSpots.set(id, spot)
+        }
+    }
+
+    /** A player who left or was removed takes their card's spot with them. */
+    private async dropSpot(userId: string): Promise<void> {
+        this.loungeSpots.delete(userId)
+        await this.ctx.storage.delete(`spot:${userId}`)
+    }
+
     /** Advance the auto-start clock; returns the presence-frame fields. */
-    private async tickAutoStart(humans: number): Promise<{ autoStartInMs?: number }> {
-        if (!(await this.isRoomPublic())) return {}
+    private async tickAutoStart(humans: number, seated: number): Promise<{ autoStartInMs?: number }> {
+        const isPublic = await this.isRoomPublic()
         await this.loadGame()
         const t = await this.getTimers()
         const now = Date.now()
-        const next = autoStartTick({ at: t.startAt }, { isPublic: true, phase: this.roomStatus(), humans, now })
+        const input = { phase: this.roomStatus(), humans: isPublic ? humans : seated, now }
+        const next = isPublic ? autoStartTick({ at: t.startAt }, { ...input, isPublic }) : hostStartTick({ at: t.startAt }, input)
         if (next.at !== t.startAt) {
             if (next.at === undefined) delete t.startAt; else t.startAt = next.at
             await this.putTimers(t)

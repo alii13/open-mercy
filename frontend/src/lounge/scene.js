@@ -1,6 +1,6 @@
 // The public table: one lit card table where every player is a standing card.
 // The world never acts on local input directly. Input becomes an intent ({ kind, ... }) handed to
-// onIntent; PublicTableLounge.vue applies it locally, relays it through the room socket, and applies
+// onIntent; TableLounge.vue applies it locally, relays it through the room socket, and applies
 // everyone else's the same way, by calling join / leave / move / flick / draw / emote for each player.
 // Started from the prototype in docs/lounge-proto, which keeps its own copy for experiments.
 import * as THREE from 'three'
@@ -49,7 +49,7 @@ const finite = (...v) => v.every(Number.isFinite)
 
 // A host that can unmount during load keeps the promise and disposes through it: ready.then((l) => l.dispose()).
 // Each lounge needs its own canvas, sized by CSS: dispose() and a failed load leave the old canvas's context lost for good.
-export async function createLounge({ canvas, overlay, artUrl, badgeUrl, reducedMotion = false }) {
+export async function createLounge({ canvas, overlay, artUrl, badgeUrl, reducedMotion = false, feltLine = 'PUBLIC TABLE  ·  IT DEALS ITSELF' }) {
   await Promise.all([document.fonts.load('64px "Black Ops One"'), document.fonts.load('600 16px "Chakra Petch"')])
 
   // Phones and small screens get a lighter frame: fewer pixels, smaller shadow and felt maps, half the dust.
@@ -171,7 +171,7 @@ export async function createLounge({ canvas, overlay, artUrl, badgeUrl, reducedM
     g.font = '44px "Black Ops One"'; g.fillStyle = 'rgba(255,204,0,0.26)'
     g.letterSpacing = '6px'; g.fillText('OPEN MERCY', 0, -200)
     g.font = '600 13px "Chakra Petch"'; g.fillStyle = 'rgba(255,255,255,0.22)'
-    g.letterSpacing = '4px'; g.fillText('PUBLIC TABLE  ·  IT DEALS ITSELF', 0, 205)
+    g.letterSpacing = '4px'; g.fillText(feltLine, 0, 205)
   })
 
   const dotTex = canvasTex(64, 64, (g) => {
@@ -425,8 +425,10 @@ export async function createLounge({ canvas, overlay, artUrl, badgeUrl, reducedM
     g.add(ring, glow, hit)
 
     const tagEl = document.createElement('div')
-    tagEl.innerHTML = `<div class="tag${you ? ' you' : ''}" style="--c:${sk.accent}">${you ? '<b>YOU</b>' : '<i></i>'}<span></span></div>`
-    tagEl.querySelector('span').textContent = name
+    // Name and rank on the first line; YOU and HOST on their own line under it.
+    tagEl.innerHTML = `<div class="tag${you ? ' you' : ''}" style="--c:${sk.accent}"><span class="tag-line"><span class="tag-name"></span><small></small></span><span class="tag-chips">${you ? '<b>YOU</b>' : ''}<em>HOST</em></span></div>`
+    tagEl.querySelector('.tag-name').textContent = name
+    tagEl.dataset.id = id
     const tag = new CSS2DObject(tagEl)
     tag.center.set(0.5, 1)
     const bubbleEl = document.createElement('div')
@@ -439,10 +441,11 @@ export async function createLounge({ canvas, overlay, artUrl, badgeUrl, reducedM
     const spot0 = finite(x, z) ? clampToSeats(x, z) : freeSpot(you)
     g.position.set(spot0.x, 0, spot0.z)
     scene.add(g)
-    const p = { id, name, you, skin: sk, rank, g, card, ring, glow, hit, tagEl, bubbleEl, tag, bubble, baseY: 0, tx: spot0.x, tz: spot0.z, k: 3.2,
+    const p = { id, name, you, skin: sk, rank: undefined, g, card, ring, glow, hit, tagEl, bubbleEl, tag, bubble, baseY: 0, tx: spot0.x, tz: spot0.z, k: 3.2,
       speed: 0, phase: rand(0, 10), w: 0, wv: 0, lift: -1.1, bubbleTimer: null }
     sizeSeat(p)
     players.set(id, p)
+    rankTag(p, rank)
     if (you) youP = p
 
     ring.scale.setScalar(0.01)
@@ -453,6 +456,26 @@ export async function createLounge({ canvas, overlay, artUrl, badgeUrl, reducedM
       emit('event', { text: you ? 'You joined' : `${name} joined` })
     }
     return p
+  }
+
+  // The tag's HOST chip, and whether a tap on it does something (the host page reads data-id).
+  function setTag(id, { host = false, action = false } = {}) {
+    const p = players.get(id)
+    if (!p) return
+    const t = p.tagEl.firstChild
+    t.classList.toggle('host', host)
+    t.classList.toggle('action', action)
+    p.tagEl.style.pointerEvents = action ? 'auto' : 'none'
+    // Keyboard users reach the same sheet: the tag's own text (name, rank, chips) names the button.
+    if (action) { p.tagEl.setAttribute('role', 'button'); p.tagEl.tabIndex = 0 }
+    else { p.tagEl.removeAttribute('role'); p.tagEl.removeAttribute('tabindex') }
+  }
+
+  function rename(id, name) {
+    const p = players.get(id)
+    if (!p || p.name === name) return
+    p.name = name
+    p.tagEl.querySelector('.tag-name').textContent = name
   }
 
   // Portrait phones see the table from far back, so seated cards stand larger there; frame() re-runs this on rotation.
@@ -508,7 +531,9 @@ export async function createLounge({ canvas, overlay, artUrl, badgeUrl, reducedM
     if (!p || !finite(x, z)) return
     const c = clampToSeats(x, z)
     p.tx = c.x; p.tz = c.z
-    p.k = drag ? 12 : 3.2
+    // The drop that ends a drag keeps the drag's quick follow; only a fresh tap-to-move eases slowly.
+    p.k = drag || p.dragging ? 12 : 3.2
+    p.dragging = drag
   }
 
   function emote(id, text) {
@@ -690,7 +715,8 @@ export async function createLounge({ canvas, overlay, artUrl, badgeUrl, reducedM
     pulse(1.8)
     tl.to(deck.position, { y: 0.42, duration: 0.2, ease: 'power2.out', yoyo: true, repeat: 1 }, 0)
     tl.to(deck.rotation, { y: deck.rotation.y + Math.PI * 2, duration: 0.55, ease: 'power3.out' }, 0)
-    const STAGGER = 0.035, START = 0.3
+    // A private room seats 20: past seven seats the cards fly closer together, so every deal takes as long as a full public table's.
+    const STAGGER = 0.035 * Math.min(1, 7 / seats.length), START = 0.3
     let i = 0
     for (let r = 0; r < 7; r++) {
       for (const p of seats) {
@@ -870,8 +896,9 @@ export async function createLounge({ canvas, overlay, artUrl, badgeUrl, reducedM
     if (!drag || e.pointerId !== drag.id) return
     if (!drag.moved) emit('intent', { kind: 'wave' })
     else {
+      // The drop goes as drag: false, which the room stores for late joiners.
       const h = pick(e)
-      if (h.felt) emit('intent', { kind: 'move', x: h.felt.x, z: h.felt.z, drag: true })
+      if (h.felt) emit('intent', { kind: 'move', x: h.felt.x, z: h.felt.z, drag: false })
     }
     drag = null
   }
@@ -964,10 +991,17 @@ export async function createLounge({ canvas, overlay, artUrl, badgeUrl, reducedM
   }, { signal })
 
   // A rank arrives after its player sits down: redraw that card's face in place.
+  // The tag carries the global rank after the name.
+  function rankTag(p, rank) {
+    p.rank = rank
+    if (rank === undefined) return
+    p.tagEl.firstChild.querySelector('small').textContent = rank ? `#${rank.global.toLocaleString('en-US')}` : ''
+  }
+
   function setRank(id, rank) {
     const p = players.get(id)
     if (!p || JSON.stringify(p.rank) === JSON.stringify(rank)) return
-    p.rank = rank
+    rankTag(p, rank)
     const face = p.card.children[0].material
     const old = face.map
     face.map = face.emissiveMap = playerFaceTex(p.skin, rank)
@@ -975,7 +1009,7 @@ export async function createLounge({ canvas, overlay, artUrl, badgeUrl, reducedM
   }
 
   return {
-    join, leave, move, flick, simulateFlick, draw, emote, deal, reset, pulse, players, setRank,
+    join, leave, rename, setTag, move, flick, simulateFlick, draw, emote, deal, reset, pulse, players, setRank,
     onIntent: (fn) => listeners.intent.push(fn),
     onEvent: (fn) => listeners.event.push(fn),
     get busy() { return flights.size > 0 || dealing },

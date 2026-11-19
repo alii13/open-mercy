@@ -300,12 +300,15 @@
         </button>
       </div>
 
-      <!-- A public room waits at the 3D table; private rooms, and any browser
-           that cannot draw it, keep the list below. -->
-      <PublicTableLounge
+      <!-- Every room waits at the 3D table. A browser that cannot draw it keeps
+           the list below. -->
+      <TableLounge
         v-else-if="atTable"
+        :copied="copied"
+        :invite-url="inviteUrl()"
         @fallback="loungeFailed = true"
         @leave="showLeaveConfirm = true"
+        @share="shareInvite"
       />
 
       <!-- Waiting room — after creating, before starting -->
@@ -491,7 +494,8 @@
           >
             START GAME ({{ mpStore.presentUserIds.length }})
           </Button>
-          <p v-else class="waiting-text">
+          <!-- While a countdown runs the ring says what happens next. -->
+          <p v-else-if="!mpStore.autoStart" class="waiting-text">
             {{ mpStore.isHost ? 'Waiting for players…' : 'Waiting for the host to start the game…' }}
           </p>
           <!-- One voice message at a time: the discovery nudge takes the
@@ -630,11 +634,11 @@ import { usePresence } from '../composables/usePresence'
 import InviteFriends from './InviteFriends.vue'
 import WhatsNew from './WhatsNew.vue'
 import PublicTableCard from './PublicTableCard.vue'
-// The 3D table is its own chunk: three.js loads only when a public room opens.
+// The 3D table is its own chunk: three.js loads only when a room opens.
 // A chunk that fails to load (a deploy since page load, a dropped connection)
 // falls back to the list, the same as a browser that cannot draw the table.
-const PublicTableLounge = defineAsyncComponent({
-  loader: () => import('./PublicTableLounge.vue').then((m) => { loungeLoaded.value = true; return m }),
+const TableLounge = defineAsyncComponent({
+  loader: () => import('./TableLounge.vue').then((m) => { loungeLoaded.value = true; return m }),
   onError: (_err, _retry, fail) => { loungeFailed.value = true; fail() },
 })
 import { publicTableView, PUBLIC_TABLE_RULES } from '../utils/publicTable'
@@ -814,7 +818,10 @@ const loungeFailed = ref(false)
 // The table takes the whole screen, top bar included: LEAVE is the way out. The bar stays
 // until the table's code has arrived, so a slow download never leaves a blank page.
 const loungeLoaded = ref(false)
-const atTable = computed(() => !!mpStore.currentGame && (mpStore.gameStatus === 'waiting' || mpStore.loungeShow) && mpStore.isPublicRoom && !loungeFailed.value)
+// Someone who joins a private room just as its game ends keeps the list: the
+// others are on the result screen, not at the table.
+const atTable = computed(() => !!mpStore.currentGame && (mpStore.gameStatus === 'waiting' || mpStore.loungeShow)
+  && (mpStore.isPublicRoom || !mpStore.ghostInFinishedGame) && !loungeFailed.value)
 const showSignOutConfirm = ref(false)
 const editingName = ref(false)
 const editTarget = ref<'room' | null>(null)

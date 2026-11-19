@@ -22,6 +22,10 @@ export interface LoungeJoin {
 export interface Lounge {
     join(p: LoungeJoin): unknown
     leave(id: string): void
+    /** A seated player's new name on their tag. */
+    rename(id: string, name: string): void
+    /** The HOST chip, and whether the tag takes taps (its element carries data-id). */
+    setTag(id: string, o: { host?: boolean; action?: boolean }): void
     move(id: string, x: number, z: number, drag?: boolean): void
     flick(id: string, path: [number, number][], hit?: string, hitAt?: number): void
     simulateFlick(id: string, angle: number, speed: number): LoungeAct | null
@@ -50,4 +54,6 @@ export function createLounge(o: {
     artUrl: (name: string) => string
     badgeUrl: (file: string) => string
     reducedMotion?: boolean
+    /** The small line printed on the felt under the deck. */
+    feltLine?: string
 }): Promise<Lounge>

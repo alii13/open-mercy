@@ -70,6 +70,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: '2026-11-20',
+        level: 'quiet',
+        tag: 'NEW',
+        title: 'Wait for friends at the 3D table',
+        body: "When you make a room for friends, you now wait at the 3D table, like in public games. Drag your card around and tap a friend's card to flick it. When the host taps START, everyone sees the same countdown.",
+    },
+    {
         // Same day as the email switch: a full timestamp sorts after the plain date.
         id: '2026-11-17T12:00Z',
         level: 'loud',
