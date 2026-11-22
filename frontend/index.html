@@ -196,6 +196,7 @@
         align-items: center;
         gap: 0.25rem;
         margin: 0;
+        font-weight: 700;
       }
       .boot-uno {
         font-family: 'Black Ops One', 'Impact', 'Arial Black', sans-serif;
@@ -259,10 +260,10 @@
       <!-- Boot state. Visually matches App.vue .loading-screen so the Vue
            swap-in is imperceptible. Replaced once Vue mounts. -->
       <div class="boot" role="status" aria-label="Loading">
-        <h1 class="boot-brand">
+        <div class="boot-brand">
           <span class="boot-uno">OPEN</span>
           <span class="boot-nomercy">MERCY</span>
-        </h1>
+        </div>
         <div class="boot-dot" aria-hidden="true"></div>
         <p class="boot-text">INITIALIZING</p>
       </div>
@@ -270,6 +271,7 @@
         <noscript>
           <p>Open Mercy needs JavaScript to play. Turn it on in your browser, or read on.</p>
         </noscript>
+        <!--landing:h1-->
         <!--landing:guide-->
         <!--landing:faq-->
       </div>

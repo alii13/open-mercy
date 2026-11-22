@@ -63,7 +63,7 @@
       </div>
 
       <!-- The store apps do not name another company's game on their first screen. -->
-      <h1 class="hero-tagline" ref="taglineRef">{{ isNative ? 'Free online card game' : 'Play UNO No Mercy online, a free card game' }}</h1>
+      <h1 class="hero-tagline" ref="taglineRef">{{ isNative ? 'Free online card game' : LANDING_TAGLINE }}</h1>
 
       <div class="hero-cta" ref="heroCtaRef">
         <p v-if="inviteCode" class="invite-banner">
@@ -146,6 +146,7 @@ import { Capacitor } from '@capacitor/core'
 import LandingGuide from './LandingGuide.vue'
 import LandingFAQ from './LandingFAQ.vue'
 import SiteFooter from './SiteFooter.vue'
+import { LANDING_TAGLINE } from '../data/landingTagline'
 import LandingStatsBadge from './LandingStatsBadge.vue'
 import { useSitePulse } from '../composables/useSitePulse'
 import Card from './game/Card.vue'
@@ -732,7 +733,7 @@ function runHeroChoreography() {
   text-align: center;
   /* An h1 styled as body text: drop the UA margin and weight. */
   margin: 0;
-  font-weight: 400;
+  font-weight: inherit;
   z-index: var(--z-base);
 }
 
