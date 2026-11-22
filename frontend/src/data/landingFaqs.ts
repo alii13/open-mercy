@@ -15,6 +15,11 @@
 export const LANDING_FAQS: readonly { q: string; a: string; webOnly?: true }[] = [
   {
     webOnly: true,
+    q: 'What is UNO No Mercy?',
+    a: "UNO Show 'Em No Mercy is Mattel's tougher version of UNO, played with 168 cards. Draw cards go up to Draw 10 and stack, a 7 swaps hands, a 0 passes every hand along, and a player holding 25 cards is out. Open Mercy plays by these rules online, free.",
+  },
+  {
+    webOnly: true,
     q: 'Can I play UNO No Mercy online for free?',
     a: 'Yes. Open Mercy plays by the UNO No Mercy rules and is free in your browser, with friends or against the computer. It is an independent game, not the official UNO app.',
   },
