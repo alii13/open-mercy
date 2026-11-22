@@ -48,6 +48,7 @@ Parts 2 to 6 sit inside `div.hero`, in that order. `frontend/public/rules/guide.
 Open Mercy is the name of the game, the site and the app. "UNO No Mercy" describes the rules it follows.
 
 - Write "plays by UNO No Mercy rules" or "UNO No Mercy rules". Never call Open Mercy "UNO No Mercy", and never write "official".
+- A `title`, an `h1` or a page's opening lines may use the words people search, "Play UNO No Mercy online" or "Play UNO online with friends" (the owner's call on 2026-11-22). The page then says "No Mercy rules" in the headline's second line or the sentence that follows.
 - Plain text only. No Mattel logo, lettering, colours or card art.
 - The trademark notice (part 6) is on every page that names the game.
 - Page addresses do not contain "uno".

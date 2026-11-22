@@ -12,8 +12,8 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black" />
 
     <!-- Primary SEO -->
-    <title>Play UNO No Mercy Rules Online Free - Open Mercy</title>
-    <meta name="description" content="Play by UNO No Mercy rules online, free in your browser. Rooms for up to 20 friends, eight bots to beat, Draw 10, stacking and the 25-card mercy rule. No download." />
+    <title>UNO No Mercy Online: Play Free With Friends - Open Mercy</title>
+    <meta name="description" content="Play UNO No Mercy online, free in your browser. Rooms for up to 20 friends, eight bots to beat, Draw 10, stacking and the 25-card mercy rule. No download." />
     <meta name="keywords" content="open mercy, open mercy online, open mercy card game, brutal card game online, stacking card game, draw 6, draw 10, color roulette, mercy rule card game, free card game multiplayer" />
     <meta name="author" content="alii13" />
     <link rel="canonical" href="https://open-mercy.com/" />
@@ -21,7 +21,7 @@
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://open-mercy.com/" />
-    <meta property="og:title" content="Open Mercy - Play UNO No Mercy Rules Online, Free" />
+    <meta property="og:title" content="Open Mercy - Play UNO No Mercy Online, Free" />
     <meta property="og:description" content="A free browser card game with UNO No Mercy rules: Draw 6, Draw 10, Skip Everyone, Color Roulette. Play with friends or against the computer. No login required." />
     <meta property="og:image" content="https://open-mercy.com/og-image.png" />
     <meta property="og:image:width" content="1200" />
@@ -32,7 +32,7 @@
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:url" content="https://open-mercy.com/" />
-    <meta name="twitter:title" content="Open Mercy - Play UNO No Mercy Rules Online, Free" />
+    <meta name="twitter:title" content="Open Mercy - Play UNO No Mercy Online, Free" />
     <meta name="twitter:description" content="A free browser card game with UNO No Mercy rules: Draw 6, Draw 10, Skip Everyone, Color Roulette. Play with friends or against the computer. No login required." />
     <meta name="twitter:image" content="https://open-mercy.com/og-image.png" />
 
@@ -196,6 +196,7 @@
         align-items: center;
         gap: 0.25rem;
         margin: 0;
+        font-weight: 700;
       }
       .boot-uno {
         font-family: 'Black Ops One', 'Impact', 'Arial Black', sans-serif;
@@ -259,10 +260,10 @@
       <!-- Boot state. Visually matches App.vue .loading-screen so the Vue
            swap-in is imperceptible. Replaced once Vue mounts. -->
       <div class="boot" role="status" aria-label="Loading">
-        <h1 class="boot-brand">
+        <div class="boot-brand">
           <span class="boot-uno">OPEN</span>
           <span class="boot-nomercy">MERCY</span>
-        </h1>
+        </div>
         <div class="boot-dot" aria-hidden="true"></div>
         <p class="boot-text">INITIALIZING</p>
       </div>
@@ -270,6 +271,7 @@
         <noscript>
           <p>Open Mercy needs JavaScript to play. Turn it on in your browser, or read on.</p>
         </noscript>
+        <!--landing:h1-->
         <!--landing:guide-->
         <!--landing:faq-->
       </div>

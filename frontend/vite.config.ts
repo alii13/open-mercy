@@ -5,6 +5,7 @@ import path from 'path'
 import { readFileSync } from 'node:fs'
 import type { Plugin } from 'vite'
 import { LANDING_FAQS } from './src/data/landingFaqs'
+import { LANDING_TAGLINE } from './src/data/landingTagline'
 
 const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
@@ -34,6 +35,7 @@ function landingPrerender(): Plugin {
       }, null, 2).replace(/</g, '\\u003c')
 
       const fills: Record<string, string> = {
+        '<!--landing:h1-->': `<h1>${escapeHtml(LANDING_TAGLINE)}</h1>`,
         '<!--landing:guide-->': guide,
         '<!--landing:faq-->': faq,
         '<!--landing:faq-jsonld-->': `<script type="application/ld+json">\n${jsonLd}\n</script>`,

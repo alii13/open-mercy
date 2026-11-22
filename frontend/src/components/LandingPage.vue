@@ -42,10 +42,9 @@
         </div>
       </div>
 
-      <!-- Wordmark — fades in after the explosion. It's the page's h1: the
-           boot-screen h1 in index.html is destroyed when Vue mounts, so the
-           rendered landing page had no top-level heading at all. -->
-      <h1 class="hero-wordmark" ref="wordmarkRef">
+      <!-- Wordmark — fades in after the explosion. The tagline below is the
+           page's h1, so the heading says what a visitor can do here. -->
+      <div class="hero-wordmark" ref="wordmarkRef">
         <span class="wm-uno">OPEN</span>
         <span class="wm-row">
           <span class="wm-mercy-wrap">
@@ -61,10 +60,10 @@
             </svg>
           </span>
         </span>
-      </h1>
+      </div>
 
       <!-- The store apps do not name another company's game on their first screen. -->
-      <p class="hero-tagline" ref="taglineRef">{{ isNative ? 'Free online card game' : 'Free online card game with UNO No Mercy rules' }}</p>
+      <h1 class="hero-tagline" ref="taglineRef">{{ isNative ? 'Free online card game' : LANDING_TAGLINE }}</h1>
 
       <div class="hero-cta" ref="heroCtaRef">
         <p v-if="inviteCode" class="invite-banner">
@@ -147,6 +146,7 @@ import { Capacitor } from '@capacitor/core'
 import LandingGuide from './LandingGuide.vue'
 import LandingFAQ from './LandingFAQ.vue'
 import SiteFooter from './SiteFooter.vue'
+import { LANDING_TAGLINE } from '../data/landingTagline'
 import LandingStatsBadge from './LandingStatsBadge.vue'
 import { useSitePulse } from '../composables/useSitePulse'
 import Card from './game/Card.vue'
@@ -688,7 +688,6 @@ function runHeroChoreography() {
   font-family: var(--font-display);
   line-height: 0.95;
   letter-spacing: 0.04em;
-  /* It's an h1 now — drop the UA margin so the hero layout is unchanged. */
   margin: 0;
   font-weight: inherit;
 }
@@ -732,7 +731,9 @@ function runHeroChoreography() {
   font-size: var(--text-base);
   color: var(--text-secondary);
   text-align: center;
+  /* An h1 styled as body text: drop the UA margin and weight. */
   margin: 0;
+  font-weight: inherit;
   z-index: var(--z-base);
 }
 
