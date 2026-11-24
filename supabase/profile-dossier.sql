@@ -117,11 +117,16 @@ as $$
             gr.draw_cards_played,
             gr.biggest_stack_survived,
             gr.uno_calls,
+            gr.points_multiplier,
+            -- ponytail: a boosted day's whole bonus lands on its first game, so a
+            -- promotion that day can show a few hours early. Totals are exact.
             case
                 when row_number() over (
                     partition by (gr.played_at at time zone 'UTC')::date
                     order by gr.played_at
-                ) = 1 then 1 else 0
+                ) = 1 then max(gr.points_multiplier) over (
+                    partition by (gr.played_at at time zone 'UTC')::date
+                ) else 0
             end as new_day
         from game_results gr
         join target t on gr.user_id = t.id
@@ -130,11 +135,11 @@ as $$
         select
             played_at,
             (
-                sum(case when result = 'won' and (is_bot_game or cards_played_total >= 5) then 1 else 0 end) over w * 100
-              + sum(case when result in ('lost', 'eliminated') and (is_bot_game or cards_played_total >= 5) then 1 else 0 end) over w * 12
-              + sum(draw_cards_played) over w * 2
-              + sum(biggest_stack_survived) over w * 3
-              + sum(uno_calls) over w * 4
+                sum(case when result = 'won' and (is_bot_game or cards_played_total >= 5) then points_multiplier else 0 end) over w * 100
+              + sum(case when result in ('lost', 'eliminated') and (is_bot_game or cards_played_total >= 5) then points_multiplier else 0 end) over w * 12
+              + sum(draw_cards_played * points_multiplier) over w * 2
+              + sum(biggest_stack_survived * points_multiplier) over w * 3
+              + sum(uno_calls * points_multiplier) over w * 4
               + sum(new_day) over w * 25
             )::bigint as points
         from ordered
@@ -200,14 +205,16 @@ as $$
         gr.peak_cards,
         gr.biggest_stack_survived,
         (
-            case
-                when (gr.is_bot_game or gr.cards_played_total >= 5) and gr.result = 'won' then 100
-                when (gr.is_bot_game or gr.cards_played_total >= 5) and gr.result in ('lost', 'eliminated') then 12
-                else 0
-            end
-          + greatest(coalesce(gr.draw_cards_played, 0), 0) * 2
-          + greatest(coalesce(gr.biggest_stack_survived, 0), 0) * 3
-          + greatest(coalesce(gr.uno_calls, 0), 0) * 4
+            (
+                case
+                    when (gr.is_bot_game or gr.cards_played_total >= 5) and gr.result = 'won' then 100
+                    when (gr.is_bot_game or gr.cards_played_total >= 5) and gr.result in ('lost', 'eliminated') then 12
+                    else 0
+                end
+              + greatest(coalesce(gr.draw_cards_played, 0), 0) * 2
+              + greatest(coalesce(gr.biggest_stack_survived, 0), 0) * 3
+              + greatest(coalesce(gr.uno_calls, 0), 0) * 4
+            ) * gr.points_multiplier
         )::int as points
     from game_results gr
     join profiles p on p.id = gr.user_id
