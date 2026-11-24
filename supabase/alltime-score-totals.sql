@@ -41,8 +41,14 @@ create table if not exists public.player_alltime_totals (
 create table if not exists public.player_play_days (
     user_id uuid not null references auth.users (id) on delete cascade,
     day date not null,
+    -- The biggest points_multiplier among that day's games (announcements.sql).
+    multiplier smallint not null default 1,
     primary key (user_id, day)
 );
+
+alter table public.player_play_days add column if not exists multiplier smallint not null default 1;
+-- Stamped per game by announcements.sql; 1 outside a points announcement.
+alter table public.game_results add column if not exists points_multiplier smallint not null default 1;
 
 alter table public.player_alltime_totals enable row level security;
 alter table public.player_play_days enable row level security;
@@ -67,12 +73,30 @@ set search_path = public
 as $$
 declare
     new_days integer := 0;
+    day_points integer := 0;
+    played_day date;
+    day_multiplier smallint;
 begin
     if new.played_at is not null then
-        insert into player_play_days (user_id, day)
-        values (new.user_id, (new.played_at at time zone 'UTC')::date)
+        played_day := (new.played_at at time zone 'UTC')::date;
+        insert into player_play_days (user_id, day, multiplier)
+        values (new.user_id, played_day, new.points_multiplier)
         on conflict do nothing;
         get diagnostics new_days = row_count;
+
+        if new_days = 1 then
+            day_points := 25 * new.points_multiplier;
+        else
+            -- A boosted game on a day already counted tops the day up once.
+            select multiplier into day_multiplier from player_play_days
+            where user_id = new.user_id and day = played_day
+            for update;
+            if new.points_multiplier > day_multiplier then
+                update player_play_days set multiplier = new.points_multiplier
+                where user_id = new.user_id and day = played_day;
+                day_points := 25 * (new.points_multiplier - day_multiplier);
+            end if;
+        end if;
     end if;
 
     insert into player_alltime_totals as t (user_id, games, wins, points)
@@ -80,13 +104,15 @@ begin
         new.user_id,
         1,
         (new.result = 'won')::int,
-        case when (new.is_bot_game or new.cards_played_total >= 5) then
-            case new.result when 'won' then 100 when 'lost' then 12 when 'eliminated' then 12 else 0 end
-        else 0 end
-        + new.draw_cards_played * 2
-        + new.biggest_stack_survived * 3
-        + new.uno_calls * 4
-        + new_days * 25
+        (
+            case when (new.is_bot_game or new.cards_played_total >= 5) then
+                case new.result when 'won' then 100 when 'lost' then 12 when 'eliminated' then 12 else 0 end
+            else 0 end
+            + new.draw_cards_played * 2
+            + new.biggest_stack_survived * 3
+            + new.uno_calls * 4
+        ) * new.points_multiplier
+        + day_points
     )
     on conflict (user_id) do update
         set games = t.games + excluded.games,
@@ -110,8 +136,8 @@ lock table public.game_results in share row exclusive mode;
 delete from public.player_alltime_totals;
 delete from public.player_play_days;
 
-insert into public.player_play_days (user_id, day)
-select user_id, (played_at at time zone 'UTC')::date
+insert into public.player_play_days (user_id, day, multiplier)
+select user_id, (played_at at time zone 'UTC')::date, max(points_multiplier)
 from public.game_results
 where played_at is not null
 group by 1, 2;
@@ -124,19 +150,21 @@ from (
         count(*) as games,
         count(*) filter (where result = 'won') as wins,
         sum(
-            case when (is_bot_game or cards_played_total >= 5) then
-                case result when 'won' then 100 when 'lost' then 12 when 'eliminated' then 12 else 0 end
-            else 0 end
-            -- The stat columns are NOT NULL, so no coalesce is needed here or in the trigger.
-            + draw_cards_played * 2
-            + biggest_stack_survived * 3
-            + uno_calls * 4
+            (
+                case when (is_bot_game or cards_played_total >= 5) then
+                    case result when 'won' then 100 when 'lost' then 12 when 'eliminated' then 12 else 0 end
+                else 0 end
+                -- The stat columns are NOT NULL, so no coalesce is needed here or in the trigger.
+                + draw_cards_played * 2
+                + biggest_stack_survived * 3
+                + uno_calls * 4
+            ) * points_multiplier
         ) as points
     from public.game_results
     group by user_id
 ) g
 left join (
-    select user_id, count(*) as days from public.player_play_days group by user_id
+    select user_id, sum(multiplier) as days from public.player_play_days group by user_id
 ) d using (user_id);
 
 create or replace trigger game_results_alltime_totals
@@ -146,23 +174,31 @@ for each row execute function public.add_game_to_alltime_totals();
 commit;
 
 -- Check (read-only, run any time): compares the totals with a fresh
--- aggregate written the old way. Expect players equal and mismatches = 0.
+-- aggregate written the way player_points does it. Expect players equal and
+-- mismatches = 0.
 --
--- with fresh as (
+-- with per_day as (
 --     select
 --         gr.user_id,
 --         count(*) as games,
 --         count(*) filter (where gr.result = 'won') as wins,
---         (
---             count(*) filter (where gr.result = 'won' and (gr.is_bot_game or gr.cards_played_total >= 5)) * 100
---           + count(*) filter (where gr.result in ('lost', 'eliminated') and (gr.is_bot_game or gr.cards_played_total >= 5)) * 12
---           + coalesce(sum(gr.draw_cards_played), 0) * 2
---           + coalesce(sum(gr.biggest_stack_survived), 0) * 3
---           + coalesce(sum(gr.uno_calls), 0) * 4
---           + count(distinct (gr.played_at at time zone 'UTC')::date) * 25
---         )::bigint as points
+--         sum(
+--             (
+--                 case when (gr.is_bot_game or gr.cards_played_total >= 5) then
+--                     case gr.result when 'won' then 100 when 'lost' then 12 when 'eliminated' then 12 else 0 end
+--                 else 0 end
+--                 + gr.draw_cards_played * 2
+--                 + gr.biggest_stack_survived * 3
+--                 + gr.uno_calls * 4
+--             ) * gr.points_multiplier
+--         ) + 25 * max(gr.points_multiplier) as points
 --     from public.game_results gr
---     group by gr.user_id
+--     group by gr.user_id, (gr.played_at at time zone 'UTC')::date
+-- ),
+-- fresh as (
+--     select user_id, sum(games) as games, sum(wins) as wins, sum(points)::bigint as points
+--     from per_day
+--     group by user_id
 -- )
 -- select
 --     (select count(*) from fresh) as players,

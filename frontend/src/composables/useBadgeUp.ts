@@ -12,6 +12,7 @@ import { useAuthStore } from '../stores/authStore'
 import { useRetentionStore } from '../stores/retentionStore'
 import { supabase } from '../lib/supabase'
 import { badgeFor, pointsFromRetention, gameContribution, type GameContribution, type Badge } from '../utils/badges'
+import { currentPointsBoost } from './useAnnouncement'
 
 export function useBadgeUp() {
     const authStore = useAuthStore()
@@ -41,7 +42,8 @@ export function useBadgeUp() {
         if (authStore.user?.id) {
             if (baselineServer === null) return null
             before = baselineServer
-            after = before + gameContribution(g)
+            // A points announcement the player joined multiplies this game, as the server does.
+            after = before + gameContribution(g) * currentPointsBoost()
             baselineServer = after
         } else {
             const now = { gamesPlayed: retention.gamesPlayed, gamesWon: retention.gamesWon, unoCalls: retention.totalUnos }

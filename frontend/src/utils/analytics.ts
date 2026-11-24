@@ -84,6 +84,12 @@
  *                            nobody answering, which is the one reading that
  *                            must never be a guess.
  *
+ * Announcements (supabase/announcements.sql). `announcement_shown` is the
+ * denominator for joins and for the Discord invite under "You're in":
+ *   announcement_shown    { announcement_id }          — the modal opened
+ *   announcement_answered { announcement_id, answer }  — joined, skipped or closed
+ *   announcement_discord  { announcement_id }          — the Discord invite was opened
+ *
  * Guest claim funnel. `method` on the completion is what makes the email and
  * Google paths comparable — the whole point of instrumenting them:
  *   guest_claim_started        {}                  — email form opened

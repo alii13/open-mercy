@@ -8,6 +8,7 @@
       </a>
 
       <div class="top-bar-cta">
+        <AnnouncementChip />
         <WhatsNew ref="whatsNewRef" class="bar-whatsnew" />
         <!-- One account surface for guests and signed-in users alike: the name
              is the control, and everything about "you" hangs off it. Stats used
@@ -633,6 +634,7 @@ import { useSocialStore } from '../stores/socialStore'
 import { usePresence } from '../composables/usePresence'
 import InviteFriends from './InviteFriends.vue'
 import WhatsNew from './WhatsNew.vue'
+import AnnouncementChip from './AnnouncementChip.vue'
 import PublicTableCard from './PublicTableCard.vue'
 // The 3D table is its own chunk: three.js loads only when a room opens.
 // A chunk that fails to load (a deploy since page load, a dropped connection)

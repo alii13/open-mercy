@@ -174,9 +174,16 @@
 
     <!-- One-time release card. Signed in only: someone who has not played has
          no stake in what changed, and a guest who plays is signed in, so this
-         is the same line the landing page is drawn on. Never over a game. -->
+         is the same line the landing page is drawn on. Never over a game.
+         It waits for the announcement check, and a visit that showed an
+         announcement leaves the card for the next visit. -->
     <ReleaseCard
-      v-if="authStore.isAuthenticated && !inMpMatch && localGameStore.gameState === 'LOBBY'"
+      v-if="authStore.isAuthenticated && !inMpMatch && localGameStore.gameState === 'LOBBY' && announcementChecked && !announcementOffered && !announcementTookVisit"
+    />
+
+    <!-- The live announcement (supabase/announcements.sql), same rules as the card. -->
+    <AnnouncementModal
+      v-if="authStore.isAuthenticated && !inMpMatch && localGameStore.gameState === 'LOBBY' && announcementOffered"
     />
   </div>
 </template>
@@ -208,6 +215,7 @@ const AuthView = defineAsyncComponent(() => import('./components/AuthView.vue'))
 const InviteToast = defineAsyncComponent(() => import('./components/InviteToast.vue'))
 const FriendToast = defineAsyncComponent(() => import('./components/FriendToast.vue'))
 const ReleaseCard = defineAsyncComponent(() => import('./components/ReleaseCard.vue'))
+const AnnouncementModal = defineAsyncComponent(() => import('./components/AnnouncementModal.vue'))
 const MultiplayerLobby = defineAsyncComponent(() => import('./components/MultiplayerLobby.vue'))
 const FriendsPage = defineAsyncComponent(() => import('./components/FriendsPage.vue'))
 const LeaderboardPage = defineAsyncComponent(() => import('./components/LeaderboardPage.vue'))
@@ -238,6 +246,7 @@ const GameView = gameScreen(() => import('./components/game/GameView.vue'), 'sp_
 const MultiplayerGameView = gameScreen(() => import('./components/game/MultiplayerGameView.vue'), 'mp_game_load_failed')
 import { vFocusRing } from './directives/focusRing'
 import { useAuthStore } from './stores/authStore'
+import { loadAnnouncement, refreshAnnouncement, useAnnouncement } from './composables/useAnnouncement'
 import { supabase } from './lib/supabase'
 import { useMultiplayerStore } from './stores/multiplayerStore'
 import { useGameStore } from './stores/gameStore'
@@ -253,6 +262,17 @@ import {
 import { accountStep, closeAccountModal, openAccountModal } from './composables/useAccountModal'
 
 const authStore = useAuthStore()
+const {
+  checked: announcementChecked,
+  offered: announcementOffered,
+  tookVisit: announcementTookVisit,
+} = useAnnouncement()
+watch(() => authStore.user?.id, (id) => { if (id) void loadAnnouncement(id) }, { immediate: true })
+// An announcement can start while the tab is open: look again on the way back
+// to the lobby and when the tab comes back into view.
+const onAnnouncementVisible = () => { if (document.visibilityState === 'visible') void refreshAnnouncement() }
+onMounted(() => document.addEventListener('visibilitychange', onAnnouncementVisible))
+onUnmounted(() => document.removeEventListener('visibilitychange', onAnnouncementVisible))
 const mpStore = useMultiplayerStore()
 const localGameStore = useGameStore()
 const retention = useRetentionStore()
@@ -298,6 +318,10 @@ const inMpMatch = computed(() => {
 // A match starting under the account modal (a private room's host pressed
 // START) takes the screen, as the old full-screen claim page used to give way.
 watch(inMpMatch, (m) => { if (m) closeAccountModal() })
+watch(
+  () => !inMpMatch.value && localGameStore.gameState === 'LOBBY',
+  (inLobby) => { if (inLobby) void refreshAnnouncement() },
+)
 
 const currentScreen = computed(() => {
   if (authStore.loading) return null

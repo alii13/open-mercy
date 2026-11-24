@@ -19,19 +19,28 @@ set search_path = public
 stable
 as $$
     select
-        gr.user_id,
-        (
-            count(*) filter (where gr.result = 'won' and (gr.is_bot_game or gr.cards_played_total >= 5)) * 100
-          + count(*) filter (where gr.result in ('lost', 'eliminated') and (gr.is_bot_game or gr.cards_played_total >= 5)) * 12
-          + coalesce(sum(gr.draw_cards_played), 0) * 2
-          + coalesce(sum(gr.biggest_stack_survived), 0) * 3
-          + coalesce(sum(gr.uno_calls), 0) * 4
-          + count(distinct (gr.played_at at time zone 'UTC')::date) * 25
-        )::bigint as points,
-        greatest(0, extract(day from (now() - max(gr.played_at)))::int) as days_idle
-    from game_results gr
-    where gr.user_id = any(ids)
-    group by gr.user_id;
+        d.user_id,
+        sum(d.points)::bigint as points,
+        greatest(0, extract(day from (now() - max(d.last_played)))::int) as days_idle
+    from (
+        select
+            gr.user_id,
+            sum(
+                (
+                    case when (gr.is_bot_game or gr.cards_played_total >= 5) then
+                        case gr.result when 'won' then 100 when 'lost' then 12 when 'eliminated' then 12 else 0 end
+                    else 0 end
+                    + gr.draw_cards_played * 2
+                    + gr.biggest_stack_survived * 3
+                    + gr.uno_calls * 4
+                ) * gr.points_multiplier
+            ) + 25 * max(gr.points_multiplier) as points,
+            max(gr.played_at) as last_played
+        from game_results gr
+        where gr.user_id = any(ids)
+        group by gr.user_id, (gr.played_at at time zone 'UTC')::date
+    ) d
+    group by d.user_id;
 $$;
 
 grant execute on function public.player_points to anon, authenticated;
