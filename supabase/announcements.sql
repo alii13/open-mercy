@@ -21,6 +21,10 @@
 
 begin;
 
+-- Gives up instead of queueing every game save and sign-up behind its locks;
+-- run it again if it times out.
+set local lock_timeout = '2s';
+
 create table if not exists public.announcements (
     id text primary key,
     starts_at timestamptz not null,

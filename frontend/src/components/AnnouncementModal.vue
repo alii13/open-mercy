@@ -30,7 +30,7 @@
           <p id="ann-body" class="ann-body">{{ a.body }}</p>
 
           <p v-if="a.pointsMultiplier" class="ann-clock">
-            <Timer :size="16" :stroke-width="2" aria-hidden="true" />
+            <Timer :size="14" :stroke-width="2" aria-hidden="true" />
             ENDS IN <span class="ann-clock-time">{{ countdown }}</span>
           </p>
 
@@ -40,20 +40,40 @@
               type="button"
               class="ann-join"
               :class="{ 'is-in': justJoined }"
-              :disabled="busy || justJoined"
+              :disabled="busy || justJoined || ended"
               @click="join"
             >
               <template v-if="justJoined">
-                <Check :size="20" :stroke-width="2" aria-hidden="true" />
+                <Check :size="16" :stroke-width="2" aria-hidden="true" />
                 YOU'RE IN
               </template>
               <template v-else>{{ a.buttonLabel }}</template>
             </button>
             <p v-if="failed" class="ann-error" role="alert">Couldn't reach the server. Check your connection and try again.</p>
-            <template v-if="a.pointsMultiplier && !justJoined">
+            <p v-if="ended" class="ann-error" role="alert">This one has ended.</p>
+
+            <!-- Joined: one optional next step, then the player closes it. -->
+            <div v-if="justJoined" class="ann-next">
+              <p class="ann-next-title">Want people to play with?</p>
+              <a
+                ref="discordEl"
+                class="ann-discord"
+                :href="DISCORD_INVITE"
+                target="_blank"
+                rel="noopener noreferrer"
+                @click="openDiscord"
+              >
+                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path :d="siDiscord.path" /></svg>
+                JOIN OUR DISCORD
+              </a>
+              <button type="button" class="ann-skip" @click="close">Done</button>
+            </div>
+
+            <template v-else-if="a.pointsMultiplier && !ended">
               <p class="ann-fine">Points only count {{ boostWord }} after you tap {{ buttonInSentence }}.</p>
               <button type="button" class="ann-skip" :disabled="busy" @click="skip">Not now</button>
             </template>
+            <button v-else-if="ended" type="button" class="ann-skip" @click="close">Close</button>
           </div>
         </div>
       </div>
@@ -64,6 +84,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { Check, Timer } from 'lucide-vue-next'
+import { siDiscord } from 'simple-icons'
 import { useAnnouncement } from '../composables/useAnnouncement'
 import { countdownText } from '../utils/announcement'
 import { track } from '../utils/analytics'
@@ -79,10 +100,13 @@ const onWideChange = (e: MediaQueryListEvent) => { wide.value = e.matches }
 const busy = ref(false)
 const failed = ref(false)
 const justJoined = ref(false)
+const ended = ref(false)
+const discordEl = ref<HTMLAnchorElement | null>(null)
+const appEl = typeof document !== 'undefined' ? document.getElementById('app') : null
+const DISCORD_INVITE = 'https://discord.gg/4hwKGhJak9'
 const now = ref(Date.now())
 const joinEl = ref<HTMLButtonElement | null>(null)
 let tick: ReturnType<typeof setInterval> | null = null
-let closeTimer: ReturnType<typeof setTimeout> | null = null
 const opener = typeof document !== 'undefined' ? (document.activeElement as HTMLElement | null) : null
 
 const countdown = computed(() => countdownText((a.value?.endsAt ?? 0) - now.value))
@@ -98,15 +122,22 @@ async function join() {
   const result = await answer(true)
   busy.value = false
   if (result === 'error') { failed.value = true; return }
-  track('announcement_answered', { id: a.value?.id, answer: result })
+  track('announcement_answered', { announcement_id: a.value?.id, answer: result })
+  // Ended early while this tab was open: say so instead of closing silently.
+  if (result === 'closed') { ended.value = true; return }
   if (result !== 'joined' || !a.value?.pointsMultiplier) { close(); return }
   justJoined.value = true
-  closeTimer = setTimeout(close, 1200)
+  void nextTick(() => discordEl.value?.focus())
+}
+
+function openDiscord() {
+  track('announcement_discord', { announcement_id: a.value?.id })
+  close()
 }
 
 function skip() {
   if (busy.value || justJoined.value) return
-  track('announcement_answered', { id: a.value?.id, answer: 'skipped' })
+  track('announcement_answered', { announcement_id: a.value?.id, answer: 'skipped' })
   // The skip is counted on the server; the modal closes either way.
   void answer(false)
   close()
@@ -115,7 +146,8 @@ function skip() {
 // A points announcement waits for an explicit answer: a stray tap on the dim
 // backdrop must not use up one of the player's two chances to join.
 function dismiss() {
-  if (!a.value?.pointsMultiplier) skip()
+  if (justJoined.value || ended.value) close()
+  else if (!a.value?.pointsMultiplier) skip()
 }
 
 function onKeydown(e: KeyboardEvent) {
@@ -124,7 +156,9 @@ function onKeydown(e: KeyboardEvent) {
 
 onMounted(() => {
   tookVisit.value = true
-  track('announcement_shown', { id: a.value?.id })
+  track('announcement_shown', { announcement_id: a.value?.id })
+  // Keeps Tab and taps inside the dialog; it is teleported out of #app.
+  appEl?.setAttribute('inert', '')
   wideMedia?.addEventListener('change', onWideChange)
   window.addEventListener('keydown', onKeydown)
   tick = setInterval(() => {
@@ -139,7 +173,7 @@ onUnmounted(() => {
   wideMedia?.removeEventListener('change', onWideChange)
   window.removeEventListener('keydown', onKeydown)
   if (tick) clearInterval(tick)
-  if (closeTimer) clearTimeout(closeTimer)
+  appEl?.removeAttribute('inert')
   if (opener?.isConnected) opener.focus()
 })
 </script>
@@ -219,7 +253,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   width: min(300px, 100%);
-  padding: 6px 6px 0;
+  padding: var(--spacing-2) var(--spacing-2) 0;
   border-radius: var(--radius-md);
   background: #ffffff;
   box-shadow: var(--shadow-lg);
@@ -287,7 +321,7 @@ onUnmounted(() => {
 .ann-hero-side {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--spacing-1);
 }
 
 .ann-hero-title {
@@ -353,11 +387,7 @@ onUnmounted(() => {
   letter-spacing: 0.06em;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: scale 150ms ease-out, background-color var(--duration-snap) var(--ease-snap);
-}
-
-.ann-join:enabled:active {
-  scale: 0.96;
+  transition: background-color var(--duration-snap) var(--ease-snap);
 }
 
 .ann-join:disabled {
@@ -400,7 +430,56 @@ onUnmounted(() => {
   cursor: pointer;
 }
 
+/* Joined: the optional Discord invite, quieter than the red button above. */
+.ann-next {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--spacing-3);
+  padding-top: var(--spacing-3);
+}
+
+.ann-next-title {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 600;
+  text-align: center;
+  color: var(--text-primary);
+}
+
+.ann-discord {
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-2);
+  border-radius: var(--radius-lg);
+  /* Discord's own blurple, the same as the release card's Discord button. */
+  background: #5865f2;
+  color: #ffffff;
+  font-size: var(--text-base);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+}
+
+.ann-discord svg {
+  fill: currentColor;
+}
+
+@media (hover: hover) {
+  .ann-discord:hover {
+    background: #4752c4;
+  }
+}
+
 @media (prefers-reduced-motion: no-preference) {
+  .ann-join {
+    transition: scale var(--duration-snap) var(--ease-snap), background-color var(--duration-snap) var(--ease-snap);
+  }
+  .ann-join:enabled:active {
+    scale: 0.96;
+  }
   .ann--sheet {
     animation: ann-rise var(--duration-soft) var(--ease-strut) backwards;
   }

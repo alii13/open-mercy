@@ -35,22 +35,45 @@ const answeredThisVisit = ref(false)
 /** Decided once at load, so the modal stays open through its "You're in" beat. */
 const offerThisVisit = ref(false)
 let loadedFor: string | null = null
+let lastRead = 0
+/** While nothing is live, read again at most this often: a row inserted ahead
+ *  of time starts while tabs are already open. */
+const RECHECK_MS = 60_000
 
+/** Reads the live announcement for a newly signed-in player, from a clean slate. */
 export async function loadAnnouncement(userId: string): Promise<void> {
     if (loadedFor === userId) return
     loadedFor = userId
+    current.value = null
+    checked.value = false
+    tookVisit.value = false
+    answeredThisVisit.value = false
+    offerThisVisit.value = false
+    await read(userId)
+}
+
+/** Reads again when nothing is live, at most once a minute. */
+export async function refreshAnnouncement(): Promise<void> {
+    const userId = loadedFor
+    const live = current.value && Date.now() < current.value.endsAt
+    if (!userId || live || Date.now() - lastRead < RECHECK_MS) return
+    await read(userId)
+}
+
+async function read(userId: string): Promise<void> {
+    lastRead = Date.now()
+    let row: LiveRow | null = null
     try {
         const { data, error } = await supabase.rpc('live_announcement')
-        // Signed into another account while this was in flight: that load wins.
-        if (loadedFor !== userId) return
-        const row = (error ? null : (data as LiveRow[] | null)?.[0]) ?? null
-        current.value = row ? fromRow(row) : null
-        offerThisVisit.value = shouldOffer(current.value, false)
+        row = (error ? null : (data as LiveRow[] | null)?.[0]) ?? null
     } catch {
-        current.value = null
-    } finally {
-        checked.value = true
+        row = null
     }
+    // Signed into another account while this was in flight: that read wins.
+    if (loadedFor !== userId) return
+    current.value = row ? fromRow(row) : null
+    offerThisVisit.value = !answeredThisVisit.value && shouldOffer(current.value, false)
+    checked.value = true
 }
 
 function fromRow(r: LiveRow): Announcement {

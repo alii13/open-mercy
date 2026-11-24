@@ -36,7 +36,7 @@ One table, `announcements`. One row is one announcement.
   - An announcement with no points just has an OK button and goes away for good once tapped.
 - **No stacking:** a visit that shows an announcement does not also show the release card or a poll. They wait for the next visit.
 - **After tapping a points announcement:**
-  - the button turns into a green "YOU'RE IN", then the modal closes
+  - the button turns into a green "YOU'RE IN", and under it "Want people to play with?" offers a blurple JOIN OUR DISCORD button (the invite, no check) and Done
   - a red `2X 14:21:53` countdown in the top bar until it ends
   - the countdown runs on server time, so a wrong phone clock doesn't matter
 - **iPhone app:** it bundles its own copy of the website, so it gets this in its next App Store release. Until then, iPhone players can't opt in.

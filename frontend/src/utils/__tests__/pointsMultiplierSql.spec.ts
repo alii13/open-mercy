@@ -23,11 +23,13 @@ const files = {
 const withoutComments = (sql: string) => sql.replace(/--.*$/gm, '')
 const statements = (sql: string) => withoutComments(sql).split(/\n(?=create or replace function|insert into)/)
 const scoresGames = (statement: string) => /(\* 100\b|then 100\b)/.test(statement)
+// The game's own points times the multiplier, not just the word somewhere in the statement.
+const multipliesGames = /\)\s*\*\s*(?:gr\.|new\.)?points_multiplier\b|\*\s*points_multiplier\)/
 
 describe('the SQL points multiplier', () => {
     it.each(Object.entries(files))('is applied by every points statement in %s', (_, sql) => {
         const scoring = statements(sql).filter(scoresGames)
         expect(scoring.length).toBeGreaterThan(0)
-        for (const statement of scoring) expect(statement).toContain('points_multiplier')
+        for (const statement of scoring) expect(statement).toMatch(multipliesGames)
     })
 })
