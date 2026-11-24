@@ -12,6 +12,7 @@ const live: Announcement = {
     imageCaption: null,
     buttonLabel: 'COUNT ME IN',
     pointsMultiplier: 2,
+    startsAt: 2_000,
     endsAt: 10_000,
     joined: false,
     skips: 0,
@@ -27,5 +28,9 @@ describe('announcement', () => {
         expect(pointsBoost(live, 5_000)).toBe(1)
         expect(pointsBoost({ ...live, joined: true }, 5_000)).toBe(2)
         expect(pointsBoost({ ...live, joined: true }, 10_000)).toBe(1)
+    })
+
+    it('does not boost a player who joined early until the points start', () => {
+        expect(pointsBoost({ ...live, joined: true }, 1_000)).toBe(1)
     })
 })

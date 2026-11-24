@@ -21,6 +21,7 @@ interface LiveRow {
     image_caption: string | null
     button_label: string
     points_multiplier: number | null
+    starts_at: string
     ends_at: string
     server_now: string
     joined: boolean
@@ -89,6 +90,8 @@ function fromRow(r: LiveRow): Announcement {
         imageCaption: r.image_caption,
         buttonLabel: r.button_label,
         pointsMultiplier: r.points_multiplier,
+        // An older live_announcement() has no starts_at: it only returns rows already started.
+        startsAt: r.starts_at ? Date.parse(r.starts_at) - skew : 0,
         endsAt: Date.parse(r.ends_at) - skew,
         joined: r.joined,
         skips: r.skips,

@@ -1,5 +1,6 @@
-/** One live announcement, as live_announcement() returns it (supabase/announcements.sql).
- *  endsAt is in this device's clock, already corrected by the server's. */
+/** One shown announcement, as live_announcement() returns it (supabase/announcements.sql).
+ *  It can show before its points start. startsAt and endsAt are in this
+ *  device's clock, already corrected by the server's. */
 export interface Announcement {
     id: string
     eyebrow: string | null
@@ -11,6 +12,7 @@ export interface Announcement {
     imageCaption: string | null
     buttonLabel: string
     pointsMultiplier: number | null
+    startsAt: number
     endsAt: number
     joined: boolean
     skips: number
@@ -26,7 +28,7 @@ export function shouldOffer(a: Announcement | null, answeredThisVisit: boolean):
 /** The multiplier the server will stamp on a game this player finishes now.
  *  Only drives the post-game badge check; the server decides the real points. */
 export function pointsBoost(a: Announcement | null, now: number): number {
-    if (!a?.joined || !a.pointsMultiplier || now >= a.endsAt) return 1
+    if (!a?.joined || !a.pointsMultiplier || now < a.startsAt || now >= a.endsAt) return 1
     return a.pointsMultiplier
 }
 

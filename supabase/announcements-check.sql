@@ -89,6 +89,34 @@ begin
     assert totals_after - totals_before = 224, 'ranks should gain 224, got ' || (totals_after - totals_before);
     assert badge_after - badge_before = 224, 'badges should gain 224, got ' || (badge_after - badge_before);
 
+    -- Shown before its points start: a player can join early, and only games
+    -- from starts_at are boosted.
+    insert into public.announcements (id, shows_from, starts_at, ends_at, body, button_label, points_multiplier)
+    values ('smoke-early', now() - interval '1 hour', now() + interval '1 hour', now() + interval '3 hours', 'Smoke test', 'OK', 2);
+    perform set_config('request.jwt.claims', json_build_object('sub', p2)::text, true);
+    select * into live from public.live_announcement();
+    assert live.id = 'smoke-early', 'an announcement past shows_from should be live before it starts';
+    reply := public.answer_announcement('smoke-early', true);
+    assert reply = 'joined', 'joining before the points start should work, got ' || reply;
+
+    insert into public.game_results (
+        game_id, user_id, opponent_count, result, cards_remaining, peak_cards,
+        draw_cards_played, wild_cards_played, cards_played_total, skips_dealt,
+        swaps_made, draws_taken, biggest_stack_survived, uno_calls,
+        uno_penalties, game_duration_secs, is_bot_game, played_at
+    ) values ('bot-9999999999005', p2, 1, 'won', 0, 7, 0, 0, 10, 0, 0, 0, 0, 0, 0, 60, true, now())
+    returning points_multiplier into stamped;
+    assert stamped = 1, 'a game before the points start must get 1, got ' || stamped;
+
+    insert into public.game_results (
+        game_id, user_id, opponent_count, result, cards_remaining, peak_cards,
+        draw_cards_played, wild_cards_played, cards_played_total, skips_dealt,
+        swaps_made, draws_taken, biggest_stack_survived, uno_calls,
+        uno_penalties, game_duration_secs, is_bot_game, played_at
+    ) values ('bot-9999999999006', p2, 1, 'won', 0, 7, 0, 0, 10, 0, 0, 0, 0, 0, 0, 60, true, now() + interval '2 hours')
+    returning points_multiplier into stamped;
+    assert stamped = 2, 'an early joiner''s game inside the window must get 2, got ' || stamped;
+
     raise notice 'announcements check passed';
 end;
 $$;

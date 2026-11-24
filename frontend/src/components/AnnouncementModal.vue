@@ -31,7 +31,7 @@
 
           <p v-if="a.pointsMultiplier" class="ann-clock">
             <Timer :size="14" :stroke-width="2" aria-hidden="true" />
-            ENDS IN <span class="ann-clock-time">{{ countdown }}</span>
+            {{ started ? 'ENDS IN' : 'STARTS IN' }} <span class="ann-clock-time">{{ countdown }}</span>
           </p>
 
           <div class="ann-actions">
@@ -109,7 +109,9 @@ const joinEl = ref<HTMLButtonElement | null>(null)
 let tick: ReturnType<typeof setInterval> | null = null
 const opener = typeof document !== 'undefined' ? (document.activeElement as HTMLElement | null) : null
 
-const countdown = computed(() => countdownText((a.value?.endsAt ?? 0) - now.value))
+const started = computed(() => now.value >= (a.value?.startsAt ?? 0))
+// Before the points start the clock counts down to the start, then to the end.
+const countdown = computed(() => countdownText((started.value ? a.value?.endsAt ?? 0 : a.value?.startsAt ?? 0) - now.value))
 const boostWord = computed(() => (a.value?.pointsMultiplier === 2 ? 'double' : `${a.value?.pointsMultiplier}x`))
 const buttonInSentence = computed(() => {
   const label = (a.value?.buttonLabel ?? '').toLowerCase()
@@ -122,7 +124,7 @@ async function join() {
   const result = await answer(true)
   busy.value = false
   if (result === 'error') { failed.value = true; return }
-  track('announcement_answered', { announcement_id: a.value?.id, answer: result })
+  track(`announcement_${result}`, eventParams())
   // Ended early while this tab was open: say so instead of closing silently.
   if (result === 'closed') { ended.value = true; return }
   if (result !== 'joined' || !a.value?.pointsMultiplier) { close(); return }
@@ -130,14 +132,20 @@ async function join() {
   void nextTick(() => discordEl.value?.focus())
 }
 
+// One event name per answer, so GA counts them with no custom definitions.
+// `phase` is already a registered dimension: early = before the points start.
+function eventParams() {
+  return { announcement_id: a.value?.id, phase: started.value ? 'live' : 'early' }
+}
+
 function openDiscord() {
-  track('announcement_discord', { announcement_id: a.value?.id })
+  track('announcement_discord', eventParams())
   close()
 }
 
 function skip() {
   if (busy.value || justJoined.value) return
-  track('announcement_answered', { announcement_id: a.value?.id, answer: 'skipped' })
+  track('announcement_skipped', eventParams())
   // The skip is counted on the server; the modal closes either way.
   void answer(false)
   close()
@@ -156,7 +164,7 @@ function onKeydown(e: KeyboardEvent) {
 
 onMounted(() => {
   tookVisit.value = true
-  track('announcement_shown', { announcement_id: a.value?.id })
+  track('announcement_shown', eventParams())
   // Keeps Tab and taps inside the dialog; it is teleported out of #app.
   appEl?.setAttribute('inert', '')
   wideMedia?.addEventListener('change', onWideChange)

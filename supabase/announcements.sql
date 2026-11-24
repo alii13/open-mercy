@@ -39,8 +39,13 @@ create table if not exists public.announcements (
     image_caption text,
     button_label text not null default 'OK',
     -- Empty for an announcement with no points.
-    points_multiplier smallint check (points_multiplier between 2 and 5)
+    points_multiplier smallint check (points_multiplier between 2 and 5),
+    -- When the modal starts showing, so players can join before the points
+    -- start. Empty means starts_at. Points still count only from starts_at.
+    shows_from timestamptz
 );
+
+alter table public.announcements add column if not exists shows_from timestamptz;
 
 -- One row per player who answered an announcement. skips counts "Not now";
 -- the modal is offered at most twice, so after two skips the player is out.
@@ -94,8 +99,12 @@ before insert on public.game_results
 for each row execute function public.stamp_points_multiplier();
 
 -- The live announcement for the signed-in player, with their answer so far and
--- the server's clock, so a countdown never trusts the phone's clock.
-create or replace function public.live_announcement()
+-- the server's clock, so a countdown never trusts the phone's clock. Live means
+-- shown: from shows_from (or starts_at) until ends_at. Dropped first because its
+-- columns grew; re-running this file stays safe.
+drop function if exists public.live_announcement();
+
+create function public.live_announcement()
 returns table (
     id text,
     eyebrow text,
@@ -107,6 +116,7 @@ returns table (
     image_caption text,
     button_label text,
     points_multiplier smallint,
+    starts_at timestamptz,
     ends_at timestamptz,
     server_now timestamptz,
     joined boolean,
@@ -120,14 +130,14 @@ as $$
     select
         a.id, a.eyebrow, a.hero, a.hero_title, a.hero_note, a.body,
         a.image_path, a.image_caption, a.button_label, a.points_multiplier,
-        a.ends_at, now(),
+        a.starts_at, a.ends_at, now(),
         ap.joined_at is not null,
         coalesce(ap.skips, 0)::smallint
     from announcements a
     left join announcement_players ap
       on ap.announcement_id = a.id and ap.user_id = auth.uid()
     where auth.uid() is not null
-      and now() >= a.starts_at
+      and now() >= coalesce(a.shows_from, a.starts_at)
       and now() < a.ends_at
     order by a.starts_at desc
     limit 1;
@@ -137,7 +147,8 @@ revoke execute on function public.live_announcement() from public, anon;
 grant execute on function public.live_announcement() to authenticated;
 
 -- The player's answer: p_join true for the button, false for "Not now".
--- Returns 'joined', 'skipped' or 'closed' (not live, or skipped twice already).
+-- Returns 'joined', 'skipped' or 'closed' (not shown, or skipped twice already).
+-- Joining before starts_at is fine: the stamp only boosts games from starts_at.
 create or replace function public.answer_announcement(p_id text, p_join boolean)
 returns text
 language plpgsql
@@ -151,7 +162,7 @@ begin
     if me is null then return 'closed'; end if;
     if not exists (
         select 1 from announcements
-        where id = p_id and now() >= starts_at and now() < ends_at
+        where id = p_id and now() >= coalesce(shows_from, starts_at) and now() < ends_at
     ) then return 'closed'; end if;
 
     insert into announcement_players (announcement_id, user_id)
@@ -491,9 +502,37 @@ commit;
 --
 -- A plain announcement leaves points_multiplier out; its button just closes it.
 --
+-- Show it before the points start, so players can join early (points still
+-- count only from starts_at):
+--   update public.announcements set shows_from = now() where id = '2026-11-25-10k';
+--
 -- End one early:  update public.announcements set ends_at = now() where id = '2026-11-25-10k';
 --
 -- Who joined:     select count(*) from public.announcement_players where announcement_id = '2026-11-25-10k' and joined_at is not null;
+--
+-- How it went (exact, from the database; GA has the shown -> joined funnel):
+--
+-- select
+--     count(*) filter (where ap.joined_at is not null) as joined,
+--     count(*) filter (where ap.joined_at < a.starts_at) as joined_before_start,
+--     count(*) filter (where ap.joined_at is null and ap.skips >= 2) as skipped_twice,
+--     count(*) filter (where ap.joined_at is null and ap.skips = 1) as skipped_once
+-- from public.announcement_players ap
+-- join public.announcements a on a.id = ap.announcement_id
+-- where a.id = '2026-11-25-10k';
+--
+-- select
+--     count(*) as boosted_games,
+--     count(distinct user_id) as players,
+--     count(*) filter (where is_bot_game) as boosted_bot_games,
+--     sum((
+--         case when (is_bot_game or cards_played_total >= 5) then
+--             case result when 'won' then 100 when 'lost' then 12 when 'eliminated' then 12 else 0 end
+--         else 0 end
+--         + draw_cards_played * 2 + biggest_stack_survived * 3 + uno_calls * 4
+--     ) * (points_multiplier - 1)) as extra_points_from_games
+-- from public.game_results
+-- where points_multiplier > 1;
 --
 -- After a points day, players worth a look (near-perfect bot wins, non-stop pace):
 --
