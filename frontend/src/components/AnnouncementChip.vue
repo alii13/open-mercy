@@ -1,8 +1,8 @@
 <template>
-  <span v-if="live" class="ann-chip" :title="`${label} points until the clock runs out`">
+  <span v-if="shown" class="ann-chip" :title="started ? `${label} points until the clock runs out` : `${label} points start when the clock hits zero`">
     <span class="ann-chip-x">{{ label }}</span>
-    <span class="ann-chip-time">{{ countdownText(msLeft) }}</span>
-    <span class="ann-chip-sr">left on {{ label }} points</span>
+    <span class="ann-chip-time">{{ started ? '' : 'IN ' }}{{ countdownText(msLeft) }}</span>
+    <span class="ann-chip-sr">{{ started ? `left on ${label} points` : `until ${label} points start` }}</span>
   </span>
 </template>
 
@@ -11,14 +11,20 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useAnnouncement } from '../composables/useAnnouncement'
 import { countdownText, pointsBoost } from '../utils/announcement'
 
-// Shown to players who joined a points announcement, until it ends.
+// Shown to players who joined a points announcement: a countdown to the start
+// if they joined early, then to the end.
 const { current } = useAnnouncement()
 const now = ref(Date.now())
 let tick: ReturnType<typeof setInterval> | null = null
 
-const live = computed(() => pointsBoost(current.value, now.value) > 1)
+const started = computed(() => pointsBoost(current.value, now.value) > 1)
+const waiting = computed(() => {
+  const a = current.value
+  return !!a?.joined && !!a.pointsMultiplier && now.value < a.startsAt
+})
+const shown = computed(() => started.value || waiting.value)
 const label = computed(() => `${current.value?.pointsMultiplier ?? 1}X`)
-const msLeft = computed(() => (current.value?.endsAt ?? 0) - now.value)
+const msLeft = computed(() => (started.value ? current.value?.endsAt ?? 0 : current.value?.startsAt ?? 0) - now.value)
 
 onMounted(() => { tick = setInterval(() => { now.value = Date.now() }, 1000) })
 onUnmounted(() => { if (tick) clearInterval(tick) })

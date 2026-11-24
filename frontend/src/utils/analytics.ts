@@ -84,11 +84,15 @@
  *                            nobody answering, which is the one reading that
  *                            must never be a guess.
  *
- * Announcements (supabase/announcements.sql). `announcement_shown` is the
- * denominator for joins and for the Discord invite under "You're in":
- *   announcement_shown    { announcement_id }          — the modal opened
- *   announcement_answered { announcement_id, answer }  — joined, skipped or closed
- *   announcement_discord  { announcement_id }          — the Discord invite was opened
+ * Announcements (supabase/announcements.sql). One event per answer, so GA
+ * counts each without a custom definition. `announcement_shown` is the
+ * denominator. `phase` is early (before the points start) or live. The exact
+ * joins and skips are also in announcement_players.
+ *   announcement_shown   { announcement_id, phase }  — the modal opened
+ *   announcement_joined  { announcement_id, phase }  — the button was tapped
+ *   announcement_skipped { announcement_id, phase }  — "Not now"
+ *   announcement_closed  { announcement_id, phase }  — tapped after it ended, or after two skips
+ *   announcement_discord { announcement_id, phase }  — the Discord invite under "You're in"
  *
  * Guest claim funnel. `method` on the completion is what makes the email and
  * Google paths comparable — the whole point of instrumenting them:
