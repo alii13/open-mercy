@@ -38,7 +38,7 @@
       <Button variant="primary" size="lg" @click="$emit('home')">PLAY</Button>
     </div>
 
-    <div v-else-if="p" ref="contentEl" class="pp-content">
+    <div v-else-if="p" ref="contentEl" class="pp-content" :class="{ 'pp-content--empty': p.games === 0 }">
       <!-- WHO: the tier crest is the hero, the player's face rides its foot. -->
       <header class="pp-hero">
         <div class="pp-crest">
@@ -187,7 +187,7 @@
         <button type="button" class="pp-play" :disabled="!!invite.busy.value" @click="playTogether">{{ playLabel }}</button>
       </div>
 
-      <div class="pp-body">
+      <div class="pp-body" :class="{ 'pp-body--empty': p.games === 0 }">
         <div class="pp-main">
           <!-- No games yet: a hand nobody has dealt, and what fills this page. -->
           <section v-if="p.games === 0" class="pp-empty">
@@ -290,8 +290,9 @@
         </div>
 
         <div class="pp-side">
-          <!-- With no games, only the owner gets the ladder: the first rung is theirs to climb. -->
-          <section v-if="badgeInfo && (p.games > 0 || isOwn)" class="pp-section pp-section--ladder">
+          <!-- With no games there is nothing to climb from yet, so the empty
+               state stands alone in the middle of the page. -->
+          <section v-if="badgeInfo && p.games > 0" class="pp-section pp-section--ladder">
             <h2 class="pp-section-title">THE LADDER</h2>
             <div class="pp-card pp-ladder">
               <Badge class="pp-ladder-mark" :badge="badgeInfo.badge" size="mark" aria-hidden="true" />
@@ -863,6 +864,26 @@ watch(() => props.code, (code) => {
   /* The ladder heading sits above the line, so its card starts level with
      the stat cards beside it. */
   .pp-main { padding-top: 40px; }
+  /* No games: nothing fills a second column, so the whole page is one
+     centred column, as on a phone. */
+  .pp-body--empty { grid-template-columns: minmax(0, 1fr); }
+  .pp-body--empty .pp-main { padding-top: 0; }
+  .pp-body--empty .pp-side { display: none; }
+  .pp-content--empty {
+    max-width: 640px;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "hero" "actions" "body" "own";
+  }
+  .pp-content--empty .pp-hero {
+    flex-direction: column;
+    text-align: center;
+  }
+  .pp-content--empty .pp-who { align-items: center; }
+  .pp-content--empty .pp-name,
+  .pp-content--empty .pp-meta,
+  .pp-content--empty .pp-socials { justify-content: center; }
+  .pp-content--empty .pp-actions { justify-self: center; }
+  .pp-content--empty .pp-own { justify-self: center; }
   .pp-side .pp-section.pp-section--ladder { padding-top: 0; }
 }
 
