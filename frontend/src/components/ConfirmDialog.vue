@@ -38,7 +38,9 @@
 </template>
 
 <script setup lang="ts">
-withDefaults(
+import { useInertApp } from '../composables/useInertApp'
+
+const props = withDefaults(
   defineProps<{
     open: boolean
     title: string
@@ -57,6 +59,8 @@ defineEmits<{
   confirm: []
   cancel: []
 }>()
+
+useInertApp(() => props.open)
 </script>
 
 <style scoped>

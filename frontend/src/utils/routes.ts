@@ -21,6 +21,7 @@ export type Route =
     | { name: 'badges'; badge?: string }
     | { name: 'changelog' }
     | { name: 'profile'; code: string }
+    | { name: 'profileGames'; code: string }
     | { name: 'public' }
     | { name: 'room'; code: string }
     | { name: 'daily' }
@@ -58,6 +59,7 @@ export const router = createRouter({
         { path: '/badges/:badge([a-z-]+)?', name: 'badges', component: Screen },
         { path: '/changelog', name: 'changelog', component: Screen },
         { path: '/p/:code([A-Za-z0-9]{4,32})', name: 'profile', component: Screen },
+        { path: '/p/:code([A-Za-z0-9]{4,32})/games', name: 'profileGames', component: Screen },
         // Keeps the query and hash, where invite codes and auth redirects ride.
         { path: '/:rest(.*)*', redirect: '/' },
     ],
@@ -69,6 +71,7 @@ export function toRoute(r: Pick<RouteLocationGeneric, 'name' | 'params'>): Route
     if (r.name === 'badges') return p.badge ? { name: 'badges', badge: p.badge.toLowerCase() } : { name: 'badges' }
     if (r.name === 'changelog') return { name: 'changelog' }
     if (r.name === 'profile') return { name: 'profile', code: p.code! }
+    if (r.name === 'profileGames') return { name: 'profileGames', code: p.code! }
     if (r.name === 'public' || r.name === 'daily' || r.name === 'bot' || r.name === 'friends') return { name: r.name }
     if (r.name === 'room') return { name: 'room', code: normalizeRoomCode(p.code!) }
     return { name: 'home' }
@@ -80,6 +83,7 @@ export function routePath(route: Route): string {
         return route.tab && route.tab !== 'daily' ? `/leaderboard/${route.tab}` : '/leaderboard'
     }
     if (route.name === 'profile') return `/p/${route.code}`
+    if (route.name === 'profileGames') return `/p/${route.code}/games`
     if (route.name === 'room') return `/r/${route.code}`
     if (route.name === 'badges' && route.badge) return `/badges/${route.badge}`
     if (route.name === 'home') return '/'
@@ -91,4 +95,32 @@ export const currentRoute = computed(() => toRoute(router.currentRoute.value))
 /** Navigate to a route, preserving the query string (invite links ride on it). */
 export function navigate(route: Route): Promise<unknown> {
     return router.push({ path: routePath(route), query: router.currentRoute.value.query })
+}
+
+// Pages BACK may return to. Never a room or a game: stepping back into /r/CODE
+// or /daily would rejoin or restart it.
+const BROWSING = new Set(['home', 'leaderboard', 'badges', 'changelog', 'profile', 'profileGames', 'friends'])
+
+/**
+ * The in-app page BACK should return to, or null to go home instead. Every
+ * leaderboard tab is its own history entry, so an earlier tab of the board
+ * you are on is not a page to go back to.
+ */
+export function backTarget(previous: string | null | undefined, current?: string): string | null {
+    if (!previous) return null
+    const name = String(router.resolve(previous).name)
+    if (!BROWSING.has(name)) return null
+    if (name === 'leaderboard' && current && router.resolve(current).name === 'leaderboard') return null
+    return previous
+}
+
+/** BACK: the page you came from, or home when this page was opened from a link. */
+export function goBack(): Promise<unknown> {
+    // vue-router keeps the previous in-app path in history.state.back.
+    const previous = (window.history.state as { back?: string | null } | null)?.back
+    if (backTarget(previous, router.currentRoute.value.fullPath)) {
+        router.back()
+        return Promise.resolve()
+    }
+    return navigate({ name: 'home' })
 }

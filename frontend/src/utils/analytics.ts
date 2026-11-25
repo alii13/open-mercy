@@ -46,6 +46,9 @@
  *   leaderboard_filtered   { country: <ISO-3166 alpha-2>|global }
  *   avatar_saved       {}  - a claimed player saved a profile photo
  *   avatar_removed     {}  - and removed it
+ *   profile_socials_saved { x, instagram }  - saved their handles; each is true when set
+ *   profile_social_opened { network: x|instagram, own }  - tapped a handle on a profile
+ *   profile_play_together {}  - invited a player from their profile
  *
  * Daily reminders (web push, game-server/src/push.ts). Shown over asked is the
  * opt-in rate; opened per `variant` over push_sends.sent per variant is the

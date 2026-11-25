@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onUnmounted, ref, watch } from 'vue'
+import { useInertApp } from '../../composables/useInertApp'
 
 /**
  * Modal shell — centered overlay with focus management, Esc-to-close,
@@ -34,6 +35,9 @@ const props = withDefaults(
 const emit = defineEmits<{
   close: []
 }>()
+
+// Before the open watcher, so the page is awake when focus returns.
+useInertApp(() => !!props.open)
 
 const containerRef = ref<HTMLElement | null>(null)
 const lastFocused = ref<HTMLElement | null>(null)

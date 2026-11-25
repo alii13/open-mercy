@@ -88,6 +88,10 @@ import { siDiscord } from 'simple-icons'
 import { useAnnouncement } from '../composables/useAnnouncement'
 import { countdownText } from '../utils/announcement'
 import { track } from '../utils/analytics'
+import { useInertApp } from '../composables/useInertApp'
+
+// First, so the page behind is awake before focus goes back to the opener.
+useInertApp()
 
 const { current: a, answer, close, tookVisit } = useAnnouncement()
 

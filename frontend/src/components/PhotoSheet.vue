@@ -97,6 +97,7 @@
 import { ArrowRight, Camera, Hand, Image as ImageIcon, ImagePlus, Trash2, X, ZoomIn, ZoomOut } from 'lucide-vue-next'
 import { computed, onBeforeUnmount, onMounted, reactive, ref, shallowRef, watch } from 'vue'
 import Avatar from './Avatar.vue'
+import { useInertApp } from '../composables/useInertApp'
 import { useAuthStore } from '../stores/authStore'
 import { useBadges } from '../composables/useBadges'
 import { avatarUrlFor, removeAvatar, uploadAvatar } from '../composables/useAvatars'
@@ -110,6 +111,10 @@ const props = defineProps<{
 }>()
 // busy: the account modal holds Back and Close while a photo saves.
 const emit = defineEmits<{ claim: []; done: []; busy: [boolean] }>()
+
+// Embedded in the account modal, which already holds the page inert. Before
+// the unmount hook below, so the page is awake when focus returns.
+useInertApp(() => !props.embedded)
 
 /** Crop circle diameter, and the strip of photo shown around it. */
 const VIEW = 248

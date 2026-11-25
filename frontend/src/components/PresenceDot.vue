@@ -52,8 +52,10 @@ const label = computed(() => presenceLabel(props.lastSeenAt, now.value))
   background: #ffab2e;
 }
 
+/* Solid, not translucent: a see-through gray picks up whatever it sits on,
+   like the tier ring on the profile crest. */
 .pdot--offline {
-  background: rgba(255, 255, 255, 0.22);
+  background: color-mix(in srgb, var(--text-muted) 70%, var(--bg-concrete));
 }
 
 @keyframes pdot-pulse {

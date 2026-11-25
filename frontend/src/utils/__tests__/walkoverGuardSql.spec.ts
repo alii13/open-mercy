@@ -7,6 +7,7 @@ import dossier from '../../../../supabase/profile-dossier.sql?raw'
 import prestige from '../../../../supabase/badges-prestige.sql?raw'
 import pages from '../../../../supabase/profile-pages.sql?raw'
 import announcements from '../../../../supabase/announcements.sql?raw'
+import profileGames from '../../../../supabase/profile-games.sql?raw'
 
 // The walkover guard exists because a multiplayer game everyone left records a
 // near-zero card count. A bot never leaves, so every copy of the guard has to
@@ -20,6 +21,7 @@ const files = {
     'badges-prestige.sql': prestige,
     'profile-pages.sql': pages,
     'announcements.sql': announcements,
+    'profile-games.sql': profileGames,
 }
 
 describe('the SQL walkover guard', () => {
