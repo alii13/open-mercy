@@ -43,7 +43,7 @@
     </div>
     
     <div class="card-count" v-if="!isDiscard">
-      {{ cards.length }}
+      {{ cards.length }} left
     </div>
   </div>
 </template>
@@ -295,6 +295,7 @@ watch(() => props.cards.length, (newLen, oldLen) => {
   position: absolute;
   bottom: -25px;
   color: var(--text-muted);
+  white-space: nowrap;
   font-family: var(--font-mono);
   font-size: 0.8rem;
   background: #111;

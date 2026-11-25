@@ -27,7 +27,7 @@
           </div>
           <div class="stat-cell">
             <div class="stat-value">{{ animated.biggestStack }}</div>
-            <div class="stat-label">BIGGEST STACK</div>
+            <div class="stat-label">STACK EATEN</div>
           </div>
           <div class="stat-cell">
             <div class="stat-value">{{ animated.unosCalled }}</div>

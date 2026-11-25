@@ -125,7 +125,7 @@ function drawStats(ctx: CanvasRenderingContext2D, payload: ShareImagePayload) {
     ctx.save()
     const cells = [
         { value: String(payload.cardsPlayed), label: 'CARDS PLAYED' },
-        { value: String(payload.biggestStack), label: 'BIGGEST STACK' },
+        { value: String(payload.biggestStack), label: 'STACK EATEN' },
         { value: String(payload.unosCalled), label: 'MERCY CALLS' },
         { value: String(payload.peakHand), label: 'PEAK HAND' },
     ]
