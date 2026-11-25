@@ -1,17 +1,25 @@
 <template>
   <div class="pp-page" :class="{ 'pp-page--actions': showActions }" :style="tierStyle">
+    <!-- Icons on a phone; icon and word on a wide screen. -->
     <header class="pp-topbar">
-      <button class="back-link" @click="$emit('back')">
-        <ChevronLeft :size="14" :stroke-width="2" aria-hidden="true" />
-        BACK
+      <button type="button" class="pp-top-btn" aria-label="Back" @click="$emit('back')">
+        <ChevronLeft :size="16" :stroke-width="2" aria-hidden="true" />
+        <span class="pp-top-word" aria-hidden="true">BACK</span>
       </button>
       <a class="brand-mark" href="#" @click.prevent>
         <span class="brand-mark-uno">OPEN</span>
         <span class="brand-mark-nomercy">MERCY</span>
       </a>
-      <button v-if="p" class="share-btn" @click="onShare">
-        <Check v-if="shareState === 'copied'" :size="14" :stroke-width="2" aria-hidden="true" />
-        {{ shareState === 'copied' ? 'COPIED' : 'SHARE' }}
+      <button
+        v-if="p"
+        type="button"
+        class="pp-top-btn pp-top-btn--end"
+        :aria-label="shareState === 'copied' ? 'Profile link copied' : 'Share this profile'"
+        @click="onShare"
+      >
+        <Check v-if="shareState === 'copied'" :size="16" :stroke-width="2" aria-hidden="true" />
+        <Share v-else :size="16" :stroke-width="2" aria-hidden="true" />
+        <span class="pp-top-word" aria-hidden="true">{{ shareState === 'copied' ? 'COPIED' : 'SHARE' }}</span>
       </button>
       <span v-else class="pp-topbar-spacer" aria-hidden="true"></span>
     </header>
@@ -46,7 +54,8 @@
             link
           />
           <div class="pp-crest-face">
-            <Avatar :uid="p.user_id" :name="p.username" :size="64" />
+            <!-- The presence dot sits on the face, as on the boards and the friends list. -->
+            <Avatar :uid="p.user_id" :name="p.username" :size="64" :presence="isOwn ? undefined : lastSeen" />
             <button
               v-if="isOwn && avatarsAvailable"
               type="button"
@@ -308,7 +317,10 @@
             <h2 class="pp-section-title">SERVICE RECORD</h2>
             <ul class="pp-records">
               <li v-for="r in records" :key="r.label" class="pp-card pp-record" :class="{ 'pp-record--wide': r.wide }">
-                <p class="pp-label">{{ r.label }}</p>
+                <p class="pp-label pp-record-label">
+                  {{ r.label }}
+                  <InfoTip :label="r.label.toLowerCase()" :text="r.info" />
+                </p>
                 <p class="pp-value">{{ r.value }}</p>
               </li>
             </ul>
@@ -357,7 +369,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
-import { ArrowRight, Camera, Check, ChevronLeft, Pencil, Plus, UserPlus, X } from 'lucide-vue-next'
+import { ArrowRight, Camera, Check, ChevronLeft, Pencil, Plus, Share, UserPlus, X } from 'lucide-vue-next'
 import { siInstagram, siX } from 'simple-icons'
 import gsap from 'gsap'
 import { useProfile, type ProfileSocials } from '../composables/useProfile'
@@ -382,6 +394,7 @@ import Button from './ui/Button.vue'
 import Badge from './Badge.vue'
 import Avatar from './Avatar.vue'
 import ProfileGameRow from './ProfileGameRow.vue'
+import InfoTip from './InfoTip.vue'
 import CardBack from './game/CardBack.vue'
 import SocialsSheet from './SocialsSheet.vue'
 import { openPhotoSheet } from '../composables/usePhotoSheet'
@@ -621,6 +634,8 @@ function clock(secs: number): string {
 interface RecordRow {
     label: string
     value: string
+    /** What the record means, in the info tip. */
+    info: string
     wide?: boolean
 }
 
@@ -629,12 +644,18 @@ const records = computed<RecordRow[]>(() => {
     if (!v) return []
     // A record a player has not set yet renders as a dash rather than
     // vanishing, so the grid keeps its shape.
+    const [they, their] = isOwn.value ? ['you', 'Your'] : ['they', 'Their']
     return [
-        { label: 'FASTEST WIN', value: v.min_duration_won ? clock(v.min_duration_won) : '—' },
-        { label: 'BEST RUN', value: `${v.best_win_streak}` },
-        { label: 'STACK EATEN', value: v.max_stack_survived > 0 ? `+${v.max_stack_survived}` : '—' },
-        { label: 'PEAK HELD', value: v.max_peak_cards > 0 ? `${v.max_peak_cards}` : '—' },
-        { label: 'LEANEST WIN', value: v.min_cards_won ? `${v.min_cards_won}` : '—', wide: true },
+        { label: 'FASTEST WIN', value: v.min_duration_won ? clock(v.min_duration_won) : '—',
+          info: `${their} quickest win, timed from the deal to the last card.` },
+        { label: 'BEST RUN', value: `${v.best_win_streak}`,
+          info: `The most games ${they} won in a row.` },
+        { label: 'STACK EATEN', value: v.max_stack_survived > 0 ? `+${v.max_stack_survived}` : '—',
+          info: `The biggest pile of draw cards ${they} had to pick up at once.` },
+        { label: 'PEAK HELD', value: v.max_peak_cards > 0 ? `${v.max_peak_cards}` : '—',
+          info: `The most cards ${they} held at one time. At 25 cards a player is out.` },
+        { label: 'LEANEST WIN', value: v.min_cards_won ? `${v.min_cards_won}` : '—', wide: true,
+          info: `The fewest cards ${they} played in a game ${they} won.` },
     ]
 })
 
@@ -704,55 +725,66 @@ watch(() => props.code, (code) => {
   align-items: center;
   justify-content: space-between;
   gap: var(--spacing-3);
-  padding: var(--spacing-4) var(--spacing-6);
+  height: 60px;
+  padding: 0 var(--spacing-2);
+  border-bottom: 1px solid var(--surface-metal);
 }
 
-.back-link {
+/* 44px square with a 20px icon on a phone; icon and word on a wide screen. */
+.pp-top-btn {
   display: inline-flex;
   align-items: center;
-  gap: var(--spacing-1);
-  background: none;
+  justify-content: center;
+  gap: var(--spacing-2);
+  min-width: 44px;
+  height: 44px;
+  padding: 0;
   border: none;
-  padding: var(--spacing-2);
-  font-family: var(--font-mono);
+  border-radius: var(--radius-md);
+  background: none;
+  font-family: var(--font-body);
   font-size: var(--text-sm);
+  font-weight: 600;
   letter-spacing: 0.12em;
-  color: var(--text-secondary);
+  color: var(--text-primary);
   cursor: pointer;
-  min-height: 44px;
+  transition: color var(--duration-snap) var(--ease-snap), background var(--duration-snap) var(--ease-snap);
 }
-
-.back-link:hover { color: var(--color-neon-blue); }
+.pp-top-btn svg { width: 20px; height: 20px; }
+.pp-top-btn:focus-visible { background: var(--surface-metal-dark); }
+@media (hover: hover) {
+  .pp-top-btn:hover { background: var(--surface-metal-dark); }
+}
+.pp-top-word { display: none; }
 
 .brand-mark {
   font-family: var(--font-display);
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-decoration: none;
   font-size: var(--text-base);
 }
 .brand-mark-uno { color: var(--text-primary); }
 .brand-mark-nomercy { color: var(--color-alert); margin-left: 0.4ch; }
 
-.pp-topbar-spacer { width: 72px; }
+.pp-topbar-spacer { width: 44px; }
 
-.share-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--spacing-1);
-  background: none;
-  border: 1px solid var(--color-neon-blue);
-  border-radius: var(--radius-sm);
-  padding: var(--spacing-2) var(--spacing-3);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  letter-spacing: 0.12em;
-  color: var(--color-neon-blue);
-  cursor: pointer;
-  min-height: 44px;
-}
-
-.share-btn:hover {
-  background: rgba(0, 229, 255, 0.08);
+@media (min-width: 1024px) {
+  .pp-topbar {
+    height: 64px;
+    padding: 0 var(--spacing-8);
+  }
+  .pp-top-btn {
+    width: 120px;
+    justify-content: flex-start;
+    color: var(--text-secondary);
+  }
+  .pp-top-btn--end { justify-content: flex-end; }
+  .pp-top-btn svg { width: 16px; height: 16px; }
+  .pp-top-word { display: inline; }
+  .pp-top-btn:focus-visible,
+  .pp-top-btn:hover { background: none; color: var(--text-primary); }
+  .brand-mark { font-size: var(--text-lg); }
+  .pp-topbar-spacer { width: 120px; }
 }
 
 .pp-state {
@@ -883,6 +915,13 @@ watch(() => props.code, (code) => {
 
 .pp-crest-face :deep(.av-face) {
   box-shadow: 0 0 0 3px var(--tier-light), 0 0 0 7px var(--bg-concrete);
+}
+
+/* Green, orange or gray: big enough to read on the 64px face and its ring. */
+.pp-crest-face :deep(.av-dot) {
+  --pdot-size: 14px;
+  left: -2px;
+  bottom: -2px;
 }
 
 /* The camera sits on the face's top-right edge: 32px to look at, 44px to hit. */
@@ -1205,7 +1244,7 @@ watch(() => props.code, (code) => {
   justify-content: center;
   gap: var(--spacing-2);
   height: 56px;
-  padding: 0 18px;
+  padding: 0 var(--spacing-4);
   background: var(--surface-metal-dark);
   border: 1px solid var(--surface-metal);
   border-radius: var(--radius-md);
@@ -1233,7 +1272,7 @@ watch(() => props.code, (code) => {
 .pp-play {
   flex: 1 0 auto;
   height: 56px;
-  padding: 0 var(--spacing-4);
+  padding: 0 var(--spacing-3);
   border: none;
   border-radius: var(--radius-md);
   /* The shared primary button's red, which keeps white text readable. */
@@ -1596,6 +1635,12 @@ watch(() => props.code, (code) => {
   flex-direction: column;
   gap: var(--spacing-2);
   padding: var(--spacing-4);
+}
+
+.pp-record-label {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
 }
 .pp-record--wide {
   grid-column: 1 / -1;

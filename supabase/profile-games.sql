@@ -4,11 +4,12 @@
 -- two SECURITY DEFINER functions and grants. No table changes.
 --
 -- EXPOSURE NOTE: profile_games widens profile_recent_games. Each row also names
--- the other players in that game and marks the viewer among them, and it pages
--- through the whole history for the All games page. The owner chose both on
--- 2026-11-25. It returns no game_id, no user_id and no share codes, so a
--- script cannot walk from one player to the next through it. If a
--- private-profile setting ever ships, this function and profile_recent_games
+-- the other players in that game with their share codes, so each name links to
+-- that player's profile, and it pages through the whole history for the All
+-- games page. The owner chose all three on 2026-11-25, knowing the share codes
+-- let a script walk from one player to the next. Bots and house players have no
+-- profile, so they are never listed. It returns no game_id and no user_id. If
+-- a private-profile setting ever ships, this function and profile_recent_games
 -- are the ones it has to gate.
 --
 -- POINTS ARITHMETIC: the per-game points below copy profile_recent_games in
@@ -102,6 +103,7 @@ as $$
             jsonb_agg(
                 jsonb_build_object(
                     'name', p.username,
+                    'code', p.share_code,
                     'you', coalesce(p.id = auth.uid(), false)
                 )
                 order by coalesce(p.id = auth.uid(), false) desc, p.username

@@ -1,5 +1,7 @@
 export interface GameOpponent {
     name: string
+    /** Their share code, for a link to their profile. */
+    code: string
     /** The person looking at the profile. */
     you: boolean
 }
@@ -21,16 +23,23 @@ export interface HeadToHeadLast {
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
 
-/** "vs Rook, Sana and 1 more", split so the page can colour "you". */
-export function opponentSegments(g: OpponentFields): { text: string; you?: boolean }[] {
+export interface OpponentSegment {
+    text: string
+    you?: boolean
+    /** Set on another player's name: their profile's share code. */
+    code?: string
+}
+
+/** "vs Rook, Sana and 1 more", split so the page can colour "you" and link each name. */
+export function opponentSegments(g: OpponentFields): OpponentSegment[] {
     if (g.is_bot_game) return [{ text: g.is_daily ? 'Daily challenge' : `vs ${plural(g.opponent_count, 'bot')}` }]
     const named = g.opponents.slice(0, 2)
     if (!named.length) return [{ text: `vs ${plural(g.opponent_count, 'player')}` }]
     const more = Math.max(0, g.opponent_count - named.length)
-    const segments: { text: string; you?: boolean }[] = [{ text: 'vs ' }]
+    const segments: OpponentSegment[] = [{ text: 'vs ' }]
     named.forEach((o, i) => {
         if (i > 0) segments.push({ text: more ? ', ' : ' and ' })
-        segments.push(o.you ? { text: 'you', you: true } : { text: o.name })
+        segments.push(o.you ? { text: 'you', you: true } : { text: o.name, code: o.code })
     })
     if (more) segments.push({ text: ` and ${more} more` })
     return segments

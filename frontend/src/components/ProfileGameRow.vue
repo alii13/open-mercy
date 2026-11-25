@@ -4,7 +4,15 @@
     <div class="gr-text">
       <p class="gr-title">{{ gameSummary(game) }}</p>
       <p class="gr-sub">
-        <span v-for="(s, j) in opponentSegments(game)" :key="j" :class="{ 'gr-you': s.you }">{{ s.text }}</span>
+        <template v-for="(s, j) in opponentSegments(game)" :key="j">
+          <a
+            v-if="s.code"
+            class="gr-player"
+            :href="routePath({ name: 'profile', code: s.code })"
+            @click.prevent="navigate({ name: 'profile', code: s.code })"
+          >{{ s.text }}</a>
+          <span v-else :class="{ 'gr-you': s.you }">{{ s.text }}</span>
+        </template>
         · {{ meta }}
       </p>
     </div>
@@ -15,6 +23,7 @@
 <script setup lang="ts">
 import type { ProfileGame } from '../composables/useProfileDossier'
 import { gameSummary, opponentSegments, RESULT_LETTER } from '../utils/profileGames'
+import { navigate, routePath } from '../utils/routes'
 
 /** One game in a player's list. `meta` ends the second line: the day, or PVP/BOT. */
 defineProps<{ game: ProfileGame; meta: string }>()
@@ -64,6 +73,17 @@ defineProps<{ game: ProfileGame; meta: string }>()
   font-size: var(--text-sm);
   line-height: 20px;
   color: var(--text-secondary);
+}
+
+.gr-player {
+  color: var(--text-primary);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--text-primary) 35%, transparent);
+  text-underline-offset: 3px;
+}
+.gr-player:hover,
+.gr-player:focus-visible {
+  text-decoration-color: currentColor;
 }
 
 .gr-you {

@@ -1,20 +1,28 @@
 import { describe, expect, it } from 'vitest'
-import { groupByDay, headToHeadLine, opponentLine } from '../profileGames'
+import { groupByDay, headToHeadLine, opponentLine, opponentSegments } from '../profileGames'
 
 const now = new Date('2026-11-25T12:00:00Z').getTime()
 
 describe('opponentLine', () => {
     it('names two players and counts the rest', () => {
         const g = { is_bot_game: false, is_daily: false, opponent_count: 3, opponents: [
-            { name: 'Rook', you: false },
-            { name: 'Sana', you: false },
-            { name: 'Mo', you: false },
+            { name: 'Rook', code: 'rook0000', you: false },
+            { name: 'Sana', code: 'sana0000', you: false },
+            { name: 'Mo', code: 'mo0000', you: false },
         ] }
         expect(opponentLine(g)).toBe('vs Rook, Sana and 1 more')
     })
 
+    it('carries each named player\'s share code, so the name can link to their profile', () => {
+        const g = { is_bot_game: false, is_daily: false, opponent_count: 2, opponents: [
+            { name: 'Kite', code: 'k1t3c0de', you: false },
+            { name: 'Tester', code: 'y0uc0de1', you: true },
+        ] }
+        expect(opponentSegments(g).filter(s => s.code).map(s => [s.text, s.code])).toEqual([['Kite', 'k1t3c0de']])
+    })
+
     it('counts house players the list cannot name', () => {
-        const g = { is_bot_game: false, is_daily: false, opponent_count: 3, opponents: [{ name: 'Kite', you: true }] }
+        const g = { is_bot_game: false, is_daily: false, opponent_count: 3, opponents: [{ name: 'Kite', code: 'kite0000', you: true }] }
         expect(opponentLine(g)).toBe('vs you and 2 more')
     })
 
