@@ -28,6 +28,7 @@
  * takes plain values and works from either.
  */
 import { ref, watch, nextTick } from 'vue'
+import { useInertApp } from '../composables/useInertApp'
 import type { Badge } from '../utils/badges'
 import Button from './ui/Button.vue'
 
@@ -47,6 +48,9 @@ const props = defineProps<{
 }>()
 
 defineEmits<{ (e: 'close'): void }>()
+
+// Before the open watcher, so the page is awake when focus returns.
+useInertApp(() => props.open)
 
 const canvasEl = ref<HTMLCanvasElement | null>(null)
 const copied = ref(false)

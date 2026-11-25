@@ -61,6 +61,7 @@
 <script setup lang="ts">
 import { CalendarCheck, Flag, Megaphone, X } from 'lucide-vue-next'
 import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { useInertApp } from '../../composables/useInertApp'
 import { DECAY, POINT_WEIGHTS } from '../../utils/badges'
 import { BADGE_RENDERS } from '../../utils/badgeRenders'
 import stackCard from '../../assets/cards-hero/wild-ten-draw-130.webp'
@@ -68,6 +69,9 @@ import drawCard from '../../assets/cards-hero/two-draw-red-130.webp'
 
 defineProps<{ tier: number }>()
 const emit = defineEmits<{ close: [] }>()
+
+// Before the unmount hook below, so the page is awake when focus returns.
+useInertApp()
 
 const dailyLoss = Math.round((1 - DECAY.dailyRetention) * 100)
 

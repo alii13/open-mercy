@@ -82,6 +82,7 @@ import { MessageCircle, VolumeX } from 'lucide-vue-next'
 import { QUICK_CHAT, type QuickChatGroup } from '@quickChat'
 import { useMultiplayerStore } from '../stores/multiplayerStore'
 import { useAuthStore } from '../stores/authStore'
+import { useInertApp } from '../composables/useInertApp'
 
 const mpStore = useMultiplayerStore()
 const authStore = useAuthStore()
@@ -95,6 +96,8 @@ function byGroup(group: QuickChatGroup) {
 // --- Sheet, unread dot, send cooldown ---
 
 const open = ref(false)
+// Before the open watcher, so the table is awake when focus returns.
+useInertApp(() => open.value)
 const logEl = ref<HTMLElement | null>(null)
 const sheetEl = ref<HTMLElement | null>(null)
 const triggerEl = ref<HTMLElement | null>(null)

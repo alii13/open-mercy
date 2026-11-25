@@ -61,9 +61,13 @@ import { useAuthStore } from '../stores/authStore'
 import { parseHandle, type SocialNetwork } from '../utils/socialHandles'
 import type { ProfileSocials } from '../composables/useProfile'
 import { track } from '../utils/analytics'
+import { useInertApp } from '../composables/useInertApp'
 
 const props = defineProps<{ socials: ProfileSocials }>()
 const emit = defineEmits<{ close: []; saved: [ProfileSocials] }>()
+
+// Before the unmount hook below, so the page is awake when focus returns.
+useInertApp()
 
 const FIELDS: { network: SocialNetwork; label: string; icon: string }[] = [
   { network: 'x', label: 'X', icon: siX.path },

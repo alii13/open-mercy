@@ -611,9 +611,8 @@ const playLabel = computed(() => {
 
 async function playTogether(): Promise<void> {
   const id = p.value?.user_id
-  if (!id || invite.busy.value) return
-  if (!(await ensureSignedIn())) return
-  if (await invite.playWith(id)) track('profile_play_together')
+  if (!id) return
+  if (await invite.playWith(id, ensureSignedIn)) track('profile_play_together')
 }
 
 // Same batched lookup and same cache the leaderboard and the friends list

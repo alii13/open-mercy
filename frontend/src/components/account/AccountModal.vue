@@ -140,6 +140,10 @@ import { useSocialStore } from '../../stores/socialStore'
 import { accountStep, closeAccountModal, openAccountModal, type AccountStep } from '../../composables/useAccountModal'
 import { rememberPhotoAfterClaim } from '../../composables/usePhotoSheet'
 import { navigate, router } from '../../utils/routes'
+import { useInertApp } from '../../composables/useInertApp'
+
+// First, so the page behind is awake before focus goes back to the opener.
+useInertApp()
 
 const authStore = useAuthStore()
 const social = useSocialStore()
