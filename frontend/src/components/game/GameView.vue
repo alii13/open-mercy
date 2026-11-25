@@ -36,6 +36,7 @@
           <span class="hud-audio-label">AUDIO</span>
           <span class="hud-audio-dot"></span>
         </button>
+        <RulesButton />
         <SettingsButton />
       </template>
     </SurveillanceBar>
@@ -50,7 +51,7 @@
       :message-style="messageStyle"
       :stacking-mode="store.stackingMode"
       :turn-label="turnLabel"
-      :turn-is-mine="isMyTurn"
+      :turn-is-mine="isMyTurn && !store.isDealing"
     />
 
     <!-- Main Game Table "The Pit" -->
@@ -58,7 +59,7 @@
       ref="battlePitRef"
       :show-draw-hint="isMyTurn && store.turnState === 'WAITING_FOR_ACTION'"
       :is-muted="soundEffects.isMuted.value"
-      :current-color="store.currentColor"
+      :current-color="store.isDealing ? undefined : store.currentColor"
       :direction="store.direction"
       :draw-stack="store.drawStack"
       :my-card-count="myPlayer?.hand.length"
@@ -200,6 +201,7 @@ import { localGamePath } from '../../composables/useLocalGameUrl'
 import { useAuthStore } from '../../stores/authStore'
 import { canPlayCard } from '../../utils/gameRules'
 import { countByColor } from '../../utils/gameHelpers'
+import { stackPrompt } from '../../utils/stackPrompt'
 import { botBadge } from '../../utils/badges'
 import { BOT_LADDER, WARM_UP_GAMES } from '@engine/bot'
 import type { Card as CardType, CardColor } from '../../types/card'
@@ -217,6 +219,7 @@ import PlayerSelectModal from './PlayerSelectModal.vue'
 import DiscardAllPickerModal from './DiscardAllPickerModal.vue'
 import GameBackground from './GameBackground.vue'
 import SurveillanceBar from './SurveillanceBar.vue'
+import RulesButton from '../RulesButton.vue'
 import SettingsButton from '../SettingsButton.vue'
 import BattlePit from './BattlePit.vue'
 import StatusPanel from './StatusPanel.vue'
@@ -326,6 +329,7 @@ const isMyTurn = computed(() => store.currentPlayer?.id === myPlayerId)
 // turn banner). Keeps a slow bot from reading as a frozen game.
 const turnLabel = computed(() => {
   if (store.gameState === 'GAME_OVER') return ''
+  if (store.isDealing) return 'DEALING'
   if (isMyTurn.value) return 'YOUR TURN'
   const name = store.currentPlayer?.name
   return name && name !== 'Unknown' ? `${name.toUpperCase()}'S TURN` : "OPPONENT'S TURN"
@@ -547,10 +551,18 @@ const gameMessage = computed(() => {
     const target = store.rouletteTargetColor?.toUpperCase() || store.currentColor.toUpperCase()
     return isMyTurn.value ? `DANGER: YOU NEED ${target}` : `BOT IS SEEKING ${target}...`
   }
+  if (stackOnMe.value && store.topCard) {
+    return stackPrompt(myPlayer.value?.hand ?? [], store.topCard, store.currentColor, store.drawStack, store.stackingMode)
+  }
   return ""
 })
 
+const stackOnMe = computed(() => isMyTurn.value && store.drawStack > 0 && store.turnState === 'WAITING_FOR_ACTION')
+
 const messageStyle = computed(() => {
+    // Alert red is under 7:1 at this size, and the table washes red under a
+    // stack; a lighter red still reads as a warning and stays legible.
+    if (stackOnMe.value) return { color: 'color-mix(in srgb, var(--color-alert) 45%, white)' }
     if (store.turnState === 'ROULETTE_DRAWING') {
         const colorMap: Record<string, string> = {
             red: '#ff5555',

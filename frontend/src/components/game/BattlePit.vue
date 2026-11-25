@@ -12,9 +12,9 @@
     <!-- Layer 5: Left vertical rail — industrial control panel. Direction, color,
          stack, and a TALL Mercy thermometer. Desktop only. -->
     <aside class="pit-rail" aria-label="Game state">
-      <div ref="railDirectionRef" class="rail-cell rail-direction" :class="{ ccw: direction === -1 }" :title="direction === 1 ? 'Clockwise' : 'Counter-clockwise'">
+      <div ref="railDirectionRef" class="rail-cell rail-direction" :class="{ ccw: direction === -1 }">
         <RotateCw :size="16" :stroke-width="2" aria-hidden="true" />
-        <span>{{ direction === 1 ? 'CW' : 'CCW' }}</span>
+        <span>{{ directionWord }}</span>
       </div>
 
       <div v-if="currentColor && currentColor !== 'wild'" class="rail-cell rail-color">
@@ -72,9 +72,10 @@
 
     <!-- Mobile HUD: horizontal pill below the table (rail collapses on small screens) -->
     <div class="pit-hud-mobile" v-if="myCardCount !== undefined">
-      <div class="hud-cell" ref="hudDirectionRef">
-        <RotateCw :size="14" :stroke-width="2" aria-hidden="true" />
-        <span>{{ direction === 1 ? 'CW' : 'CCW' }}</span>
+      <!-- No room for the word on a phone: the arrow turns the way play goes. -->
+      <div class="hud-cell" ref="hudDirectionRef" role="img" :aria-label="directionWord">
+        <RotateCcw v-if="direction === -1" :size="14" :stroke-width="2" aria-hidden="true" />
+        <RotateCw v-else :size="14" :stroke-width="2" aria-hidden="true" />
       </div>
       <div v-if="currentColor && currentColor !== 'wild'" class="hud-cell">
         <span class="color-dot" :class="`dot-${currentColor}`" aria-hidden="true"></span>
@@ -111,7 +112,7 @@
 </template>
 
 <script setup lang="ts">
-import { Info, RotateCw } from 'lucide-vue-next'
+import { Info, RotateCcw, RotateCw } from 'lucide-vue-next'
 import { ref, computed, watch } from 'vue'
 import gsap from 'gsap'
 import { useScreenSize } from '../../composables/useScreenSize'
@@ -128,7 +129,13 @@ const props = defineProps<{
 }>()
 
 const { isMobile } = useScreenSize()
-const drawHintText = computed(() => (isMobile.value ? 'TAP TO DRAW' : 'CLICK TO DRAW'))
+// "CW" and "CCW" read as code to a new player; a Reverse card is what flips it.
+const directionWord = computed(() => (props.direction === -1 ? 'REVERSED' : 'CLOCKWISE'))
+// With a stack on you, the deck takes the whole stack, so say how many.
+const drawHintText = computed(() => {
+  const verb = isMobile.value ? 'TAP TO DRAW' : 'CLICK TO DRAW'
+  return props.drawStack ? `${verb} ${props.drawStack}` : verb
+})
 
 const mercyPct = computed(() => {
   if (props.myCardCount === undefined) return 0
@@ -183,7 +190,7 @@ const railDirectionRef = ref<HTMLElement | null>(null)
 const hudDirectionRef = ref<HTMLElement | null>(null)
 
 // Direction reversal payoff — comet ring sweeps the table in the new
-// direction while the CW/CCW indicator flips in with its new value.
+// direction while the direction indicator flips in with its new value.
 // flush: 'post' so the indicator already shows the new label when it flips.
 watch(() => props.direction, (dir, prev) => {
   if (dir === undefined || prev === undefined || dir === prev) return

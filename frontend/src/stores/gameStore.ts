@@ -200,15 +200,9 @@ export const useGameStore = defineStore('game', () => {
                 case 'RESHUFFLE':
                     soundEffects.playCardShuffle()
                     break
-                case 'DRAW': {
+                case 'DRAW':
                     soundEffects.playCardPick()
-                    const p = players.value.find(x => x.id === e.playerId)
-                    const s = playerStats.value[e.playerId]
-                    if (p && s && p.hand.length > s.peakCards) {
-                        s.peakCards = p.hand.length
-                    }
                     break
-                }
                 case 'TURN_ADVANCED':
                 case 'PLAY_AGAIN':
                     // The previous player's action has fully resolved (or Skip
@@ -236,6 +230,12 @@ export const useGameStore = defineStore('game', () => {
                     // State carries these; the gameState watcher handles logging.
                     break
             }
+        }
+        // Hands also grow without a DRAW (the deal, a 7 swap, a 0 pass), so
+        // read every hand after each batch, the way multiplayer reads snapshots.
+        for (const p of players.value) {
+            const s = playerStats.value[p.id]
+            if (s && p.hand.length > s.peakCards) s.peakCards = p.hand.length
         }
     }
 

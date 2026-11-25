@@ -338,6 +338,18 @@ describe('dealInitialCards generation guard', () => {
     })
 })
 
+describe('peak hand', () => {
+    it('counts the dealt hand, so a win without drawing is not a peak of 0', async () => {
+        const store = useGameStore()
+        store.initializeGame(['You', 'Friend'])
+        await store.dealInitialCards(async () => {})
+
+        for (const p of store.players) {
+            expect(store.playerStats[p.id]!.peakCards).toBeGreaterThanOrEqual(7)
+        }
+    })
+})
+
 describe('daily challenge seeding', () => {
     function deckIds(seed?: string): string[] {
         setActivePinia(createPinia())
