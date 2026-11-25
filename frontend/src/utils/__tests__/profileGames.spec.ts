@@ -1,20 +1,20 @@
 import { describe, expect, it } from 'vitest'
-import { headToHeadLine, opponentLine } from '../profileGames'
+import { groupByDay, headToHeadLine, opponentLine } from '../profileGames'
 
 const now = new Date('2026-11-25T12:00:00Z').getTime()
 
 describe('opponentLine', () => {
     it('names two players and counts the rest', () => {
         const g = { is_bot_game: false, is_daily: false, opponent_count: 3, opponents: [
-            { name: 'Rook', code: 'a', you: false },
-            { name: 'Sana', code: 'b', you: false },
-            { name: 'Mo', code: 'c', you: false },
+            { name: 'Rook', you: false },
+            { name: 'Sana', you: false },
+            { name: 'Mo', you: false },
         ] }
         expect(opponentLine(g)).toBe('vs Rook, Sana and 1 more')
     })
 
     it('counts house players the list cannot name', () => {
-        const g = { is_bot_game: false, is_daily: false, opponent_count: 3, opponents: [{ name: 'Kite', code: 'k', you: true }] }
+        const g = { is_bot_game: false, is_daily: false, opponent_count: 3, opponents: [{ name: 'Kite', you: true }] }
         expect(opponentLine(g)).toBe('vs you and 2 more')
     })
 
@@ -50,5 +50,21 @@ describe('headToHeadLine', () => {
             last_my_peak: 14,
             last_their_result: 'lost',
         }, now)).toBe('Someone else won your last game yesterday. You held 9 cards at the end.')
+    })
+})
+
+describe('groupByDay', () => {
+    it('groups games under their day with a W, E, L tally', () => {
+        const g = (played_at: string, result: string) => ({ played_at, result })
+        const days = groupByDay([
+            g('2026-11-25T09:00:00Z', 'won'),
+            g('2026-11-11T12:00:00Z', 'eliminated'),
+            g('2026-11-11T11:00:00Z', 'won'),
+            g('2026-11-11T10:00:00Z', 'lost'),
+        ], now)
+        expect(days.map(d => [d.label, d.tally, d.games.length])).toEqual([
+            ['today', '1 W', 1],
+            ['Nov 11', '1 W · 1 E · 1 L', 3],
+        ])
     })
 })

@@ -1,8 +1,15 @@
 export type SocialNetwork = 'x' | 'instagram'
 
+// A profile link has exactly one path segment; a post or a story has more.
 const PROFILE_LINK: Record<SocialNetwork, RegExp> = {
-    x: /^(?:https?:\/\/)?(?:www\.|mobile\.)?(?:x|twitter)\.com\/([^/?#]+)/i,
-    instagram: /^(?:https?:\/\/)?(?:www\.)?instagram\.com\/([^/?#]+)/i,
+    x: /^(?:https?:\/\/)?(?:www\.|mobile\.)?(?:x|twitter)\.com\/([^/?#]+)\/?(?:[?#].*)?$/i,
+    instagram: /^(?:https?:\/\/)?(?:www\.)?instagram\.com\/([^/?#]+)\/?(?:[?#].*)?$/i,
+}
+
+// One-segment pages on each network that are not anyone's profile.
+const NOT_A_PROFILE: Record<SocialNetwork, Set<string>> = {
+    x: new Set(['home', 'explore', 'search', 'notifications', 'messages', 'settings', 'i', 'compose', 'login', 'signup']),
+    instagram: new Set(['explore', 'accounts', 'direct', 'reels', 'stories', 'p', 'reel']),
 }
 
 // The same rules as the CHECK constraints in supabase/profile-socials.sql.
@@ -20,8 +27,10 @@ const HINT: Record<SocialNetwork, string> = {
 export function parseHandle(network: SocialNetwork, raw: string): { handle: string | null } | { error: string } {
     let value = raw.trim()
     const link = value.match(PROFILE_LINK[network])
-    if (link) value = link[1] ?? ''
-    else if (/[/:]/.test(value)) return { error: HINT[network] }
+    if (link) {
+        value = link[1] ?? ''
+        if (NOT_A_PROFILE[network].has(value.toLowerCase())) return { error: HINT[network] }
+    } else if (/[/:]/.test(value)) return { error: HINT[network] }
     value = value.replace(/^@/, '')
     if (!value) return { handle: null }
     return VALID[network].test(value) ? { handle: value } : { error: HINT[network] }

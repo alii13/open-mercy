@@ -13,6 +13,13 @@ describe('parseHandle', () => {
         expect(parseHandle('instagram', 'https://www.instagram.com/velvet.hammer/?igsh=abc')).toEqual({ handle: 'velvet.hammer' })
     })
 
+    it('refuses a link to a post, a story or a page that is not a profile', () => {
+        expect(parseHandle('instagram', 'https://www.instagram.com/p/C1abc/')).toHaveProperty('error')
+        expect(parseHandle('instagram', 'instagram.com/stories/velvet.hammer/123')).toHaveProperty('error')
+        expect(parseHandle('x', 'https://x.com/i/status/123')).toHaveProperty('error')
+        expect(parseHandle('x', 'x.com/home')).toHaveProperty('error')
+    })
+
     it('clears the handle when the field is empty', () => {
         expect(parseHandle('x', '  @ ')).toEqual({ handle: null })
     })

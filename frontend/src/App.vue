@@ -73,13 +73,13 @@
          An active multiplayer match always wins over the route. -->
     <LeaderboardPage
       v-else-if="currentRoute.name === 'leaderboard' && !inMpMatch"
-      @back="navigate({ name: 'home' })"
+      @back="goBack"
     />
 
     <!-- Badge system explainer (/badges) — how points and tiers work -->
     <BadgesPage
       v-else-if="currentRoute.name === 'badges' && !inMpMatch"
-      @back="navigate({ name: 'home' })"
+      @back="goBack"
     />
 
     <!-- Full changelog (/changelog) — works signed in or out -->
@@ -91,7 +91,15 @@
     <ProfilePage
       v-else-if="currentRoute.name === 'profile' && !inMpMatch"
       :code="currentRoute.code"
-      @back="navigate({ name: 'home' })"
+      @back="goBack"
+      @home="navigate({ name: 'home' })"
+    />
+
+    <!-- Every game a player has saved (/p/<code>/games) -->
+    <ProfileGamesPage
+      v-else-if="currentRoute.name === 'profileGames' && !inMpMatch"
+      :code="currentRoute.code"
+      @back="goBack"
     />
 
 
@@ -198,7 +206,7 @@ import { getDailyRecord } from './utils/dailyChallenge'
 import { nextBot } from './utils/botLadder'
 import { WARM_UP_GAMES } from '@engine/bot'
 import { adoptProfileEquip, applyEquipped } from './utils/cosmetics'
-import { currentRoute, navigate, router } from './utils/routes'
+import { currentRoute, goBack, navigate, router } from './utils/routes'
 import { takeReturnPath } from './utils/oauthRedirect'
 import { useRoomUrl } from './composables/useRoomUrl'
 import { useLocalGameUrl } from './composables/useLocalGameUrl'
@@ -221,6 +229,7 @@ const FriendsPage = defineAsyncComponent(() => import('./components/FriendsPage.
 const LeaderboardPage = defineAsyncComponent(() => import('./components/LeaderboardPage.vue'))
 const BadgesPage = defineAsyncComponent(() => import('./components/BadgesPage.vue'))
 const ProfilePage = defineAsyncComponent(() => import('./components/ProfilePage.vue'))
+const ProfileGamesPage = defineAsyncComponent(() => import('./components/ProfileGamesPage.vue'))
 const ChangelogPage = defineAsyncComponent(() => import('./components/ChangelogPage.vue'))
 const PhotoSheet = defineAsyncComponent(() => import('./components/PhotoSheet.vue'))
 const AccountModal = defineAsyncComponent(() => import('./components/account/AccountModal.vue'))
@@ -331,6 +340,7 @@ const currentScreen = computed(() => {
   if (accountStep.value === 'claim') return 'claim_account'
   if (currentRoute.value.name === 'leaderboard' && !inMpMatch.value) return 'leaderboard'
   if (currentRoute.value.name === 'profile' && !inMpMatch.value) return 'profile'
+  if (currentRoute.value.name === 'profileGames' && !inMpMatch.value) return 'profile_games'
   if (currentRoute.value.name === 'changelog' && !inMpMatch.value) return 'changelog'
   if (!authStore.isAuthenticated) return showAuthView.value ? 'auth' : 'landing'
   if (inMpMatch.value) return 'mp_game'

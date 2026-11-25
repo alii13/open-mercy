@@ -1,6 +1,5 @@
 export interface GameOpponent {
     name: string
-    code: string
     /** The person looking at the profile. */
     you: boolean
 }
@@ -60,4 +59,53 @@ export function headToHeadLine(h: HeadToHeadLast, nowMs: number): string {
         : h.last_my_result === 'lost' ? ` You held ${h.last_my_cards} cards at the end.`
         : ''
     return `${winner} won your last game ${when}.${you}`
+}
+
+export const RESULT_LETTER: Record<string, string> = { won: 'W', lost: 'L', eliminated: 'E', abandoned: '–' }
+
+export interface SummaryFields {
+    result: string
+    opponent_count: number
+    cards_played_total: number
+    cards_remaining: number
+    peak_cards: number
+    biggest_stack_survived: number
+}
+
+/** One line on what actually happened, from the fields the row carries. */
+export function gameSummary(g: SummaryFields): string {
+    switch (g.result) {
+        case 'won': {
+            // opponent_count is 1 in a one-bot game, so this cannot be hardcoded plural.
+            const who = g.opponent_count === 1 ? '1 opponent' : `${g.opponent_count} players`
+            return g.biggest_stack_survived > 0
+                ? `Beat ${who} · ate a +${g.biggest_stack_survived} stack`
+                : `Beat ${who} in ${plural(g.cards_played_total, 'card')}`
+        }
+        case 'lost':
+            return `Held ${plural(g.cards_remaining, 'card')} at the buzzer`
+        case 'eliminated':
+            return `Eliminated at ${plural(g.peak_cards, 'card')}`
+        default:
+            return `Walked away after ${plural(g.cards_played_total, 'card')}`
+    }
+}
+
+/** Games (newest first) under their day, each day with a "1 W · 1 E · 1 L" tally. */
+export function groupByDay<G extends { played_at: string; result: string }>(games: G[], nowMs: number) {
+    const days: { label: string; tally: string; games: G[] }[] = []
+    for (const g of games) {
+        const label = dayLabel(g.played_at, nowMs)
+        const last = days[days.length - 1]
+        if (last?.label === label) last.games.push(g)
+        else days.push({ label, tally: '', games: [g] })
+    }
+    for (const d of days) {
+        d.tally = (['won', 'eliminated', 'lost'] as const)
+            .map(r => [d.games.filter(g => g.result === r).length, RESULT_LETTER[r]] as const)
+            .filter(([n]) => n > 0)
+            .map(([n, letter]) => `${n} ${letter}`)
+            .join(' · ')
+    }
+    return days
 }

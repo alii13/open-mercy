@@ -27,7 +27,7 @@
           ? 'This profile link doesn\'t match any player.'
           : 'Public profiles aren\'t live yet. The game definitely is.' }}
       </p>
-      <Button variant="primary" size="lg" @click="$emit('back')">PLAY</Button>
+      <Button variant="primary" size="lg" @click="$emit('home')">PLAY</Button>
     </div>
 
     <div v-else-if="p" ref="contentEl" class="pp-content">
@@ -193,7 +193,7 @@
                 ? 'Play one game and this page fills in with your win rate, your rank and your best moments.'
                 : `${p.username} joined in ${memberSince} and hasn't played a game. Invite them to a table and you'll be their first.` }}
             </p>
-            <button v-if="isOwn" type="button" class="pp-play pp-empty-play" @click="$emit('back')">PLAY A GAME</button>
+            <button v-if="isOwn" type="button" class="pp-play pp-empty-play" @click="$emit('home')">PLAY A GAME</button>
           </section>
 
           <template v-else>
@@ -255,22 +255,27 @@
                   class="pp-result"
                   :class="`pp-result--${f}`"
                   :title="f"
+                  role="img"
+                  :aria-label="f"
                 >{{ RESULT_LETTER[f] ?? '–' }}</li>
               </ol>
             </div>
             <ul v-if="dossier.games.value.length" class="pp-card pp-games">
-              <li v-for="(g, i) in dossier.games.value.slice(0, 5)" :key="i" class="pp-game">
-                <span class="pp-result" :class="`pp-result--${g.result}`" :title="g.result">{{ RESULT_LETTER[g.result] ?? '–' }}</span>
-                <div class="pp-game-text">
-                  <p class="pp-game-title">{{ gameSummary(g) }}</p>
-                  <p class="pp-game-sub">
-                    <span v-for="(s, j) in opponentSegments(g)" :key="j" :class="{ 'pp-you': s.you }">{{ s.text }}</span>
-                    · {{ dayLabel(g.played_at, presenceNow) }}
-                  </p>
-                </div>
-                <span class="pp-game-points" :class="{ 'pp-game-points--win': g.result === 'won' }">+{{ g.points }}</span>
-              </li>
+              <ProfileGameRow
+                v-for="(g, i) in dossier.games.value"
+                :key="i"
+                :game="g"
+                :meta="dayLabel(g.played_at, presenceNow)"
+              />
             </ul>
+            <a
+              v-if="p.games > dossier.games.value.length"
+              class="pp-link"
+              :href="gamesHref"
+              @click.prevent="navigate({ name: 'profileGames', code })"
+            >
+              ALL {{ p.games.toLocaleString() }} GAMES <ArrowRight :size="14" :stroke-width="2" aria-hidden="true" />
+            </a>
           </section>
           </template>
         </div>
@@ -315,7 +320,7 @@
            to keep this profile. -->
       <section v-if="isOwn && (authStore.isAnonymous || p.games > 0)" class="pp-own">
         <p v-if="authStore.isAnonymous" class="pp-own-line">This is your guest profile - claim it from the lobby (CLAIM ACCOUNT) and everything here is yours forever.</p>
-        <Button v-if="authStore.isAnonymous" variant="secondary" size="md" block @click="$emit('back')">GO TO LOBBY</Button>
+        <Button v-if="authStore.isAnonymous && p.games > 0" variant="secondary" size="md" block @click="$emit('home')">GO TO LOBBY</Button>
         <!-- The one owner tool that is not on the page already: a PNG of
              these numbers, worth posting. -->
         <button v-if="p.games > 0" type="button" class="pp-link" @click="showShareCard = true">
@@ -366,16 +371,17 @@ import { useSocialStore } from '../stores/socialStore'
 import { shareProfile } from '../utils/share'
 import { track } from '../utils/analytics'
 import { useBadges } from '../composables/useBadges'
-import { useProfileDossier, type ProfileGame } from '../composables/useProfileDossier'
+import { useProfileDossier } from '../composables/useProfileDossier'
 import { usePlayWithFriend } from '../composables/usePlayWithFriend'
 import { BADGES, badgeSlug } from '../utils/badges'
-import { dayLabel, headToHeadLine, opponentSegments } from '../utils/profileGames'
+import { dayLabel, headToHeadLine, RESULT_LETTER } from '../utils/profileGames'
 import { socialUrl, type SocialNetwork } from '../utils/socialHandles'
 import { navigate, routePath } from '../utils/routes'
 import SiteFooter from './SiteFooter.vue'
 import Button from './ui/Button.vue'
 import Badge from './Badge.vue'
 import Avatar from './Avatar.vue'
+import ProfileGameRow from './ProfileGameRow.vue'
 import CardBack from './game/CardBack.vue'
 import SocialsSheet from './SocialsSheet.vue'
 import { openPhotoSheet } from '../composables/usePhotoSheet'
@@ -384,7 +390,7 @@ import ShareStatsCard from './ShareStatsCard.vue'
 import { siteOrigin } from '../utils/siteOrigin'
 
 const props = defineProps<{ code: string }>()
-defineEmits<{ (e: 'back'): void }>()
+defineEmits<{ (e: 'back'): void; (e: 'home'): void }>()
 
 const pp = useProfile()
 const dossier = useProfileDossier()
@@ -442,6 +448,7 @@ const badgeInfo = computed(() => (p.value?.user_id ? badges.value[p.value.user_i
 const next = computed(() => badgeInfo.value?.progress.next ?? null)
 const tierStyle = computed(() => (badgeInfo.value ? { '--tier': badgeInfo.value.badge.color } : undefined))
 
+const gamesHref = computed(() => routePath({ name: 'profileGames', code: props.code }))
 const badgesHref = computed(() => routePath({ name: 'badges', badge: badgeInfo.value ? badgeSlug(badgeInfo.value.badge) : undefined }))
 function openBadges() {
   void navigate({ name: 'badges', badge: badgeInfo.value ? badgeSlug(badgeInfo.value.badge) : undefined })
@@ -478,7 +485,7 @@ const statsCaption = computed(() => {
     const v = p.value
     if (!v) return ''
     const st = dossier.standing.value
-    const parts = [`${v.games.toLocaleString()} games played`]
+    const parts = [`${v.games.toLocaleString()} ${v.games === 1 ? 'game' : 'games'} played`]
     if (st && topPercent.value) parts.push(`top ${topPercent.value}% of ${st.globalTotal.toLocaleString()}`)
     if (st?.countryRank && countryName.value) parts.push(`#${st.countryRank.toLocaleString()} in ${countryName.value}`)
     return parts.join(' · ')
@@ -504,6 +511,11 @@ const missingSocials = computed(() => SOCIALS.filter(n => !pp.socials.value?.[n.
 function onSocialsSaved(saved: ProfileSocials) {
   pp.socials.value = saved
   socialsOpen.value = false
+  // The button that opened the sheet may be gone now (an Add pill for a handle
+  // just saved), so focus lands on the handles row rather than the page body.
+  void nextTick(() => {
+    if (document.activeElement === document.body) contentEl.value?.querySelector<HTMLElement>('.pp-social')?.focus()
+  })
 }
 
 // The page can sit open for an hour, and a chip that still reads ONLINE after
@@ -628,8 +640,6 @@ const records = computed<RecordRow[]>(() => {
 
 const EMPTY_CARD = { width: 68, height: 95 }
 
-const RESULT_LETTER: Record<string, string> = { won: 'W', lost: 'L', eliminated: 'E', abandoned: '–' }
-
 const shareState = ref<'idle' | 'copied'>('idle')
 
 async function onShare() {
@@ -663,25 +673,6 @@ watch(p, async (val) => {
         animateIn()
     }
 })
-
-/** One line on what actually happened, from the fields the row carries. */
-function gameSummary(g: ProfileGame): string {
-    switch (g.result) {
-        case 'won': {
-            // opponent_count is 1 in a one-bot game, so this cannot be hardcoded plural.
-            const who = g.opponent_count === 1 ? '1 opponent' : `${g.opponent_count} players`
-            return g.biggest_stack_survived > 0
-                ? `Beat ${who} · ate a +${g.biggest_stack_survived} stack`
-                : `Beat ${who} in ${g.cards_played_total} cards`
-        }
-        case 'lost':
-            return `Held ${g.cards_remaining} cards at the buzzer`
-        case 'eliminated':
-            return `Eliminated at ${g.peak_cards} cards`
-        default:
-            return `Walked away after ${g.cards_played_total} cards`
-    }
-}
 
 onMounted(() => {
     void pp.fetchProfile(props.code)
@@ -1165,6 +1156,7 @@ watch(() => props.code, (code) => {
   padding: 0;
   color: var(--text-secondary);
 }
+.pp-social--edit::before { inset: -4px; }
 
 @media (min-width: 1024px) {
   .pp-socials,
@@ -1189,9 +1181,13 @@ watch(() => props.code, (code) => {
 .pp-page--actions {
   padding-bottom: calc(88px + env(safe-area-inset-bottom));
 }
+:global(html:has(.pp-page--actions)) {
+  scroll-padding-bottom: calc(88px + env(safe-area-inset-bottom));
+}
 
 @media (min-width: 1024px) {
   .pp-page--actions { padding-bottom: 0; }
+  :global(html:has(.pp-page--actions)) { scroll-padding-bottom: 0; }
   .pp-actions {
     position: static;
     align-self: center;
@@ -1202,7 +1198,8 @@ watch(() => props.code, (code) => {
 }
 
 .pp-friend {
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1215,8 +1212,9 @@ watch(() => props.code, (code) => {
   font-family: var(--font-body);
   font-size: var(--text-base);
   font-weight: 600;
+  line-height: 1.2;
+  text-align: left;
   color: var(--text-primary);
-  white-space: nowrap;
   cursor: pointer;
   transition: border-color var(--duration-snap) var(--ease-snap), background var(--duration-snap) var(--ease-snap);
 }
@@ -1233,13 +1231,13 @@ watch(() => props.code, (code) => {
 }
 
 .pp-play {
-  flex: 1;
-  min-width: 0;
+  flex: 1 0 auto;
   height: 56px;
   padding: 0 var(--spacing-4);
   border: none;
   border-radius: var(--radius-md);
-  background: var(--color-alert);
+  /* The shared primary button's red, which keeps white text readable. */
+  background: linear-gradient(180deg, var(--color-alert) 0%, var(--color-alert-dim) 100%);
   font-family: var(--font-display);
   font-size: var(--text-xl);
   letter-spacing: 0.06em;
@@ -1248,7 +1246,11 @@ watch(() => props.code, (code) => {
   cursor: pointer;
   transition: background var(--duration-snap) var(--ease-snap), opacity var(--duration-snap) var(--ease-snap);
 }
-.pp-play:hover:not(:disabled) { background: color-mix(in srgb, var(--color-alert) 85%, white); }
+.pp-play:hover:not(:disabled) { filter: brightness(1.1); }
+
+@media (max-width: 374px) {
+  .pp-play { font-size: var(--text-base); }
+}
 .pp-play:disabled { opacity: 0.7; cursor: wait; }
 
 @media (min-width: 1024px) {
@@ -1362,6 +1364,12 @@ watch(() => props.code, (code) => {
   padding: var(--spacing-4);
 }
 .pp-stat--wide { flex-grow: 1.5; }
+
+/* Below 375px three 28px numbers no longer fit side by side. */
+@media (max-width: 374px) {
+  .pp-stat-row { flex-wrap: wrap; }
+  .pp-stat--wide { flex-basis: 100%; }
+}
 
 .pp-caption {
   margin: 0;
@@ -1516,49 +1524,6 @@ watch(() => props.code, (code) => {
   padding: 0 var(--spacing-4);
   list-style: none;
 }
-
-.pp-game {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-3);
-  min-height: 64px;
-  padding: var(--spacing-2) 0;
-}
-.pp-game + .pp-game { border-top: 1px solid var(--surface-metal); }
-
-.pp-game-text {
-  flex: 1;
-  min-width: 0;
-}
-
-.pp-game-title {
-  margin: 0;
-  font-size: var(--text-base);
-  line-height: 22px;
-  color: #fff;
-}
-
-.pp-game-sub {
-  margin: 0;
-  font-size: var(--text-sm);
-  line-height: 20px;
-  color: var(--text-secondary);
-}
-
-.pp-you {
-  font-weight: 600;
-  color: color-mix(in srgb, var(--color-neon-blue) 50%, white);
-}
-
-.pp-game-points {
-  flex: none;
-  font-size: var(--text-base);
-  font-weight: 700;
-  line-height: 22px;
-  font-variant-numeric: tabular-nums;
-  color: var(--text-secondary);
-}
-.pp-game-points--win { color: var(--color-hazard); }
 
 /* Ladder */
 .pp-ladder {

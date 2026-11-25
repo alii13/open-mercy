@@ -4,11 +4,12 @@
 -- two SECURITY DEFINER functions and grants. No table changes.
 --
 -- EXPOSURE NOTE: profile_games widens profile_recent_games. Each row also names
--- the other players in that game and says whether the viewer was one of them.
--- The owner chose to show opponent names on 2026-11-25; names and share codes
--- are already public on the boards. It still returns no game_id and no
--- user_id. If a private-profile setting ever ships, this function and
--- profile_recent_games are the ones it has to gate.
+-- the other players in that game and marks the viewer among them, and it pages
+-- through the whole history for the All games page. The owner chose both on
+-- 2026-11-25. It returns no game_id, no user_id and no share codes, so a
+-- script cannot walk from one player to the next through it. If a
+-- private-profile setting ever ships, this function and profile_recent_games
+-- are the ones it has to gate.
 --
 -- POINTS ARITHMETIC: the per-game points below copy profile_recent_games in
 -- profile-dossier.sql exactly, multiplier included. Change both together with
@@ -43,8 +44,7 @@ returns table (
     peak_cards int,
     biggest_stack_survived int,
     points int,
-    opponents jsonb,
-    with_viewer boolean
+    opponents jsonb
 )
 language sql
 security definer
@@ -95,20 +95,17 @@ as $$
               + greatest(coalesce(g.uno_calls, 0), 0) * 4
             ) * g.points_multiplier
         )::int as points,
-        coalesce(o.opponents, '[]'::jsonb),
-        coalesce(o.with_viewer, false)
+        coalesce(o.opponents, '[]'::jsonb)
     from page g
     left join lateral (
         select
             jsonb_agg(
                 jsonb_build_object(
                     'name', p.username,
-                    'code', p.share_code,
                     'you', coalesce(p.id = auth.uid(), false)
                 )
                 order by coalesce(p.id = auth.uid(), false) desc, p.username
-            ) as opponents,
-            bool_or(coalesce(p.id = auth.uid(), false)) as with_viewer
+            ) as opponents
         -- distinct: rows saved before 2026-11-18 can repeat a player.
         from (
             select distinct x.user_id

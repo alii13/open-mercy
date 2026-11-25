@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { router, toRoute, routePath, navigate } from '../routes'
+import { router, toRoute, routePath, navigate, backTarget } from '../routes'
 
 const parseRoute = (path: string) => toRoute(router.resolve(path))
 
@@ -39,6 +39,11 @@ describe('parseRoute', () => {
 
     it('accepts mixed-case codes as-is', () => {
         expect(parseRoute('/p/Ab12Cd34')).toEqual({ name: 'profile', code: 'Ab12Cd34' })
+    })
+
+    it('maps /p/<code>/games to that player\'s games', () => {
+        expect(parseRoute('/p/9f3ac21b/games')).toEqual({ name: 'profileGames', code: '9f3ac21b' })
+        expect(routePath({ name: 'profileGames', code: '9f3ac21b' })).toBe('/p/9f3ac21b/games')
     })
 
     it('maps /public to the public table', () => {
@@ -113,5 +118,20 @@ describe('navigation', () => {
         await router.push('/changelog?ref=x')
         await navigate({ name: 'leaderboard', tab: 'weekly' })
         expect(router.currentRoute.value.fullPath).toBe('/leaderboard/weekly?ref=x')
+    })
+})
+
+describe('backTarget', () => {
+    it('goes back to a page you were reading', () => {
+        expect(backTarget('/leaderboard/alltime')).toBe('/leaderboard/alltime')
+        expect(backTarget('/p/9f3ac21b')).toBe('/p/9f3ac21b')
+        expect(backTarget('/badges/warlord')).toBe('/badges/warlord')
+    })
+
+    it('never steps back into a room or a game, or out of the app', () => {
+        expect(backTarget('/r/XK7P2M')).toBeNull()
+        expect(backTarget('/public')).toBeNull()
+        expect(backTarget('/daily')).toBeNull()
+        expect(backTarget(null)).toBeNull()
     })
 })

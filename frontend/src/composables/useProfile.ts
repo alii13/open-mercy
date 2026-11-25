@@ -35,7 +35,11 @@ export function useProfile() {
     // Null until profile-socials.sql is run: the handles row hides itself.
     const socials = ref<ProfileSocials | null>(null)
 
+    /** Bumped per fetch, so a slow answer for the last profile never lands on this one. */
+    let seq = 0
+
     async function fetchProfile(code: string) {
+        const mine = ++seq
         loading.value = true
         notFound.value = false
         unavailable.value = false
@@ -50,6 +54,7 @@ export function useProfile() {
                 }),
                 supabase.from('profiles').select('x_handle, instagram_handle').eq('share_code', code).maybeSingle(),
             ])
+            if (mine !== seq) return
             if (error) {
                 unavailable.value = true
                 return
@@ -63,9 +68,9 @@ export function useProfile() {
             }
             profile.value = row
         } catch {
-            unavailable.value = true
+            if (mine === seq) unavailable.value = true
         } finally {
-            loading.value = false
+            if (mine === seq) loading.value = false
         }
     }
 

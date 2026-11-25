@@ -38,15 +38,15 @@
               enterkeyhint="done"
               :aria-invalid="!!errors[f.network]"
               :aria-describedby="errors[f.network] ? `ss-${f.network}-error` : undefined"
-              :disabled="busy"
+              :readonly="busy"
               @input="errors[f.network] = ''"
             />
           </div>
-          <p v-if="errors[f.network]" :id="`ss-${f.network}-error`" class="ss-error" role="alert">{{ errors[f.network] }}</p>
+          <p v-if="errors[f.network]" :id="`ss-${f.network}-error`" class="ss-error">{{ errors[f.network] }}</p>
         </div>
 
         <p v-if="saveError" class="ss-error" role="alert">{{ saveError }}</p>
-        <button type="submit" class="ss-save" :disabled="busy">{{ busy ? 'SAVING...' : 'SAVE' }}</button>
+        <button type="submit" class="ss-save" :disabled="busy">{{ busy ? 'SAVING…' : 'SAVE' }}</button>
       </form>
     </div>
   </Teleport>
@@ -55,7 +55,7 @@
 <script setup lang="ts">
 import { X } from 'lucide-vue-next'
 import { siInstagram, siX } from 'simple-icons'
-import { onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
 import { parseHandle, type SocialNetwork } from '../utils/socialHandles'
@@ -100,12 +100,18 @@ function close() {
 }
 
 async function save() {
+  if (busy.value) return
   const x = parseHandle('x', values.x)
   const instagram = parseHandle('instagram', values.instagram)
   if ('error' in x) errors.x = x.error
   if ('error' in instagram) errors.instagram = instagram.error
+  if ('error' in x || 'error' in instagram) {
+    await nextTick()
+    document.getElementById('error' in x ? 'ss-x' : 'ss-instagram')?.focus()
+    return
+  }
   const uid = authStore.user?.id
-  if ('error' in x || 'error' in instagram || !uid) return
+  if (!uid) return
   const next: ProfileSocials = { x_handle: x.handle, instagram_handle: instagram.handle }
   busy.value = true
   saveError.value = ''
@@ -143,7 +149,7 @@ async function save() {
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: var(--spacing-6);
-  background: #121416;
+  background: var(--surface-metal-dark);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: var(--radius-lg);
   font-family: var(--font-body);
@@ -246,7 +252,7 @@ async function save() {
   transition: border-color var(--duration-snap) var(--ease-snap);
 }
 .ss-input:focus-within {
-  border-color: #5a5d63;
+  border-color: var(--focus-ring-color);
 }
 .ss-input.has-error {
   border-color: var(--color-alert);

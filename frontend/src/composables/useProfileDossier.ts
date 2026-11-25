@@ -62,16 +62,21 @@ export function useProfileDossier() {
         headToHead.value = null
     }
 
+    /** Bumped per fetch, so a slow answer for the last profile never lands on this one. */
+    let seq = 0
+
     async function fetchDossier(shareCode: string) {
         if (!shareCode) return
+        const mine = ++seq
         loading.value = true
         reset()
         try {
             const [r, g, h] = await Promise.all([
                 supabase.rpc('profile_rank', { p_share_code: shareCode }),
-                supabase.rpc('profile_games', { p_share_code: shareCode, p_limit: 10 }),
+                supabase.rpc('profile_games', { p_share_code: shareCode, p_limit: 3 }),
                 supabase.rpc('profile_head_to_head', { p_share_code: shareCode }),
             ])
+            if (mine !== seq) return
 
             if (!r.error) {
                 const row = (r.data as RankRow[] | null)?.[0]
@@ -87,24 +92,15 @@ export function useProfileDossier() {
                 }
             }
 
-            if (!g.error) {
-                games.value = (g.data as ProfileGame[] | null) ?? []
-            } else {
-                // profile-games.sql not run yet: the older list, without names.
-                const old = await supabase.rpc('profile_recent_games', { p_share_code: shareCode, max_rows: 10 })
-                if (!old.error) {
-                    games.value = ((old.data as Omit<ProfileGame, 'is_daily' | 'opponents'>[] | null) ?? [])
-                        .map(row => ({ ...row, is_daily: false, opponents: [] }))
-                }
-            }
+            if (!g.error) games.value = (g.data as ProfileGame[] | null) ?? []
 
             if (!h.error) headToHead.value = (h.data as HeadToHead[] | null)?.[0] ?? null
         } catch {
             // Offline, or the SQL has not been run — the page still renders
             // everything public_profile already gave it.
-            reset()
+            if (mine === seq) reset()
         } finally {
-            loading.value = false
+            if (mine === seq) loading.value = false
         }
     }
 
