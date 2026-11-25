@@ -70,6 +70,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        id: '2026-11-25',
+        level: 'loud',
+        tag: 'NEW',
+        title: 'Add your X and Instagram to your profile',
+        body: "Profiles have a new look. Add your X and Instagram so other players can find you, and see your record against anyone you've shared a table with.",
+        cta: { label: 'OPEN YOUR PROFILE', ownProfile: true },
+    },
+    {
         id: '2026-11-20',
         level: 'quiet',
         tag: 'NEW',

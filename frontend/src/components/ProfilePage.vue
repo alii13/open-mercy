@@ -1,5 +1,5 @@
 <template>
-  <div class="pp-page">
+  <div class="pp-page" :class="{ 'pp-page--actions': showActions }" :style="tierStyle">
     <header class="pp-topbar">
       <button class="back-link" @click="$emit('back')">
         <ChevronLeft :size="14" :stroke-width="2" aria-hidden="true" />
@@ -31,240 +31,297 @@
     </div>
 
     <div v-else-if="p" ref="contentEl" class="pp-content">
-      <!-- WHO — name first, so you know whose page this is before the badge -->
-      <header class="pp-who">
-        <form v-if="editing" class="pp-rename" @submit.prevent="saveName">
-          <input
-            ref="nameInputEl"
-            v-model="nameInput"
-            class="pp-rename-input"
-            :class="{ 'has-error': nameError }"
-            maxlength="20"
-            aria-label="Your name"
-            :aria-invalid="!!nameError"
-            aria-describedby="pp-rename-error"
-            :disabled="saving"
-            @input="nameError = ''; nameSuggestions = []"
-            @keyup.esc="cancelEdit"
+      <!-- WHO: the tier crest is the hero, the player's face rides its foot. -->
+      <header class="pp-hero">
+        <div class="pp-crest">
+          <!-- The same badge as everywhere else, so hovering it shows the tier
+               popover and tapping it opens that tier on the badges page. -->
+          <Badge
+            v-if="badgeInfo"
+            class="pp-crest-badge"
+            :badge="badgeInfo.badge"
+            :points="badgeInfo.points"
+            :progress="badgeInfo.progress"
+            size="mark"
+            link
           />
-          <button type="submit" class="pp-rename-btn pp-rename-save" :disabled="saving" aria-label="Save name">
-            <Check :size="22" :stroke-width="2.5" aria-hidden="true" />
-          </button>
-          <button type="button" class="pp-rename-btn" :disabled="saving" aria-label="Cancel" @click="cancelEdit">
-            <X :size="22" :stroke-width="2.5" aria-hidden="true" />
-          </button>
-          <p v-if="nameError" id="pp-rename-error" class="pp-rename-error" role="alert">{{ nameError }}</p>
-          <div v-if="nameSuggestions.length" class="pp-rename-suggest">
-            <span>Free:</span>
-            <button v-for="n in nameSuggestions" :key="n" type="button" class="pp-rename-chip" @click="nameInput = n; saveName()">{{ n }}</button>
-          </div>
-        </form>
-        <h1 v-else class="pp-name">
-          {{ p.username }}<span v-if="flagEmoji(p.country)" class="pp-flag" :title="p.country ?? ''">{{ flagEmoji(p.country) }}</span>
-          <button v-if="isOwn" type="button" class="pp-rename-pencil" aria-label="Edit your name" title="Edit name" @click="startEdit">
-            <Pencil :size="22" :stroke-width="2" aria-hidden="true" />
-          </button>
-          <!-- Where a shared friend link lands, so it sits by the name rather
-               than at the bottom of the rail. -->
-          <template v-if="!isOwn && !social.unavailable && p.user_id">
-            <button v-if="friendState === 'asked-me'" type="button" class="pp-friend pp-friend--accept" @click="acceptFromProfile">
-              <UserPlus :size="18" :stroke-width="2.2" aria-hidden="true" />
-              Accept request
-            </button>
+          <div class="pp-crest-face">
+            <Avatar :uid="p.user_id" :name="p.username" :size="64" />
             <button
-              v-else
+              v-if="isOwn && avatarsAvailable"
               type="button"
-              class="pp-friend"
-              :class="{ 'pp-friend--done': friendState === 'friends' || friendState === 'asked' }"
-              :disabled="friendState !== 'none' || adding"
-              @click="addFriend"
+              class="pp-photo-btn"
+              aria-label="Change profile photo"
+              title="Profile photo"
+              @click="openPhotoSheet"
             >
-              <Check v-if="friendState === 'friends' || friendState === 'asked'" :size="18" :stroke-width="2.2" aria-hidden="true" />
-              <UserPlus v-else :size="18" :stroke-width="2" aria-hidden="true" />
-              {{ addLabel === 'Add as friend' ? 'Add friend' : addLabel }}
+              <Camera :size="16" :stroke-width="2" aria-hidden="true" />
             </button>
-          </template>
-        </h1>
-        <p class="pp-meta">
-          <span v-if="presenceOnline" class="pp-live">Online now</span>
-          <span v-else-if="lastSeenLabel">Last seen {{ lastSeenLabel }}</span>
-          <span class="pp-sep" aria-hidden="true"></span>
-          <span>{{ p.games }} games</span>
-          <span class="pp-sep" aria-hidden="true"></span>
-          <span>Since {{ memberSince }}</span>
-        </p>
+          </div>
+        </div>
+
+        <div class="pp-who">
+          <p v-if="badgeInfo" class="pp-tier">{{ badgeInfo.badge.title }} · Tier {{ badgeInfo.badge.tier }} of {{ BADGES.length }}</p>
+
+          <form v-if="editing" class="pp-rename" @submit.prevent="saveName">
+            <input
+              ref="nameInputEl"
+              v-model="nameInput"
+              class="pp-rename-input"
+              :class="{ 'has-error': nameError }"
+              maxlength="20"
+              aria-label="Your name"
+              :aria-invalid="!!nameError"
+              aria-describedby="pp-rename-error"
+              :disabled="saving"
+              @input="nameError = ''; nameSuggestions = []"
+              @keyup.esc="cancelEdit"
+            />
+            <button type="submit" class="pp-rename-btn pp-rename-save" :disabled="saving" aria-label="Save name">
+              <Check :size="20" :stroke-width="2" aria-hidden="true" />
+            </button>
+            <button type="button" class="pp-rename-btn" :disabled="saving" aria-label="Cancel" @click="cancelEdit">
+              <X :size="20" :stroke-width="2" aria-hidden="true" />
+            </button>
+            <p v-if="nameError" id="pp-rename-error" class="pp-rename-error" role="alert">{{ nameError }}</p>
+            <div v-if="nameSuggestions.length" class="pp-rename-suggest">
+              <span>Free:</span>
+              <button v-for="n in nameSuggestions" :key="n" type="button" class="pp-rename-chip" @click="nameInput = n; saveName()">{{ n }}</button>
+            </div>
+          </form>
+          <h1 v-else class="pp-name" :class="{ 'pp-name--long': p.username.length > 13 }">
+            {{ p.username }}
+            <button v-if="isOwn" type="button" class="pp-rename-pencil" aria-label="Edit your name" title="Edit name" @click="startEdit">
+              <Pencil :size="20" :stroke-width="2" aria-hidden="true" />
+            </button>
+          </h1>
+
+          <p class="pp-meta">
+            <template v-if="countryName">
+              <span class="pp-flag" aria-hidden="true">{{ flagEmoji(p.country) }}</span>
+              <span class="pp-meta-strong">{{ countryName }}</span>
+              <span class="pp-dot" aria-hidden="true">·</span>
+            </template>
+            <template v-if="!isOwn && presenceOnline">
+              <span class="pp-live" aria-hidden="true"></span>
+              <span class="pp-meta-strong">Online now</span>
+              <span class="pp-dot" aria-hidden="true">·</span>
+            </template>
+            <template v-else-if="!isOwn && lastSeenLabel">
+              <span>Last seen {{ lastSeenLabel }}</span>
+              <span class="pp-dot" aria-hidden="true">·</span>
+            </template>
+            <span>Joined {{ memberSince }}</span>
+          </p>
+
+          <div v-if="socialLinks.length || (isOwn && pp.socials.value)" class="pp-socials">
+            <a
+              v-for="s in socialLinks"
+              :key="s.network"
+              class="pp-social"
+              :href="s.url"
+              target="_blank"
+              rel="noopener noreferrer nofollow ugc"
+              :aria-label="`${s.handle} on ${s.label}`"
+              @click="track('profile_social_opened', { network: s.network, own: isOwn })"
+            >
+              <svg class="pp-social-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path :d="s.icon" /></svg>
+              {{ s.handle }}
+            </a>
+            <template v-if="isOwn && pp.socials.value">
+              <button
+                v-for="s in missingSocials"
+                :key="s.network"
+                type="button"
+                class="pp-social pp-social--add"
+                @click="socialsOpen = true"
+              >
+                <Plus :size="14" :stroke-width="2" aria-hidden="true" />
+                Add {{ s.label }}
+              </button>
+              <button
+                v-if="socialLinks.length"
+                type="button"
+                class="pp-social pp-social--edit"
+                aria-label="Edit your socials"
+                title="Edit socials"
+                @click="socialsOpen = true"
+              >
+                <Pencil :size="14" :stroke-width="2" aria-hidden="true" />
+              </button>
+            </template>
+          </div>
+        </div>
       </header>
 
-      <div class="pp-side">
-      <!-- RAIL — the player's photo is the hero, their tier shield its pip;
-           the full badge below keeps the tier name and progress bar. -->
-      <aside class="pp-rail">
-        <div class="pp-rail-face">
-          <Avatar
-            class="pp-rail-avatar"
-            :uid="p.user_id"
-            :name="p.username"
-            :badge="badgeInfo?.badge"
-            :points="badgeInfo?.points"
-            :progress="badgeInfo?.progress"
-            :presence="lastSeen"
-            badge-link
-          />
-          <button
-            v-if="isOwn && avatarsAvailable"
-            type="button"
-            class="pp-photo-btn"
-            aria-label="Change profile photo"
-            title="Profile photo"
-            @click="openPhotoSheet"
-          >
-            <Camera :size="20" :stroke-width="2" aria-hidden="true" />
+      <!-- On a phone this is the bar at the bottom of the screen; on a wide
+           screen it sits beside the name. -->
+      <div v-if="showActions" class="pp-actions">
+        <template v-if="!social.unavailable">
+          <button v-if="friendState === 'asked-me'" type="button" class="pp-friend pp-friend--accept" @click="acceptFromProfile">
+            <UserPlus :size="16" :stroke-width="2" aria-hidden="true" />
+            Accept request
           </button>
-        </div>
-        <Badge
-          v-if="badgeInfo"
-          class="pp-rail-badge"
-          :badge="badgeInfo.badge"
-          :points="badgeInfo.points"
-          :progress="badgeInfo.progress"
-          size="full"
-          link
-        />
-        <p v-if="badgeInfo" class="pp-rail-tier">TIER {{ badgeInfo.badge.tier }} OF {{ BADGES.length }}</p>
-
-        <div v-if="badgeInfo" class="pp-rail-points">
-          <span class="pp-rail-points-value">{{ badgeInfo.points.toLocaleString() }}</span>
-          <span class="pp-rail-points-label">POINTS EARNED</span>
-        </div>
-
-        <p v-if="badgeInfo" class="pp-ladder-title">THE LADDER</p>
-        <ol v-if="badgeInfo" class="pp-ladder">
-          <li
-            v-for="tier in BADGES"
-            :key="tier.tier"
-            class="pp-ladder-row"
-            :class="{
-              'pp-ladder-row--current': tier.tier === badgeInfo.badge.tier,
-              'pp-ladder-row--locked': tier.tier > badgeInfo.badge.tier,
-            }"
+          <button
+            v-else
+            type="button"
+            class="pp-friend"
+            :class="{ 'pp-friend--done': friendState === 'friends' || friendState === 'asked' }"
+            :disabled="friendState !== 'none' || adding"
+            @click="addFriend"
           >
-            <Badge class="pp-ladder-mark" :badge="tier" size="mark" aria-hidden="true" />
-            <span class="pp-ladder-name">{{ tier.title }}</span>
-            <span class="pp-ladder-threshold">{{ tier.threshold.toLocaleString() }}</span>
-          </li>
-        </ol>
-      </aside>
+            <Check v-if="friendState === 'friends' || friendState === 'asked'" :size="16" :stroke-width="2" aria-hidden="true" />
+            <UserPlus v-else :size="16" :stroke-width="2" aria-hidden="true" />
+            {{ addLabel }}
+          </button>
+        </template>
+        <button type="button" class="pp-play" :disabled="!!invite.busy.value" @click="playTogether">{{ playLabel }}</button>
+      </div>
 
-      <section v-if="isOwn" class="pp-cta pp-cta--own">
-        <div class="pp-cta-head">
-          <span class="pp-cta-title">YOUR PROFILE</span>
+      <div class="pp-body">
+        <div class="pp-main">
+          <!-- No games yet: a hand nobody has dealt, and what fills this page. -->
+          <section v-if="p.games === 0" class="pp-empty">
+            <div class="pp-empty-hand" aria-hidden="true">
+              <CardBack class="pp-empty-card pp-empty-card--left" :size="EMPTY_CARD" />
+              <CardBack class="pp-empty-card pp-empty-card--right" :size="EMPTY_CARD" />
+              <CardBack class="pp-empty-card" :size="EMPTY_CARD" />
+            </div>
+            <h2 class="pp-empty-title">{{ isOwn ? 'YOUR FIRST GAME' : 'NO GAMES YET' }}</h2>
+            <p class="pp-empty-line">
+              {{ isOwn
+                ? 'Play one game and this page fills in with your win rate, your rank and your best moments.'
+                : `${p.username} joined in ${memberSince} and hasn't played a game. Invite them to a table and you'll be their first.` }}
+            </p>
+            <button v-if="isOwn" type="button" class="pp-play pp-empty-play" @click="$emit('back')">PLAY A GAME</button>
+          </section>
+
+          <template v-else>
+          <section class="pp-stats">
+            <div class="pp-stat-row">
+              <div class="pp-card pp-stat">
+                <p class="pp-label">WIN RATE</p>
+                <p class="pp-value">{{ winRate }}%</p>
+              </div>
+              <div class="pp-card pp-stat">
+                <p class="pp-label">WINS</p>
+                <p class="pp-value">{{ p.wins.toLocaleString() }}</p>
+              </div>
+              <div v-if="dossier.standing.value?.globalRank" class="pp-card pp-stat pp-stat--wide">
+                <p class="pp-label">GLOBAL RANK</p>
+                <p class="pp-value">#{{ dossier.standing.value.globalRank.toLocaleString() }}</p>
+              </div>
+            </div>
+            <p class="pp-caption">{{ statsCaption }}</p>
+          </section>
+
+          <!-- Only between two people who have shared a table. A 0-0 tells
+               nobody anything. -->
+          <section v-if="h2h" class="pp-section">
+            <h2 class="pp-section-title">HEAD TO HEAD</h2>
+            <div class="pp-card pp-h2h">
+              <div class="pp-h2h-score">
+                <div class="pp-h2h-side">
+                  <Avatar class="pp-ring pp-ring--you" :uid="authStore.user?.id" :name="authStore.username" :size="48" />
+                  <div>
+                    <p class="pp-label pp-label--you">YOU</p>
+                    <p class="pp-h2h-num">{{ h2h.my_wins }}</p>
+                  </div>
+                </div>
+                <span class="pp-h2h-vs" aria-hidden="true">VS</span>
+                <div class="pp-h2h-side pp-h2h-side--them">
+                  <div>
+                    <p class="pp-label">THEM</p>
+                    <p class="pp-h2h-num">{{ h2h.their_wins }}</p>
+                  </div>
+                  <Avatar class="pp-ring" :uid="p.user_id" :name="p.username" :size="48" />
+                </div>
+              </div>
+              <div v-if="h2h.my_wins + h2h.their_wins > 0" class="pp-h2h-bar" aria-hidden="true">
+                <span class="pp-h2h-bar-you" :style="{ flexGrow: h2h.my_wins }"></span>
+                <span class="pp-h2h-bar-them" :style="{ flexGrow: h2h.their_wins }"></span>
+              </div>
+              <p class="pp-h2h-line">{{ headToHeadLine(h2h, presenceNow) }}</p>
+            </div>
+          </section>
+
+          <section v-if="dossier.games.value.length || p.recent_form.length" class="pp-section">
+            <div class="pp-section-head">
+              <h2 class="pp-section-title">RECENT GAMES</h2>
+              <ol class="pp-form" aria-label="Last five results, newest first">
+                <li
+                  v-for="(f, i) in p.recent_form.slice(0, 5)"
+                  :key="i"
+                  class="pp-result"
+                  :class="`pp-result--${f}`"
+                  :title="f"
+                >{{ RESULT_LETTER[f] ?? '–' }}</li>
+              </ol>
+            </div>
+            <ul v-if="dossier.games.value.length" class="pp-card pp-games">
+              <li v-for="(g, i) in dossier.games.value.slice(0, 5)" :key="i" class="pp-game">
+                <span class="pp-result" :class="`pp-result--${g.result}`" :title="g.result">{{ RESULT_LETTER[g.result] ?? '–' }}</span>
+                <div class="pp-game-text">
+                  <p class="pp-game-title">{{ gameSummary(g) }}</p>
+                  <p class="pp-game-sub">
+                    <span v-for="(s, j) in opponentSegments(g)" :key="j" :class="{ 'pp-you': s.you }">{{ s.text }}</span>
+                    · {{ dayLabel(g.played_at, presenceNow) }}
+                  </p>
+                </div>
+                <span class="pp-game-points" :class="{ 'pp-game-points--win': g.result === 'won' }">+{{ g.points }}</span>
+              </li>
+            </ul>
+          </section>
+          </template>
         </div>
-        <p v-if="authStore.isAnonymous" class="pp-cta-line">This is your guest profile - claim it from the lobby (CLAIM ACCOUNT) and everything here is yours forever.</p>
+
+        <div class="pp-side">
+          <!-- With no games, only the owner gets the ladder: the first rung is theirs to climb. -->
+          <section v-if="badgeInfo && (p.games > 0 || isOwn)" class="pp-section pp-section--ladder">
+            <h2 class="pp-section-title">THE LADDER</h2>
+            <div class="pp-card pp-ladder">
+              <Badge class="pp-ladder-mark" :badge="badgeInfo.badge" size="mark" aria-hidden="true" />
+              <div class="pp-ladder-body">
+                <p class="pp-ladder-points">
+                  {{ badgeInfo.points.toLocaleString() }}<span v-if="next" class="pp-ladder-of"> / {{ next.threshold.toLocaleString() }}</span>
+                </p>
+                <div v-if="next" class="pp-ladder-bar" aria-hidden="true">
+                  <span :style="{ width: `${Math.round(badgeInfo.progress.pct * 100)}%` }"></span>
+                </div>
+                <p class="pp-ladder-next">
+                  {{ next ? `${badgeInfo.progress.needed.toLocaleString()} to ${next.title}` : 'Top rank reached' }}
+                </p>
+              </div>
+              <Badge v-if="next" class="pp-ladder-mark pp-ladder-mark--next" :badge="next" size="mark" aria-hidden="true" />
+            </div>
+            <a class="pp-link" :href="badgesHref" @click.prevent="openBadges">
+              ALL {{ BADGES.length }} BADGES <ArrowRight :size="14" :stroke-width="2" aria-hidden="true" />
+            </a>
+          </section>
+
+          <section v-if="p.games > 0" class="pp-section">
+            <h2 class="pp-section-title">SERVICE RECORD</h2>
+            <ul class="pp-records">
+              <li v-for="r in records" :key="r.label" class="pp-card pp-record" :class="{ 'pp-record--wide': r.wide }">
+                <p class="pp-label">{{ r.label }}</p>
+                <p class="pp-value">{{ r.value }}</p>
+              </li>
+            </ul>
+          </section>
+        </div>
+      </div>
+
+      <!-- Outside the games branch, so a guest with no games still sees how
+           to keep this profile. -->
+      <section v-if="isOwn && (authStore.isAnonymous || p.games > 0)" class="pp-own">
+        <p v-if="authStore.isAnonymous" class="pp-own-line">This is your guest profile - claim it from the lobby (CLAIM ACCOUNT) and everything here is yours forever.</p>
         <Button v-if="authStore.isAnonymous" variant="secondary" size="md" block @click="$emit('back')">GO TO LOBBY</Button>
-        <!-- The one owner tool that is not on the page already: a PNG of these
-             numbers, worth posting. Renaming is the pencil by the name. -->
-        <button v-if="p.games > 0" class="pp-own-link" @click="showShareCard = true">
+        <!-- The one owner tool that is not on the page already: a PNG of
+             these numbers, worth posting. -->
+        <button v-if="p.games > 0" type="button" class="pp-link" @click="showShareCard = true">
           SHARE A STATS CARD <ArrowRight :size="14" :stroke-width="2" aria-hidden="true" />
         </button>
       </section>
-      </div>
-
-      <div class="pp-record">
-      <div v-if="p.games === 0" class="pp-empty">First game pending. The deck is waiting.</div>
-
-      <template v-else>
-        <!-- Where they stand in the field. Hidden rather than guessed at when
-             profile-dossier.sql has not been run. -->
-        <section v-if="dossier.standing.value" class="pp-standing-section">
-          <h3 class="pp-section-title">STANDING</h3>
-          <div class="pp-standing">
-            <div class="pp-standing-cell">
-              <p class="pp-standing-label">GLOBAL RANK</p>
-              <p class="pp-standing-value pp-standing-value--global">#{{ dossier.standing.value.globalRank!.toLocaleString() }}</p>
-              <p class="pp-standing-sub">
-                of {{ dossier.standing.value.globalTotal.toLocaleString() }}<template v-if="topPercent"> · top {{ topPercent }}%</template>
-              </p>
-            </div>
-            <div v-if="dossier.standing.value.countryRank && flagEmoji(p.country)" class="pp-standing-cell">
-              <p class="pp-standing-label">
-                <span class="pp-standing-flag" aria-hidden="true">{{ flagEmoji(p.country) }}</span> COUNTRY
-              </p>
-              <p class="pp-standing-value">#{{ dossier.standing.value.countryRank.toLocaleString() }}</p>
-              <p class="pp-standing-sub">of {{ dossier.standing.value.countryTotal.toLocaleString() }}</p>
-            </div>
-          </div>
-        </section>
-
-        <!-- Every badge they have taken, and when -->
-        <section v-if="recentPromotions.length" class="pp-upgrades-section">
-          <h3 class="pp-section-title">UPGRADES</h3>
-          <ol class="pp-upgrades">
-            <li
-              v-for="(promotion, i) in recentPromotions"
-              :key="promotion.badge.tier"
-              class="pp-upgrade"
-              :class="{ 'pp-upgrade--current': promotion.badge.tier === badgeInfo?.badge.tier }"
-            >
-              <span v-if="i > 0" class="pp-upgrade-link" aria-hidden="true"></span>
-              <Badge class="pp-upgrade-mark" :badge="promotion.badge" size="mark" aria-hidden="true" />
-              <span class="pp-upgrade-name" :style="{ color: promotion.badge.color }">{{ promotion.badge.title }}</span>
-              <span class="pp-upgrade-when">{{ shortDate(promotion.at) }}</span>
-            </li>
-            <li v-if="badgeInfo?.progress.next" class="pp-upgrade pp-upgrade--next">
-              <span class="pp-upgrade-link pp-upgrade-link--pending" aria-hidden="true"></span>
-              <Badge class="pp-upgrade-mark pp-upgrade-mark--locked" :badge="badgeInfo.progress.next" size="mark" aria-hidden="true" />
-              <span class="pp-upgrade-name" :style="{ color: badgeInfo.progress.next.color }">{{ badgeInfo.progress.next.title }}</span>
-              <span class="pp-upgrade-when">{{ badgeInfo.progress.needed.toLocaleString() }} to go</span>
-            </li>
-          </ol>
-        </section>
-
-        <section class="pp-panel">
-          <h3 class="pp-section-title">SERVICE RECORD</h3>
-          <ul class="pp-records">
-            <li v-for="r in records" :key="r.label" class="pp-record-card">
-              <p class="pp-record-label">{{ r.label }}</p>
-              <p class="pp-record-value" :class="{ 'pp-record-value--hazard': r.hazard }">{{ r.value }}</p>
-            </li>
-          </ul>
-        </section>
-
-        <!-- Last 10 games. The detailed rows need profile-dossier.sql; without
-             it the page falls back to the W/L strip public_profile returns. -->
-        <section v-if="dossier.games.value.length" class="pp-games">
-          <h3 class="pp-section-title">
-            RECENT GAMES <span class="pp-title-note">LATEST FIRST</span>
-          </h3>
-          <ul class="pp-game-rows">
-            <li v-for="(g, i) in dossier.games.value" :key="i" class="pp-game-row">
-              <span class="pp-game-result" :class="'pp-game-result--' + g.result">
-                {{ g.result.charAt(0).toUpperCase() }}
-              </span>
-              <span class="pp-game-mode">{{ g.is_bot_game ? 'BOT' : 'PVP' }}</span>
-              <span class="pp-game-line">{{ gameSummary(g) }}</span>
-              <span class="pp-game-points" :class="{ 'pp-game-points--win': g.result === 'won' }">+{{ g.points }}</span>
-              <span class="pp-game-date">{{ shortDate(g.played_at) }}</span>
-            </li>
-          </ul>
-        </section>
-        <section v-else-if="p.recent_form.length" class="pp-form">
-          <h3 class="pp-section-title">
-            RECENT FORM <span class="pp-title-note">LATEST FIRST</span>
-          </h3>
-          <div class="pp-form-strip">
-            <span
-              v-for="(f, i) in p.recent_form"
-              :key="i"
-              class="pp-form-chip"
-              :class="'pp-form-chip--' + f"
-              :title="f"
-            >{{ FORM_LETTER[f] ?? '·' }}</span>
-          </div>
-        </section>
-
-      </template>
-
-      </div>
     </div>
 
     <ShareStatsCard
@@ -283,16 +340,22 @@
       :share-url="shareUrl"
       @close="showShareCard = false"
     />
-
+    <SocialsSheet
+      v-if="socialsOpen && pp.socials.value"
+      :socials="pp.socials.value"
+      @close="socialsOpen = false"
+      @saved="onSocialsSaved"
+    />
     <SiteFooter />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
-import { ArrowRight, Camera, Check, ChevronLeft, Pencil, UserPlus, X } from 'lucide-vue-next'
+import { ArrowRight, Camera, Check, ChevronLeft, Pencil, Plus, UserPlus, X } from 'lucide-vue-next'
+import { siInstagram, siX } from 'simple-icons'
 import gsap from 'gsap'
-import { useProfile } from '../composables/useProfile'
+import { useProfile, type ProfileSocials } from '../composables/useProfile'
 import { useMotion } from '../composables/useMotion'
 import { useAuthStore } from '../stores/authStore'
 import { flagEmoji } from '../utils/country'
@@ -304,11 +367,17 @@ import { shareProfile } from '../utils/share'
 import { track } from '../utils/analytics'
 import { useBadges } from '../composables/useBadges'
 import { useProfileDossier, type ProfileGame } from '../composables/useProfileDossier'
-import { BADGES } from '../utils/badges'
+import { usePlayWithFriend } from '../composables/usePlayWithFriend'
+import { BADGES, badgeSlug } from '../utils/badges'
+import { dayLabel, headToHeadLine, opponentSegments } from '../utils/profileGames'
+import { socialUrl, type SocialNetwork } from '../utils/socialHandles'
+import { navigate, routePath } from '../utils/routes'
 import SiteFooter from './SiteFooter.vue'
 import Button from './ui/Button.vue'
 import Badge from './Badge.vue'
 import Avatar from './Avatar.vue'
+import CardBack from './game/CardBack.vue'
+import SocialsSheet from './SocialsSheet.vue'
 import { openPhotoSheet } from '../composables/usePhotoSheet'
 import { avatarsAvailable } from '../composables/useAvatars'
 import ShareStatsCard from './ShareStatsCard.vue'
@@ -370,6 +439,13 @@ async function saveName() {
 const { badges, fetchBadges } = useBadges()
 watch(() => p.value?.user_id, (id) => { if (id) void fetchBadges([id]) }, { immediate: true })
 const badgeInfo = computed(() => (p.value?.user_id ? badges.value[p.value.user_id] : undefined))
+const next = computed(() => badgeInfo.value?.progress.next ?? null)
+const tierStyle = computed(() => (badgeInfo.value ? { '--tier': badgeInfo.value.badge.color } : undefined))
+
+const badgesHref = computed(() => routePath({ name: 'badges', badge: badgeInfo.value ? badgeSlug(badgeInfo.value.badge) : undefined }))
+function openBadges() {
+  void navigate({ name: 'badges', badge: badgeInfo.value ? badgeSlug(badgeInfo.value.badge) : undefined })
+}
 
 const winRate = computed(() => {
     if (!p.value || p.value.games === 0) return 0
@@ -378,10 +454,57 @@ const winRate = computed(() => {
 
 const memberSince = computed(() => {
     if (!p.value) return ''
-    return new Date(p.value.member_since)
-        .toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
-        .toUpperCase()
+    return new Date(p.value.member_since).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
 })
+
+const countryName = computed(() => {
+    const code = p.value?.country
+    if (!code || !flagEmoji(code)) return ''
+    try {
+        return new Intl.DisplayNames(['en'], { type: 'region' }).of(code) ?? ''
+    } catch {
+        return ''
+    }
+})
+
+/** Rounded up, so the very top of the board never reads "top 0%". */
+const topPercent = computed(() => {
+    const st = dossier.standing.value
+    if (!st?.globalRank || st.globalTotal <= 0) return 0
+    return Math.max(1, Math.ceil((st.globalRank / st.globalTotal) * 100))
+})
+
+const statsCaption = computed(() => {
+    const v = p.value
+    if (!v) return ''
+    const st = dossier.standing.value
+    const parts = [`${v.games.toLocaleString()} games played`]
+    if (st && topPercent.value) parts.push(`top ${topPercent.value}% of ${st.globalTotal.toLocaleString()}`)
+    if (st?.countryRank && countryName.value) parts.push(`#${st.countryRank.toLocaleString()} in ${countryName.value}`)
+    return parts.join(' · ')
+})
+
+// Socials. A handle only ever links to its own network: socialUrl builds the
+// address from a fixed origin, and the database refuses anything else.
+const SOCIALS: { network: SocialNetwork; label: string; icon: string; field: keyof ProfileSocials }[] = [
+  { network: 'x', label: 'X', icon: siX.path, field: 'x_handle' },
+  { network: 'instagram', label: 'Instagram', icon: siInstagram.path, field: 'instagram_handle' },
+]
+const socialsOpen = ref(false)
+const socialLinks = computed(() => {
+  const s = pp.socials.value
+  if (!s) return []
+  return SOCIALS.flatMap(n => {
+    const handle = s[n.field]
+    return handle ? [{ ...n, handle, url: socialUrl(n.network, handle) }] : []
+  })
+})
+const missingSocials = computed(() => SOCIALS.filter(n => !pp.socials.value?.[n.field]))
+
+function onSocialsSaved(saved: ProfileSocials) {
+  pp.socials.value = saved
+  socialsOpen.value = false
+}
 
 // The page can sit open for an hour, and a chip that still reads ONLINE after
 // the player left is a small lie.
@@ -403,13 +526,15 @@ const friendState = computed<FriendState>(() => {
   return 'none'
 })
 
+const showActions = computed(() => !isOwn.value && !!p.value?.user_id)
+
 const adding = ref(false)
 const addResult = ref<string | null>(null)
 // One result per profile: an answer about the last player must not label the next.
 watch(() => props.code, () => { addResult.value = null })
 const addLabel = computed(() => {
   if (adding.value) return 'Adding…'
-  if (friendState.value === 'friends') return "You're friends"
+  if (friendState.value === 'friends') return 'Friends'
   if (friendState.value === 'asked') return 'Request sent'
   if (friendState.value === 'blocked') return 'You blocked this player'
   switch (addResult.value) {
@@ -417,23 +542,26 @@ const addLabel = computed(() => {
     case 'declined': return 'Try again in a few days'
     case 'blocked': return "Can't add this player"
     case 'failed': return 'Try again'
-    default: return 'Add as friend'
+    default: return 'Add friend'
   }
 })
 
 // A visitor from a shared link is often signed out. ADD makes them a guest
 // first - the same identity PLAY would give them - and stays on this page.
+async function ensureSignedIn(): Promise<boolean> {
+  if (authStore.isAuthenticated) return true
+  const res = await authStore.signInAnonymously()
+  if (res.success) await social.refresh()
+  return res.success
+}
+
 async function addFriend(): Promise<void> {
   const id = p.value?.user_id
   if (!id || adding.value) return
   adding.value = true
   try {
-    if (!authStore.isAuthenticated) {
-      const res = await authStore.signInAnonymously()
-      if (!res.success) { addResult.value = 'failed'; return }
-      await social.refresh()
-      if (friendState.value !== 'none') return
-    }
+    if (!(await ensureSignedIn())) { addResult.value = 'failed'; return }
+    if (friendState.value !== 'none') return
     const result = await social.sendRequest(id)
     addResult.value = result === 'sent' || result === 'accepted' || result === 'already' ? null : result
   } finally {
@@ -446,6 +574,23 @@ async function acceptFromProfile(): Promise<void> {
   if (id) await social.respond(id, true)
 }
 
+// Anyone may invite anyone (supabase/invites.sql). Opening the room moves the
+// URL to /r/CODE (useRoomUrl), which shows the waiting room; navigating home
+// from there would leave the room, so this page does not navigate at all.
+const invite = usePlayWithFriend()
+const playLabel = computed(() => {
+  const id = p.value?.user_id
+  if (id && invite.busy.value === id) return 'OPENING…'
+  return (id && invite.asked.value[id]) || 'PLAY TOGETHER'
+})
+
+async function playTogether(): Promise<void> {
+  const id = p.value?.user_id
+  if (!id || invite.busy.value) return
+  if (!(await ensureSignedIn())) return
+  if (await invite.playWith(id)) track('profile_play_together')
+}
+
 // Same batched lookup and same cache the leaderboard and the friends list
 // use - one presence path, so the dot cannot disagree with itself.
 const { presence, fetchPresence } = usePresence()
@@ -453,7 +598,9 @@ watch(() => p.value?.user_id, (id) => { if (id) void fetchPresence([id]) }, { im
 const lastSeen = computed(() => (p.value?.user_id ? presence.value[p.value.user_id] ?? null : null))
 
 const presenceOnline = computed(() => isOnline(lastSeen.value, presenceNow.value))
-const lastSeenLabel = computed(() => relativeTime(lastSeen.value, presenceNow.value).toUpperCase())
+const lastSeenLabel = computed(() => relativeTime(lastSeen.value, presenceNow.value))
+
+const h2h = computed(() => (isOwn.value ? null : dossier.headToHead.value))
 
 function clock(secs: number): string {
     return `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`
@@ -462,26 +609,26 @@ function clock(secs: number): string {
 interface RecordRow {
     label: string
     value: string
-    hazard?: boolean
+    wide?: boolean
 }
 
 const records = computed<RecordRow[]>(() => {
     const v = p.value
     if (!v) return []
-    // The five the dossier shows. A record a player has not set yet renders as
-    // a dash rather than vanishing, so the row keeps its shape.
+    // A record a player has not set yet renders as a dash rather than
+    // vanishing, so the grid keeps its shape.
     return [
-        { label: 'FASTEST WIN', value: v.min_duration_won ? clock(v.min_duration_won) : '—', hazard: true },
-        { label: 'STACK EATEN', value: v.max_stack_survived > 0 ? `+${v.max_stack_survived}` : '—' },
-        { label: 'LEANEST WIN', value: v.min_cards_won ? `${v.min_cards_won}` : '—' },
-        { label: 'PEAK HELD', value: v.max_peak_cards > 0 ? `${v.max_peak_cards}` : '—' },
+        { label: 'FASTEST WIN', value: v.min_duration_won ? clock(v.min_duration_won) : '—' },
         { label: 'BEST RUN', value: `${v.best_win_streak}` },
+        { label: 'STACK EATEN', value: v.max_stack_survived > 0 ? `+${v.max_stack_survived}` : '—' },
+        { label: 'PEAK HELD', value: v.max_peak_cards > 0 ? `${v.max_peak_cards}` : '—' },
+        { label: 'LEANEST WIN', value: v.min_cards_won ? `${v.min_cards_won}` : '—', wide: true },
     ]
 })
 
-const FORM_LETTER: Record<string, string> = { won: 'W', lost: 'L', eliminated: 'E', abandoned: '–' }
+const EMPTY_CARD = { width: 68, height: 95 }
 
-
+const RESULT_LETTER: Record<string, string> = { won: 'W', lost: 'L', eliminated: 'E', abandoned: '–' }
 
 const shareState = ref<'idle' | 'copied'>('idle')
 
@@ -501,8 +648,8 @@ async function onShare() {
     }
 }
 
-// Stat blocks rise in once — final state matches natural layout, inline
-// props cleared so GSAP never fights Vue.
+// Sections rise in once - final state matches natural layout, inline props
+// cleared so GSAP never fights Vue.
 function animateIn() {
     const blocks = contentEl.value?.querySelectorAll('section')
     if (!blocks?.length || motion.reduced) return
@@ -516,22 +663,6 @@ watch(p, async (val) => {
         animateIn()
     }
 })
-
-/** Rounded up, so the very top of the board never reads "top 0%". */
-const topPercent = computed(() => {
-    const st = dossier.standing.value
-    if (!st?.globalRank || st.globalTotal <= 0) return 0
-    return Math.max(1, Math.ceil((st.globalRank / st.globalTotal) * 100))
-})
-
-/** The chain reads as a run-up to where they are now, so it shows the last few
- *  tiers rather than all ten - at ten the labels have no room to breathe. */
-const recentPromotions = computed(() => dossier.promotions.value.slice(-5))
-
-function shortDate(iso: string): string {
-    const d = new Date(iso)
-    return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
 
 /** One line on what actually happened, from the fields the row carries. */
 function gameSummary(g: ProfileGame): string {
@@ -557,19 +688,24 @@ onMounted(() => {
     void dossier.fetchDossier(props.code)
 })
 watch(() => props.code, (code) => {
+    socialsOpen.value = false
     void pp.fetchProfile(code)
     void dossier.fetchDossier(code)
 })
 </script>
 
 <style scoped>
-
 .pp-page {
+  --tier: #ffcf99;
+  --tier-light: color-mix(in srgb, var(--tier) 45%, white);
   min-height: 100vh;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  background: var(--bg-void, #0a0a0a);
+  /* The tier's colour lights the top of the page, behind the crest. */
+  background:
+    radial-gradient(ellipse 120% 420px at 50% 0, color-mix(in srgb, var(--tier) 22%, transparent), transparent 100%) no-repeat,
+    var(--bg-concrete);
 }
 
 .pp-topbar {
@@ -578,7 +714,6 @@ watch(() => props.code, (code) => {
   justify-content: space-between;
   gap: var(--spacing-3);
   padding: var(--spacing-4) var(--spacing-6);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .back-link {
@@ -602,7 +737,7 @@ watch(() => props.code, (code) => {
   font-family: var(--font-display);
   letter-spacing: 0.08em;
   text-decoration: none;
-  font-size: 1rem;
+  font-size: var(--text-base);
 }
 .brand-mark-uno { color: var(--text-primary); }
 .brand-mark-nomercy { color: var(--color-alert); margin-left: 0.4ch; }
@@ -619,10 +754,10 @@ watch(() => props.code, (code) => {
   padding: var(--spacing-2) var(--spacing-3);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
-  letter-spacing: 0.14em;
+  letter-spacing: 0.12em;
   color: var(--color-neon-blue);
   cursor: pointer;
-  min-height: 36px;
+  min-height: 44px;
 }
 
 .share-btn:hover {
@@ -650,530 +785,208 @@ watch(() => props.code, (code) => {
 
 .pp-state-title {
   font-family: var(--font-display);
-  font-size: 1.3rem;
+  font-size: var(--text-xl);
   letter-spacing: 0.12em;
   color: var(--text-primary);
   margin: 0;
 }
 
-/* After .pp-chip, not before: both are one class deep, so source order is
-   what decides the colour. */
-.pp-title-note {
-  font-family: var(--font-mono);
-  font-size: 0.6rem;
-  letter-spacing: 0.12em;
-  color: var(--text-muted);
-  margin-left: var(--spacing-2);
-}
-
-.pp-empty {
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  color: var(--text-muted);
-  text-align: center;
-  padding: var(--spacing-6);
-}
-
-.pp-section-title {
-  font-family: var(--font-display);
-  font-size: 0.95rem;
-  letter-spacing: 0.14em;
-  color: var(--text-secondary);
-  margin: 0 0 var(--spacing-4);
-}
-
-.pp-records {
-  border-left: 2px solid var(--color-alert, #ff2a2a);
-  padding-left: var(--spacing-4);
-}
-
-.pp-record-row:last-child { border-bottom: none; }
-
-.pp-record-label {
+/* ---- layout ---------------------------------------------------------------
+   Phone: one column, the actions pinned to the bottom of the screen.
+   Wide: the actions beside the name, then two columns. */
+.pp-content {
   flex: 1;
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  letter-spacing: 0.1em;
-  color: var(--text-secondary);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "hero" "body" "own";
+  align-content: start;
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  font-family: var(--font-body);
 }
 
-.pp-record-value {
-  font-family: var(--font-display);
-  font-size: var(--text-sm);
-  letter-spacing: 0.06em;
-  color: var(--text-primary);
-}
+.pp-hero { grid-area: hero; }
+.pp-body { grid-area: body; }
+.pp-actions { grid-area: actions; }
+.pp-own { grid-area: own; }
 
-.pp-form-strip {
-  display: flex;
-  gap: var(--spacing-2);
-}
-
-.pp-form-chip {
-  width: 22px;
-  height: 22px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  font-family: var(--font-mono);
-  font-size: 0.62rem;
-  font-weight: 700;
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text-muted);
-}
-
-.pp-form-chip--won {
-  background: rgba(0, 255, 102, 0.18);
-  color: #00ff66;
-  box-shadow: inset 0 0 0 1px rgba(0, 255, 102, 0.4);
-}
-
-.pp-form-chip--eliminated {
-  background: rgba(255, 42, 42, 0.15);
-  color: var(--color-alert, #ff2a2a);
-  box-shadow: inset 0 0 0 1px rgba(255, 42, 42, 0.35);
-}
-
-.pp-form-chip--lost {
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--text-secondary);
-}
-
-
-.pp-cta--own {
-  background: rgba(255, 255, 255, 0.02);
-  border-color: rgba(255, 255, 255, 0.08);
-}
-
-.pp-cta-line {
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  color: var(--text-secondary);
-  margin: 0;
-}
-
-/* Forged steel plate, the same material as the rank emblems: square corners,
-   the display face in capitals, a gold mark. Quiet next to the name, but
-   clearly a control. */
-.pp-friend {
-  flex: none;
-  align-self: center;
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  height: 44px;
-  padding: 0 18px;
-  background: linear-gradient(180deg, #2a2d31 0%, #16181b 55%, #0e0f11 100%);
-  border: 1px solid #3a3e44;
-  border-radius: var(--radius-sm);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.14),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.6),
-    0 6px 18px rgba(0, 0, 0, 0.55);
-  font-family: var(--font-display);
-  font-size: 15px;
-  letter-spacing: 0.12em;
-  line-height: 1;
-  text-transform: uppercase;
-  color: var(--text-primary);
-  white-space: nowrap;
-  cursor: pointer;
-  transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
-}
-
-.pp-friend svg { color: var(--color-hazard); }
-
-.pp-friend:hover:not(:disabled) {
-  border-color: rgba(255, 204, 0, 0.55);
-  transform: translateY(-1px);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.18),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.6),
-    0 8px 22px rgba(0, 0, 0, 0.6);
-}
-
-.pp-friend:disabled { cursor: default; }
-
-.pp-friend--done {
-  background: rgba(255, 255, 255, 0.03);
-  border-color: rgba(255, 255, 255, 0.1);
-  box-shadow: none;
-  color: var(--text-secondary);
-}
-
-.pp-friend--done svg { color: var(--color-neon-green); }
-
-/* Answering someone is the game's solid gold. */
-.pp-friend--accept {
-  background: linear-gradient(180deg, #ffd633 0%, #ffcc00 45%, #e0a800 100%);
-  border-color: #ffdf5e;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 6px 20px rgba(255, 204, 0, 0.25);
-  color: var(--bg-concrete);
-}
-
-.pp-friend--accept svg { color: var(--bg-concrete); }
-
-.pp-own-link {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--spacing-1);
-  background: none;
-  border: none;
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  letter-spacing: 0.12em;
-  color: var(--text-secondary);
-  cursor: pointer;
-  padding: var(--spacing-2);
-}
-
-.pp-own-link:hover { color: var(--color-neon-blue); }
-
-@media (max-width: 480px) {
-}
-
-/* ---- Dossier sections (standing, ladder, upgrades, games) ---------------- */
-
-.pp-standing {
-  display: flex;
-  flex-wrap: wrap;
-  padding-block: var(--spacing-6);
-  border-top: 1px solid rgba(255, 255, 255, 0.07);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-}
-
-.pp-standing-cell {
-  flex: 1 1 180px;
+.pp-body {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-2);
-  padding-right: var(--spacing-6);
+  padding: 0 var(--spacing-4) var(--spacing-12);
 }
 
-.pp-standing-cell + .pp-standing-cell {
-  padding-left: var(--spacing-6);
-  border-left: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.pp-standing-label {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-1);
-  margin: 0;
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  letter-spacing: 0.18em;
-  color: var(--text-muted);
-}
-
-.pp-standing-flag { font-size: 1em; line-height: 1; }
-
-.pp-standing-value {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: var(--text-3xl);
-  line-height: 1;
-  color: var(--text-primary);
-}
-
-/* One cyan moment: the number this panel exists for. */
-.pp-standing-value--global { color: var(--color-neon-blue); }
-
-.pp-standing-sub {
-  margin: 0;
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  color: var(--text-muted);
-}
-
-.pp-ladder {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+.pp-main,
+.pp-side {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-1);
-}
-
-.pp-ladder-row {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-3);
-  padding: var(--spacing-1) var(--spacing-2);
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  color: var(--text-secondary);
-}
-
-.pp-ladder-row--current {
-  border-color: color-mix(in srgb, var(--color-hazard) 35%, transparent);
-  background: rgba(255, 204, 0, 0.08);
-  color: var(--text-primary);
-}
-
-.pp-ladder-row--locked { color: var(--text-muted); }
-.pp-ladder-row--locked .pp-ladder-mark { opacity: 0.4; }
-
-.pp-ladder-mark { flex: none; }
-.pp-ladder-mark :deep(.badge-emblem) { width: 22px; height: 22px; }
-
-.pp-ladder-name { flex: 1; min-width: 0; }
-
-.pp-ladder-threshold {
-  flex: none;
-  font-size: var(--text-xs);
-  color: var(--text-muted);
-}
-
-/* A chain you read left to right, each node joined to the last. */
-.pp-upgrades {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  align-items: flex-start;
-}
-
-.pp-upgrade {
-  flex: 1 1 0;
   min-width: 0;
-  position: relative;
+}
+
+@media (min-width: 1024px) {
+  .pp-content {
+    max-width: 1120px;
+    padding: 0 var(--spacing-8);
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "hero actions" "body body" "own own";
+  }
+  .pp-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 400px;
+    gap: var(--spacing-16);
+    align-items: start;
+    padding: var(--spacing-6) 0 var(--spacing-24);
+  }
+  /* The ladder heading sits above the line, so its card starts level with
+     the stat cards beside it. */
+  .pp-main { padding-top: 40px; }
+  .pp-side .pp-section.pp-section--ladder { padding-top: 0; }
+}
+
+/* ---- hero ---------------------------------------------------------------- */
+.pp-hero {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--spacing-1);
-  padding-top: var(--spacing-4);
-  font-family: var(--font-mono);
+  gap: var(--spacing-8);
+  padding: var(--spacing-1) var(--spacing-4) var(--spacing-8);
   text-align: center;
 }
 
-/* A short rule in the gap between two emblems, inset so it never runs into
-   either one. */
-.pp-upgrade-link {
-  position: absolute;
-  top: calc(var(--spacing-4) + 15px);
-  right: calc(50% + 16px);
-  width: calc(100% - 32px);
-  height: 1px;
-  background: #3f3f46;
-}
-
-/* The tier not yet taken: a dashed run-up to its own emblem, greyed out. */
-.pp-upgrade-link--pending {
-  background: repeating-linear-gradient(to right, #3f3f46 0 4px, transparent 4px 8px);
-}
-
-.pp-upgrade-mark--locked { filter: grayscale(1) brightness(0.6); }
-
-/* One slot height for every emblem, so the bigger current one does not push
-   its label below the rest of the row. */
-.pp-upgrade-mark { height: 30px; display: flex; align-items: center; }
-.pp-upgrade-mark :deep(.badge-emblem) { width: 22px; height: 22px; }
-.pp-upgrade--current .pp-upgrade-mark :deep(.badge-emblem) { width: 30px; height: 30px; }
-
-/* A wrap here shoves the date out of the row and breaks the chain's baseline,
-   so the label never wraps. Capping the chain at five tiers is what buys it
-   the room to stay on one line. */
-.pp-upgrade-name {
-  max-width: 100%;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.pp-upgrade--current .pp-upgrade-name { font-size: var(--text-xs); }
-.pp-upgrade--current .pp-upgrade-when { color: var(--text-primary); }
-.pp-upgrade--next { opacity: 0.75; }
-
-.pp-upgrade-when {
-  font-size: var(--text-xs);
-  color: var(--text-muted);
-}
-
-.pp-game-rows {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-1);
-}
-
-.pp-game-row {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-3);
-  padding: var(--spacing-2) var(--spacing-3);
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.04);
-  border-radius: var(--radius-sm);
-  font-family: var(--font-mono);
-}
-
-.pp-game-result {
-  flex: none;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-sm);
-  font-family: var(--font-display);
-  font-size: var(--text-xs);
-}
-
-.pp-game-result--won { background: var(--color-neon-green); color: var(--bg-concrete); }
-.pp-game-result--lost { background: var(--color-alert); color: #ffffff; }
-.pp-game-result--eliminated { background: var(--text-muted); color: #ffffff; }
-.pp-game-result--abandoned { background: rgba(255, 255, 255, 0.1); color: var(--text-muted); }
-
-.pp-game-mode {
-  flex: none;
-  width: 34px;
-  font-size: var(--text-xs);
-  letter-spacing: 0.1em;
-  color: var(--text-secondary);
-}
-
-.pp-game-line {
-  flex: 1;
-  min-width: 0;
-  font-size: var(--text-sm);
-  color: var(--text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.pp-game-points {
-  flex: none;
-  width: 56px;
-  text-align: right;
-  font-size: var(--text-sm);
-  font-weight: 700;
-  color: var(--text-muted);
-}
-
-.pp-game-points--win { color: var(--color-hazard); }
-
-.pp-game-date {
-  flex: none;
-  width: 56px;
-  text-align: right;
-  font-size: var(--text-xs);
-  color: var(--text-muted);
-}
-
-@media (max-width: 600px) {
-  /* Both ranks stay on one row on a phone: two short numbers side by side read
-     faster than two tall stacked blocks, and they fit. */
-  .pp-standing-cell {
-    flex: 1 1 0;
-    min-width: 0;
-    padding-right: var(--spacing-3);
-  }
-
-  .pp-standing-cell + .pp-standing-cell {
-    padding-left: var(--spacing-3);
-  }
-
-  .pp-standing-value { font-size: var(--text-2xl); }
-
-  /* A chain has no room on a phone; the nodes become rows. */
-  .pp-upgrades { flex-direction: column; align-items: stretch; gap: var(--spacing-1); }
-
-  .pp-upgrade {
+@media (min-width: 1024px) {
+  .pp-hero {
     flex-direction: row;
-    align-items: center;
-    gap: var(--spacing-3);
-    padding: var(--spacing-2) var(--spacing-3);
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.04);
-    border-radius: var(--radius-sm);
+    gap: var(--spacing-8);
+    padding: var(--spacing-8) 0;
     text-align: left;
   }
-
-  .pp-upgrade--current { border-color: color-mix(in srgb, var(--color-hazard) 30%, transparent); }
-  .pp-upgrade-link { display: none; }
-  .pp-upgrade-name { flex: 1; min-width: 0; }
-  .pp-upgrade--current .pp-upgrade-mark :deep(.badge-emblem) { width: 22px; height: 22px; }
-
-  .pp-game-mode { display: none; }
-  .pp-game-line { font-size: var(--text-xs); }
-}
-/* ---- Dossier layout ------------------------------------------------------
-   One page for every profile: your own and everyone else's. The rail carries
-   the badge beside the record on desktop and drops below the name on a phone,
-   which is why this is a grid and not two columns. */
-.pp-content {
-  width: 100%;
-  max-width: 1120px;
-  margin: 0 auto;
-  padding: var(--spacing-6) var(--spacing-4) var(--spacing-12);
-  display: grid;
-  grid-template-columns: 340px 1fr;
-  grid-template-areas:
-    'rail who'
-    'rail record';
-  align-content: start;
-  gap: var(--spacing-6) var(--spacing-8);
+  .pp-page {
+    background:
+      radial-gradient(ellipse 900px 420px at 22% 0, color-mix(in srgb, var(--tier) 22%, transparent), transparent 100%) no-repeat,
+      var(--bg-concrete);
+  }
 }
 
-.pp-who { grid-area: who; }
-.pp-record { grid-area: record; }
-
-/* The rail is shorter than the record, so the call to action sits in the space
-   under it rather than stranding the column half empty. */
-.pp-side {
-  grid-area: rail;
-  align-self: start;
+.pp-crest {
+  position: relative;
+  flex: none;
   display: flex;
-  flex-direction: column;
-  gap: var(--spacing-4);
+  align-items: center;
+  justify-content: center;
+  width: 180px;
+  height: 180px;
+  background: radial-gradient(circle, color-mix(in srgb, var(--tier) 35%, transparent) 0%, transparent 65%);
+}
+
+.pp-hero .pp-crest-badge {
+  --emblem-size: 150px;
+}
+
+.pp-crest-face {
+  position: absolute;
+  left: 50%;
+  bottom: -14px;
+  transform: translateX(-50%);
+}
+
+.pp-crest-face :deep(.av-face) {
+  box-shadow: 0 0 0 3px var(--tier-light), 0 0 0 7px var(--bg-concrete);
+}
+
+/* The camera sits on the face's top-right edge: 32px to look at, 44px to hit. */
+.pp-photo-btn {
+  position: absolute;
+  top: -8px;
+  right: -16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: var(--surface-metal);
+  color: var(--text-primary);
+  box-shadow: 0 0 0 3px var(--bg-concrete);
+  cursor: pointer;
+  transition: background var(--duration-snap) var(--ease-snap);
+}
+.pp-photo-btn::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+}
+.pp-photo-btn:hover,
+.pp-photo-btn:focus-visible {
+  background: #2a2d32;
 }
 
 .pp-who {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-2);
-  padding-bottom: var(--spacing-4);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  align-items: center;
+  gap: var(--spacing-3);
+  min-width: 0;
+}
+
+@media (min-width: 1024px) {
+  .pp-who {
+    flex: 1;
+    align-items: flex-start;
+  }
+}
+
+.pp-tier {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--tier-light);
 }
 
 .pp-name {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--spacing-3);
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-2);
   margin: 0;
   font-family: var(--font-display);
-  font-size: var(--text-display);
+  font-size: 34px;
   font-weight: 400;
-  line-height: 1.05;
-  color: var(--text-primary);
+  line-height: 1.1;
+  color: #fff;
   overflow-wrap: anywhere;
+}
+
+/* Names run to 20 characters; a long one steps down a size rather than
+   breaking mid-word. */
+.pp-name--long { font-size: 28px; }
+
+@media (min-width: 1024px) {
+  .pp-name {
+    justify-content: flex-start;
+    font-size: var(--text-display);
+  }
+  .pp-name--long { font-size: var(--text-3xl); }
 }
 
 .pp-rename-pencil {
   flex: none;
-  align-self: center;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   background: none;
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   color: var(--text-muted);
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
+  transition: color var(--duration-snap) var(--ease-snap), border-color var(--duration-snap) var(--ease-snap);
 }
 
 .pp-rename-pencil:hover,
@@ -1186,7 +999,9 @@ watch(() => props.code, (code) => {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: center;
   gap: var(--spacing-2);
+  width: 100%;
   margin: 0;
 }
 
@@ -1202,7 +1017,7 @@ watch(() => props.code, (code) => {
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: var(--radius-md);
   font-family: var(--font-display);
-  font-size: var(--text-3xl);
+  font-size: var(--text-2xl);
   line-height: 1.1;
   color: var(--text-primary);
 }
@@ -1239,8 +1054,7 @@ watch(() => props.code, (code) => {
 .pp-rename-error {
   flex-basis: 100%;
   margin: 0;
-  font-family: var(--font-body);
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   color: var(--color-alert);
 }
 
@@ -1250,16 +1064,16 @@ watch(() => props.code, (code) => {
   flex-wrap: wrap;
   align-items: center;
   gap: var(--spacing-2);
-  font-family: var(--font-body);
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   color: var(--text-muted);
 }
 
 .pp-rename-chip {
-  padding: 4px 10px;
+  min-height: 44px;
+  padding: 0 var(--spacing-3);
   background: none;
   border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font: inherit;
   color: var(--text-primary);
   cursor: pointer;
@@ -1267,230 +1081,582 @@ watch(() => props.code, (code) => {
 
 .pp-rename-chip:hover { border-color: var(--color-hazard); }
 
-/* 1em from painted pixels, matching the all-time board's measurement. */
-.pp-flag {
-  flex: none;
-  font-size: 1em;
-  line-height: 1;
-}
-
 .pp-meta {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: var(--spacing-2);
-  margin: 0;
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  color: var(--text-muted);
-}
-
-.pp-live { color: var(--color-neon-green); }
-
-.pp-sep {
-  width: 3px;
-  height: 3px;
-  border-radius: var(--radius-pill);
-  background: var(--text-muted);
-  opacity: 0.6;
-}
-
-.pp-rail {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--spacing-4);
-  padding: var(--spacing-6) var(--spacing-4);
-  background: rgba(0, 0, 0, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: var(--radius-md);
-}
-
-.pp-rail-face {
-  position: relative;
-  /* Room for the pip, which hangs below the photo's edge. */
-  padding-bottom: var(--spacing-3);
-}
-.pp-rail-avatar {
-  --av-size: 128px;
-}
-/* The camera sits top-right: the pip owns bottom-right, presence bottom-left. */
-.pp-photo-btn {
-  position: absolute;
-  top: -4px;
-  right: -8px;
-  display: flex;
-  align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: var(--surface-metal);
-  color: var(--text-primary);
-  box-shadow: 0 0 0 3px var(--bg-concrete);
-  cursor: pointer;
-  transition: background var(--duration-snap) var(--ease-snap);
-}
-.pp-photo-btn:hover,
-.pp-photo-btn:focus-visible {
-  background: #2a2d32;
-}
-/* The shield rides the photo as its pip, so the full badge shows only its
-   tier name and progress bar here. */
-.pp-rail-badge :deep(.badge-emblem) { display: none; }
-.pp-rail-badge :deep(.badge-label) { font-size: var(--text-2xl); }
-
-.pp-rail-tier,
-.pp-rail-points-label,
-.pp-ladder-title {
-  margin: 0;
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  letter-spacing: 0.22em;
-  color: var(--text-muted);
-}
-
-.pp-rail-points {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--spacing-1);
-  width: 100%;
-  padding-top: var(--spacing-4);
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.pp-rail-points-value {
-  font-family: var(--font-display);
-  font-size: var(--text-2xl);
-  line-height: 1;
-  color: var(--text-primary);
-}
-
-.pp-ladder-title {
-  width: 100%;
-  padding-top: var(--spacing-4);
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.pp-ladder { width: 100%; }
-
-/* The rail spans both grid rows, so a tall rail stretches the record's row.
-   Pin the record to the top of it, or a short record (a new player with no
-   games) floats in the middle of the gap. */
-.pp-record {
-  align-self: start;
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-8);
-  min-width: 0;
-}
-
-.pp-panel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-4);
-}
-
-/* Five cards across, matching the dossier's service record. */
-.pp-records {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
   flex-wrap: wrap;
-  gap: var(--spacing-3);
-}
-
-.pp-record-card {
-  flex: 1 1 120px;
-  display: flex;
-  flex-direction: column;
   gap: var(--spacing-2);
-  padding: var(--spacing-3);
-  background: rgba(0, 0, 0, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: var(--radius-sm);
-}
-
-/* Uniform white labels; one value carries the colour instead. */
-.pp-record-label {
   margin: 0;
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  letter-spacing: 0.14em;
-  color: #ffffff;
-}
-
-.pp-record-value {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: var(--text-xl);
-  line-height: 1;
-  color: var(--text-primary);
-}
-
-.pp-record-value--hazard { color: var(--color-hazard); }
-
-@media (max-width: 900px) {
-  .pp-content {
-    grid-template-columns: 1fr;
-    grid-template-areas: 'who' 'rail' 'record';
-    gap: var(--spacing-4);
-    padding: var(--spacing-4) var(--spacing-3) var(--spacing-8);
-  }
-
-  .pp-rail-avatar { --av-size: 104px; }
-  .pp-record-card { flex: 1 1 calc(50% - var(--spacing-2)); }
-}
-
-
-.pp-cta {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-3);
-  padding: var(--spacing-4);
-  background: linear-gradient(180deg, rgba(255, 204, 0, 0.05), rgba(255, 255, 255, 0.02));
-  border: 1px solid rgba(255, 204, 0, 0.14);
-  border-radius: var(--radius-md);
-  text-align: left;
-}
-
-.pp-cta-head {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-2);
-  flex-wrap: wrap;
-}
-
-.pp-cta-title {
-  font-family: var(--font-display);
-  font-size: 1rem;
-  letter-spacing: 0.12em;
-  color: var(--text-primary);
-}
-
-.pp-cta-line {
-  margin: 0;
-  font-family: var(--font-mono);
   font-size: var(--text-sm);
+  font-weight: 500;
   color: var(--text-secondary);
 }
 
-@media (max-width: 900px) {
-  .pp-name { font-size: var(--text-3xl); }
-  .pp-flag { font-size: 0.9em; }
+.pp-meta-strong { color: var(--text-primary); }
+.pp-dot { color: var(--text-muted); }
+.pp-flag { font-size: 1em; line-height: 1; }
 
-  /* Stacked, the call to action belongs after the record, not wedged between
-     the badge and the stats. `display: contents` drops the side wrapper so its
-     two children can take grid areas of their own. */
-  .pp-content {
-    grid-template-areas: 'who' 'rail' 'record' 'cta';
+.pp-live {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-neon-green);
+}
+
+.pp-socials {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--spacing-2);
+  padding-top: var(--spacing-1);
+}
+
+/* 36px to look at, 44px to hit. */
+.pp-social {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  background: var(--bg-concrete-light);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-primary);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background var(--duration-snap) var(--ease-snap), border-color var(--duration-snap) var(--ease-snap);
+}
+.pp-social::before {
+  content: '';
+  position: absolute;
+  inset: -4px 0;
+}
+.pp-social:hover,
+.pp-social:focus-visible {
+  background: var(--surface-metal);
+}
+
+.pp-social-icon {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+.pp-social--add {
+  background: none;
+  border: 1px dashed color-mix(in srgb, var(--text-muted) 55%, transparent);
+  color: var(--text-secondary);
+}
+.pp-social--add:hover,
+.pp-social--add:focus-visible {
+  background: none;
+  border-color: var(--text-muted);
+  color: var(--text-primary);
+}
+
+.pp-social--edit {
+  width: 36px;
+  justify-content: center;
+  padding: 0;
+  color: var(--text-secondary);
+}
+
+@media (min-width: 1024px) {
+  .pp-socials,
+  .pp-meta { justify-content: flex-start; }
+}
+
+/* ---- actions -------------------------------------------------------------- */
+/* Fixed rather than sticky: a grid item can only stick inside its own row. */
+.pp-actions {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--z-hud);
+  display: flex;
+  gap: var(--spacing-2);
+  padding: var(--spacing-4) var(--spacing-4) calc(var(--spacing-4) + env(safe-area-inset-bottom));
+  background: var(--bg-concrete);
+  border-top: 1px solid var(--surface-metal);
+}
+
+.pp-page--actions {
+  padding-bottom: calc(88px + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 1024px) {
+  .pp-page--actions { padding-bottom: 0; }
+  .pp-actions {
+    position: static;
+    align-self: center;
+    padding: 0;
+    background: none;
+    border: none;
   }
+}
 
-  .pp-side { display: contents; }
-  .pp-rail { grid-area: rail; }
-  .pp-cta { grid-area: cta; }
+.pp-friend {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-2);
+  height: 56px;
+  padding: 0 18px;
+  background: var(--surface-metal-dark);
+  border: 1px solid var(--surface-metal);
+  border-radius: var(--radius-md);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color var(--duration-snap) var(--ease-snap), background var(--duration-snap) var(--ease-snap);
+}
+.pp-friend:hover:not(:disabled) { border-color: var(--text-muted); }
+.pp-friend:disabled { cursor: default; }
+.pp-friend--done { color: var(--text-secondary); }
+.pp-friend--done svg { color: var(--color-neon-green); }
+
+/* Answering someone is the game's solid gold. */
+.pp-friend--accept {
+  background: var(--color-hazard);
+  border-color: var(--color-hazard);
+  color: var(--bg-concrete);
+}
+
+.pp-play {
+  flex: 1;
+  min-width: 0;
+  height: 56px;
+  padding: 0 var(--spacing-4);
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--color-alert);
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  letter-spacing: 0.06em;
+  color: #fff;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--duration-snap) var(--ease-snap), opacity var(--duration-snap) var(--ease-snap);
+}
+.pp-play:hover:not(:disabled) { background: color-mix(in srgb, var(--color-alert) 85%, white); }
+.pp-play:disabled { opacity: 0.7; cursor: wait; }
+
+@media (min-width: 1024px) {
+  .pp-play {
+    flex: none;
+    width: 240px;
+    height: 52px;
+  }
+  .pp-friend { height: 52px; }
+}
+
+/* ---- body ----------------------------------------------------------------- */
+.pp-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-4);
+  padding: var(--spacing-8) 0 var(--spacing-2);
+  text-align: center;
+}
+
+.pp-empty-hand {
+  position: relative;
+  width: 180px;
+  height: 116px;
+  margin-bottom: var(--spacing-1);
+}
+
+.pp-empty-card {
+  position: absolute;
+  top: 0;
+  left: 56px;
+}
+.pp-empty-card--left,
+.pp-empty-card--right {
+  top: 14px;
+  opacity: 0.55;
+}
+.pp-empty-card--left { left: 22px; transform: rotate(-14deg); }
+.pp-empty-card--right { left: 90px; transform: rotate(14deg); }
+
+.pp-empty-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  line-height: 28px;
+  color: #fff;
+}
+
+.pp-empty-line {
+  max-width: 300px;
+  margin: 0;
+  font-size: var(--text-base);
+  line-height: 24px;
+  color: var(--text-secondary);
+}
+
+.pp-empty-play {
+  flex: none;
+  width: 100%;
+  margin-top: var(--spacing-1);
+}
+
+@media (min-width: 1024px) {
+  .pp-empty-play { width: 240px; height: 52px; }
+}
+
+.pp-card {
+  background: var(--surface-metal-dark);
+  border: 1px solid var(--surface-metal);
+  border-radius: var(--radius-md);
+}
+
+.pp-label {
+  margin: 0;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  line-height: 16px;
+  color: var(--text-secondary);
+}
+
+.pp-value {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 28px;
+  line-height: 32px;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+.pp-stats {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+}
+
+.pp-stat-row {
+  display: flex;
+  gap: var(--spacing-2);
+}
+
+.pp-stat {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+  padding: var(--spacing-4);
+}
+.pp-stat--wide { flex-grow: 1.5; }
+
+.pp-caption {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 20px;
+  color: var(--text-secondary);
+}
+
+.pp-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+  padding-top: var(--spacing-12);
+}
+
+.pp-side .pp-section { padding-top: var(--spacing-8); }
+
+@media (min-width: 1024px) {
+  .pp-side .pp-section + .pp-section { padding-top: 28px; }
+}
+
+/* 24px tall, the same as the result chips beside RECENT GAMES, so headings
+   in the two columns line up. */
+.pp-section-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  line-height: 24px;
+  color: #fff;
+}
+
+.pp-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-3);
+}
+
+.pp-link {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  min-height: 44px;
+  margin-top: calc(-1 * var(--spacing-2));
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--text-primary);
+  text-decoration: none;
+  cursor: pointer;
+}
+.pp-link:hover,
+.pp-link:focus-visible { color: var(--color-neon-blue); }
+
+/* Head to head */
+.pp-h2h {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+  padding: var(--spacing-4);
+}
+
+.pp-h2h-score {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pp-h2h-side {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  width: 120px;
+}
+.pp-h2h-side--them {
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.pp-ring :deep(.av-face) { box-shadow: 0 0 0 2px var(--tier-light); }
+.pp-ring--you :deep(.av-face) { box-shadow: 0 0 0 2px var(--color-neon-blue); }
+
+.pp-label--you { color: color-mix(in srgb, var(--color-neon-blue) 50%, white); }
+
+.pp-h2h-num {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 40px;
+  line-height: 44px;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+.pp-h2h-vs {
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  color: var(--text-secondary);
+}
+
+.pp-h2h-bar {
+  display: flex;
+  gap: 2px;
+  height: 6px;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.pp-h2h-bar span { flex-basis: 0; }
+.pp-h2h-bar-you { background: var(--color-neon-blue); }
+.pp-h2h-bar-them { background: var(--tier-light); }
+
+.pp-h2h-line {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 20px;
+  color: var(--text-primary);
+}
+
+/* Results */
+.pp-form {
+  display: flex;
+  gap: var(--spacing-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pp-result {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  background: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--bg-concrete);
+}
+.pp-result--won { background: var(--color-neon-green); }
+.pp-result--abandoned { background: var(--surface-metal); color: var(--text-secondary); }
+
+.pp-games {
+  margin: 0;
+  padding: 0 var(--spacing-4);
+  list-style: none;
+}
+
+.pp-game {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  min-height: 64px;
+  padding: var(--spacing-2) 0;
+}
+.pp-game + .pp-game { border-top: 1px solid var(--surface-metal); }
+
+.pp-game-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.pp-game-title {
+  margin: 0;
+  font-size: var(--text-base);
+  line-height: 22px;
+  color: #fff;
+}
+
+.pp-game-sub {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 20px;
+  color: var(--text-secondary);
+}
+
+.pp-you {
+  font-weight: 600;
+  color: color-mix(in srgb, var(--color-neon-blue) 50%, white);
+}
+
+.pp-game-points {
+  flex: none;
+  font-size: var(--text-base);
+  font-weight: 700;
+  line-height: 22px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+.pp-game-points--win { color: var(--color-hazard); }
+
+/* Ladder */
+.pp-ladder {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  height: 90px;
+  padding: 0 var(--spacing-4);
+}
+
+.pp-ladder .pp-ladder-mark { --emblem-size: 44px; flex: none; }
+.pp-ladder .pp-ladder-mark--next { opacity: 0.35; }
+
+.pp-ladder-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+
+.pp-ladder-points {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 700;
+  line-height: 22px;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+}
+.pp-ladder-of {
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+
+.pp-ladder-bar {
+  height: 12px;
+  border-radius: 2px;
+  background: var(--surface-metal);
+  overflow: hidden;
+}
+/* The hazard stripe: the climb is the daily loop's colour. */
+.pp-ladder-bar span {
+  display: block;
+  height: 100%;
+  background: repeating-linear-gradient(135deg, var(--color-hazard) 0 8px, var(--color-hazard-dim) 8px 14px);
+}
+
+.pp-ladder-next {
+  margin: 0;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  line-height: 16px;
+  text-transform: uppercase;
+  color: var(--color-hazard);
+}
+
+/* Service record: two by two, the leanest win across the bottom. */
+.pp-records {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--spacing-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pp-record {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+  padding: var(--spacing-4);
+}
+.pp-record--wide {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pp-own {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacing-3);
+  max-width: 400px;
+  padding: 0 var(--spacing-4) var(--spacing-12);
+}
+
+@media (min-width: 1024px) {
+  .pp-own { padding: 0 0 var(--spacing-24); }
+  .pp-body { padding-bottom: var(--spacing-12); }
+}
+
+.pp-own-line {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--text-secondary);
 }
 </style>

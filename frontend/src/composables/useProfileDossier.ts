@@ -1,10 +1,10 @@
 /**
- * The three dossier sections a public profile cannot derive for itself.
+ * The profile sections public_profile() cannot derive for itself.
  *
  * public_profile() returns one row of aggregates, which covers the badge and
- * the personal bests. Standing, the promotion history and the per-game activity
- * all need data that owner-only RLS keeps out of the client, so they come from
- * the definer functions in supabase/profile-dossier.sql.
+ * the personal bests. Standing, the games list and head-to-head all need data
+ * that owner-only RLS keeps out of the client, so they come from the definer
+ * functions in supabase/profile-dossier.sql and supabase/profile-games.sql.
  *
  * Each is feature-detected independently: a profile missing one section is far
  * better than a profile that fails to render because one function has not been
@@ -14,18 +14,13 @@
 
 import { ref } from 'vue'
 import { supabase } from '../lib/supabase'
-import { BADGES, type Badge } from '../utils/badges'
+import type { GameOpponent, HeadToHeadLast } from '../utils/profileGames'
 
 export interface ProfileStanding {
     globalRank: number | null
     globalTotal: number
     countryRank: number | null
     countryTotal: number
-}
-
-export interface ProfilePromotion {
-    badge: Badge
-    at: string
 }
 
 export interface ProfileGame {
@@ -38,6 +33,14 @@ export interface ProfileGame {
     peak_cards: number
     biggest_stack_survived: number
     points: number
+    is_daily: boolean
+    opponents: GameOpponent[]
+}
+
+export interface HeadToHead extends HeadToHeadLast {
+    games: number
+    my_wins: number
+    their_wins: number
 }
 
 interface RankRow {
@@ -47,23 +50,16 @@ interface RankRow {
     country_total: number
 }
 
-interface PromotionRow {
-    tier: number
-    at: string
-}
-
-const badgeByTier = new Map(BADGES.map(b => [b.tier, b]))
-
 export function useProfileDossier() {
     const standing = ref<ProfileStanding | null>(null)
-    const promotions = ref<ProfilePromotion[]>([])
     const games = ref<ProfileGame[]>([])
+    const headToHead = ref<HeadToHead | null>(null)
     const loading = ref(false)
 
     function reset() {
         standing.value = null
-        promotions.value = []
         games.value = []
+        headToHead.value = null
     }
 
     async function fetchDossier(shareCode: string) {
@@ -71,10 +67,10 @@ export function useProfileDossier() {
         loading.value = true
         reset()
         try {
-            const [r, pr, g] = await Promise.all([
+            const [r, g, h] = await Promise.all([
                 supabase.rpc('profile_rank', { p_share_code: shareCode }),
-                supabase.rpc('profile_promotions', { p_share_code: shareCode }),
-                supabase.rpc('profile_recent_games', { p_share_code: shareCode, max_rows: 10 }),
+                supabase.rpc('profile_games', { p_share_code: shareCode, p_limit: 10 }),
+                supabase.rpc('profile_head_to_head', { p_share_code: shareCode }),
             ])
 
             if (!r.error) {
@@ -91,13 +87,18 @@ export function useProfileDossier() {
                 }
             }
 
-            if (!pr.error) {
-                promotions.value = ((pr.data as PromotionRow[] | null) ?? [])
-                    .map(row => ({ badge: badgeByTier.get(row.tier), at: row.at }))
-                    .filter((p): p is ProfilePromotion => !!p.badge)
+            if (!g.error) {
+                games.value = (g.data as ProfileGame[] | null) ?? []
+            } else {
+                // profile-games.sql not run yet: the older list, without names.
+                const old = await supabase.rpc('profile_recent_games', { p_share_code: shareCode, max_rows: 10 })
+                if (!old.error) {
+                    games.value = ((old.data as Omit<ProfileGame, 'is_daily' | 'opponents'>[] | null) ?? [])
+                        .map(row => ({ ...row, is_daily: false, opponents: [] }))
+                }
             }
 
-            if (!g.error) games.value = (g.data as ProfileGame[] | null) ?? []
+            if (!h.error) headToHead.value = (h.data as HeadToHead[] | null)?.[0] ?? null
         } catch {
             // Offline, or the SQL has not been run — the page still renders
             // everything public_profile already gave it.
@@ -107,5 +108,5 @@ export function useProfileDossier() {
         }
     }
 
-    return { standing, promotions, games, loading, fetchDossier }
+    return { standing, games, headToHead, loading, fetchDossier }
 }
