@@ -128,6 +128,11 @@ describe('backTarget', () => {
         expect(backTarget('/badges/warlord')).toBe('/badges/warlord')
     })
 
+    it('does not walk back through the leaderboard\'s own tabs', () => {
+        expect(backTarget('/leaderboard/weekly', '/leaderboard/alltime')).toBeNull()
+        expect(backTarget('/p/9f3ac21b', '/p/77aa11bb')).toBe('/p/9f3ac21b')
+    })
+
     it('never steps back into a room or a game, or out of the app', () => {
         expect(backTarget('/r/XK7P2M')).toBeNull()
         expect(backTarget('/public')).toBeNull()

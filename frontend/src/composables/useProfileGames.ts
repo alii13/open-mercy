@@ -27,10 +27,11 @@ export function useProfileGames() {
         // ponytail: paging on played_at alone skips a game saved in the same
         // millisecond as a page's last row; add the row id as a tie-break if that bites.
         const before = append ? games.value[games.value.length - 1]?.played_at ?? null : null
+        // One extra row says whether another page exists.
         const { data, error } = await supabase.rpc('profile_games', {
             p_share_code: code,
             p_before: before,
-            p_limit: GAMES_PAGE,
+            p_limit: GAMES_PAGE + 1,
             p_filter: filter,
         })
         if (mine !== seq) return
@@ -40,8 +41,9 @@ export function useProfileGames() {
             return
         }
         const rows = (data as ProfileGame[] | null) ?? []
-        games.value = append ? [...games.value, ...rows] : rows
-        more.value = rows.length === GAMES_PAGE
+        more.value = rows.length > GAMES_PAGE
+        const page = rows.slice(0, GAMES_PAGE)
+        games.value = append ? [...games.value, ...page] : page
     }
 
     return { games, loading, failed, more, load }

@@ -74,7 +74,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         level: 'loud',
         tag: 'NEW',
         title: 'Add your X and Instagram to your profile',
-        body: "Profiles have a new look. Add your X and Instagram so other players can find you, and see your record against anyone you've shared a table with.",
+        body: "Profiles have a new look. Add your X and Instagram so other players can find you, see your record against anyone you've shared a table with, and look back through every game you've played.",
         cta: { label: 'OPEN YOUR PROFILE', ownProfile: true },
     },
     {

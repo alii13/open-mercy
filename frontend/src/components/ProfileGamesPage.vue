@@ -120,8 +120,9 @@ const filters = computed(() => {
   if (!v) return []
   const out: { id: GamesFilter; label: string }[] = [{ id: 'all', label: 'All' }]
   if (v.wins > 0) out.push({ id: 'won', label: 'Won' })
-  if (!isOwn.value && gamesTogether.value > 0) out.push({ id: 'with_viewer', label: 'Vs you' })
   if (v.daily_played > 0) out.push({ id: 'daily', label: 'Daily' })
+  // Last: it appears when head-to-head answers, and must not shift the others.
+  if (!isOwn.value && gamesTogether.value > 0) out.push({ id: 'with_viewer', label: 'Vs you' })
   return out
 })
 
@@ -152,8 +153,9 @@ function pick(f: GamesFilter) {
   void list.load(props.code, f)
 }
 
+// After a failed SHOW MORE, try that page again rather than starting over.
 function reload() {
-  void list.load(props.code, filter.value)
+  void list.load(props.code, filter.value, list.games.value.length > 0)
 }
 
 function loadMore() {

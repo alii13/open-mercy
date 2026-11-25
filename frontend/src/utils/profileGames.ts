@@ -48,7 +48,8 @@ export function dayLabel(iso: string, nowMs: number): string {
     const days = Math.round((startOf(now) - startOf(d)) / 86_400_000)
     if (days === 0) return 'today'
     if (days === 1) return 'yesterday'
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    const year = d.getFullYear() === now.getFullYear() ? undefined : 'numeric'
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year })
 }
 
 export function headToHeadLine(h: HeadToHeadLast, nowMs: number): string {

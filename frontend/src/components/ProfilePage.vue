@@ -269,7 +269,7 @@
               />
             </ul>
             <a
-              v-if="p.games > dossier.games.value.length"
+              v-if="dossier.games.value.length && p.games > dossier.games.value.length"
               class="pp-link"
               :href="gamesHref"
               @click.prevent="navigate({ name: 'profileGames', code })"

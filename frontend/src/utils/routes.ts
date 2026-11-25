@@ -101,17 +101,24 @@ export function navigate(route: Route): Promise<unknown> {
 // or /daily would rejoin or restart it.
 const BROWSING = new Set(['home', 'leaderboard', 'badges', 'changelog', 'profile', 'profileGames', 'friends'])
 
-/** The in-app page BACK should return to, or null to go home instead. */
-export function backTarget(previous: string | null | undefined): string | null {
+/**
+ * The in-app page BACK should return to, or null to go home instead. Every
+ * leaderboard tab is its own history entry, so an earlier tab of the board
+ * you are on is not a page to go back to.
+ */
+export function backTarget(previous: string | null | undefined, current?: string): string | null {
     if (!previous) return null
-    return BROWSING.has(String(router.resolve(previous).name)) ? previous : null
+    const name = String(router.resolve(previous).name)
+    if (!BROWSING.has(name)) return null
+    if (name === 'leaderboard' && current && router.resolve(current).name === 'leaderboard') return null
+    return previous
 }
 
 /** BACK: the page you came from, or home when this page was opened from a link. */
 export function goBack(): Promise<unknown> {
     // vue-router keeps the previous in-app path in history.state.back.
     const previous = (window.history.state as { back?: string | null } | null)?.back
-    if (backTarget(previous)) {
+    if (backTarget(previous, router.currentRoute.value.fullPath)) {
         router.back()
         return Promise.resolve()
     }
