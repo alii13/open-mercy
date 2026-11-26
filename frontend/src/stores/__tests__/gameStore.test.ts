@@ -348,6 +348,27 @@ describe('peak hand', () => {
             expect(store.playerStats[p.id]!.peakCards).toBeGreaterThanOrEqual(7)
         }
     })
+
+    it('counts the 25th card of a mercy knockout', () => {
+        vi.useFakeTimers()
+        const store = useGameStore()
+        store.initializeGame(['You', 'Friend'])
+        const [me, friend] = store.players
+        me!.hand = Array.from({ length: 24 }, (_, i) => ({ id: `h-${i}`, color: 'blue', type: 'number', value: 1 }))
+        friend!.hand = [red5]
+        store.gameState = 'PLAYING'
+        store.discardPile = [{ id: 'top', color: 'red', type: 'number', value: 9 }]
+        store.currentColor = 'red'
+        store.deck = [{ id: 'green-2', color: 'green', type: 'number', value: 2 }]
+        store.currentPlayerIndex = 0
+        store.turnState = 'WAITING_FOR_ACTION'
+
+        store.drawCardsForCurrentPlayer()
+        vi.runAllTimers()
+
+        expect(me!.isEliminated).toBe(true)
+        expect(store.playerStats[me!.id]!.peakCards).toBe(25)
+    })
 })
 
 describe('daily challenge seeding', () => {

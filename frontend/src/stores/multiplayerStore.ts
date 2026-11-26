@@ -445,6 +445,10 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
                             shout(`${playerName(ev.playerId)} is ELIMINATED`)
                         }
                         if (catchableUserId.value === ev.playerId) catchableUserId.value = null
+                        // Snapshots after this show an empty hand, so this is where the 25 is seen.
+                        if (ev.playerId === myUserId.value && ev.handSize !== undefined && ev.handSize > mpStats.value.peakCards) {
+                            mpStats.value.peakCards = ev.handSize
+                        }
                         if (ev.playerId === myUserId.value && !selfEliminated.value) {
                             selfEliminated.value = { n: ++koN }
                             spectateStartedAt = Date.now()

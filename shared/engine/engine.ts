@@ -43,9 +43,10 @@ export function drawCardToHand(s: EngineState, playerId: string, ev: EngineEvent
 export function checkMercyElimination(s: EngineState, player: Player, ev: EngineEvent[]): boolean {
     if (!checkMercyRule(player.hand.length)) return false
     player.isEliminated = true
+    const handSize = player.hand.length
     s.discardPile.push(...player.hand)
     player.hand = []
-    ev.push({ t: 'ELIMINATED', playerId: player.id })
+    ev.push({ t: 'ELIMINATED', playerId: player.id, handSize })
 
     const activePlayers = s.players.filter(p => !p.isEliminated)
     if (activePlayers.length === 1 && activePlayers[0]) {
@@ -64,9 +65,10 @@ export function eliminatePlayer(s: EngineState, playerId: string, ev: EngineEven
     if (!player || player.isEliminated) return false
     const hadTurn = currentPlayer(s)?.id === playerId
     player.isEliminated = true
+    const handSize = player.hand.length
     s.discardPile.push(...player.hand)
     player.hand = []
-    ev.push({ t: 'ELIMINATED', playerId: player.id })
+    ev.push({ t: 'ELIMINATED', playerId: player.id, handSize })
 
     const activePlayers = s.players.filter(p => !p.isEliminated)
     if (activePlayers.length === 1 && activePlayers[0]) {

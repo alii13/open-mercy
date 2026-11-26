@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
-import { startGame, applyIntent, forceEliminate, persistResults, retryResults, RESULT_RETRY_DELAYS_MS, playHouseTurn, timeOutTurn, clearTimeouts, personalView, type ResultBatch } from './game'
+import { startGame, applyIntent, forceEliminate, persistResults, retryResults, RESULT_RETRY_DELAYS_MS, playHouseTurn, timeOutTurn, clearTimeouts, personalView, updateStats, type ResultBatch } from './game'
 import type { Card, CardColor } from '../../shared/engine'
 import * as engine from '../../shared/engine'
 
@@ -192,6 +192,21 @@ describe('STACK_EATEN signal', () => {
   })
 })
 
+describe('peak hand at a mercy knockout', () => {
+  it('saves the 25th card, which the engine has already discarded', () => {
+    const { game } = twoPlayers()
+    const victim = game.engine.players[game.engine.currentPlayerIndex]!
+    victim.hand = Array.from({ length: 21 }, (_, i): Card => ({ id: `h-${i}`, color: 'blue', type: 'number', value: 1 }))
+    game.engine.drawStack = 4
+
+    const res = applyIntent(game, victim.id, { kind: 'DRAW' })
+    updateStats(game, res.events)
+
+    expect(victim.isEliminated).toBe(true)
+    expect(game.stats![victim.id]!.peakCards).toBe(25)
+  })
+})
+
 // Issue #182: a drawn Color Roulette was parked in the drawn-wild colour picker,
 // so the drawer was asked to pick a colour as if it were a plain Wild. The
 // roulette colour belongs to the victim, so it must play straight through.
@@ -285,7 +300,7 @@ describe('turn clock timeouts', () => {
     const events = timeOutTurn(game, 'u1', true)
 
     expect(events[0]).toEqual({ t: 'TURN_TIMED_OUT', playerId: 'u1', timeouts: 3 })
-    expect(events).toContainEqual({ t: 'ELIMINATED', playerId: 'u1' })
+    expect(events).toContainEqual(expect.objectContaining({ t: 'ELIMINATED', playerId: 'u1' }))
     expect(events.some((e) => e.t === 'CARD_PLAYED')).toBe(false)
     expect(game.engine.players[0]!.isEliminated).toBe(true)
     expect(game.engine.gameState).toBe('PLAYING')
