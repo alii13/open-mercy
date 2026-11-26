@@ -708,6 +708,15 @@ describe('elimination and spectating', () => {
         }))
     })
 
+    it('counts the hand that knocked me out in my peak', async () => {
+        const mp = useMultiplayerStore()
+        const ws = await joinRoom(mp)
+        ws.receive({ t: 'snapshot', seq: 1, game: playingView({ players: threePlayers() }) })
+
+        ws.receive({ t: 'event', seq: 9, ev: { t: 'ELIMINATED', playerId: 'me', handSize: 25 } })
+        expect(mp.mpStats.peakCards).toBe(25)
+    })
+
     it('closes the spectate clock once at game over, and on leave', async () => {
         const mp = useMultiplayerStore()
         const ws = await joinRoom(mp)

@@ -362,7 +362,8 @@ describe('mercy rule', () => {
         expect(s.players[0]!.hand).toEqual([])
         expect(s.winnerId).toBe('p-1')
         expect(s.gameState).toBe('GAME_OVER')
-        expect(ev.some(e => e.t === 'ELIMINATED')).toBe(true)
+        // The hand is gone by now, so the event is the only record of the 25.
+        expect(ev).toContainEqual({ t: 'ELIMINATED', playerId: 'p-0', handSize: 25 })
         expect(ev.some(e => e.t === 'GAME_OVER')).toBe(true)
     })
 })

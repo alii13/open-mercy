@@ -78,7 +78,9 @@ export interface EngineState {
 export type EngineEvent =
     | { t: 'RESHUFFLE' }
     | { t: 'DRAW'; playerId: string; card: Card }
-    | { t: 'ELIMINATED'; playerId: string }
+    // handSize is the hand the player held when they went out; the engine
+    // empties the hand in the same step, so this is the only record of it.
+    | { t: 'ELIMINATED'; playerId: string; handSize: number }
     | { t: 'GAME_OVER'; winnerId: string }
     | { t: 'UNO_PENALTY'; playerId: string }
     | { t: 'AT_ONE_UNCALLED'; playerId: string }

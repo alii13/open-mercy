@@ -76,6 +76,11 @@ export function updateStats(game: GameRecord, events: GameEvent[]): void {
             case 'UNO_PENALTY':
                 statsFor(game, ev.playerId).unoPenalties++
                 break
+            case 'ELIMINATED': {
+                const s = statsFor(game, ev.playerId)
+                if (ev.handSize !== undefined && ev.handSize > s.peakCards) s.peakCards = ev.handSize
+                break
+            }
         }
     }
     for (const p of game.engine.players) {
@@ -612,7 +617,7 @@ function translateEngineEvents(ev: EngineEvent[]): GameEvent[] {
         switch (e.t) {
             case 'RESHUFFLE': out.push({ t: 'RESHUFFLED' }); break
             case 'DRAW': out.push({ t: 'YOU_DREW', cards: [e.card], _owner: e.playerId } as GameEvent & { _owner: string }); break
-            case 'ELIMINATED': out.push({ t: 'ELIMINATED', playerId: e.playerId }); break
+            case 'ELIMINATED': out.push({ t: 'ELIMINATED', playerId: e.playerId, handSize: e.handSize }); break
             case 'GAME_OVER': out.push({ t: 'GAME_OVER', winnerId: e.winnerId }); break
             case 'UNO_PENALTY': out.push({ t: 'UNO_PENALTY', playerId: e.playerId }); break
             case 'AT_ONE_UNCALLED': out.push({ t: 'AT_ONE', playerId: e.playerId }); break

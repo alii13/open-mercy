@@ -60,7 +60,9 @@ export type GameEvent =
     | { t: 'PLAYER_DREW'; playerId: string; count: number }
     | { t: 'STACK_EATEN'; playerId: string; amount: number }
     | { t: 'RESHUFFLED' }
-    | { t: 'ELIMINATED'; playerId: string }
+    // handSize: the hand held when going out (25 for a mercy knockout).
+    // Optional because a game server deployed before it never sends it.
+    | { t: 'ELIMINATED'; playerId: string; handSize?: number }
     | { t: 'UNO_PENALTY'; playerId: string }
     | { t: 'AT_ONE'; playerId: string }
     | { t: 'UNO_CALLED'; playerId: string }

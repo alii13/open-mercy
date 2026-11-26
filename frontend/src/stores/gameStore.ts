@@ -224,7 +224,12 @@ export const useGameStore = defineStore('game', () => {
                     }
                     break
                 }
-                case 'ELIMINATED':
+                case 'ELIMINATED': {
+                    // The hand is already empty, so the loop below cannot see the 25.
+                    const s = playerStats.value[e.playerId]
+                    if (s && e.handSize > s.peakCards) s.peakCards = e.handSize
+                    break
+                }
                 case 'GAME_OVER':
                 case 'CHOOSE_DISCARD_ALL_TOP':
                     // State carries these; the gameState watcher handles logging.
